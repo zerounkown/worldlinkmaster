@@ -1,0 +1,133 @@
+@using WorldLinkMaster.Web.Models
+@model List<Product>
+@{
+    ViewData["Title"] = "World Link Master";
+    var categories = ViewBag.Categories as List<Category> ?? new List<Category>();
+    var showcaseEvents = ViewBag.ShowcaseEvents as List<PromoEvent> ?? new List<PromoEvent>();
+    var todayForEvents = DateTime.UtcNow.Date;
+}
+
+<section class="hero">
+    <div class="container">
+        <div class="hero-logo">
+            <img src="~/images/logo.png" alt="World Link Masters" />
+        </div>
+        <span class="hero-eyebrow">Welcome to World Link Master</span>
+        <h1>Gear Built for the <span class="accent">Long Haul</span></h1>
+        <p>Wherever the mission takes you, we've got you covered. Browse field-tested apparel, packs, footwear, and equipment chosen for durability, function, and value &mdash; and built to earn your trust from the first order.</p>
+        <a class="btn-wlm" asp-controller="Products" asp-action="Index">Start Shopping With Us</a>
+        <a class="btn-wlm-outline ms-2" asp-controller="Home" asp-action="About">Our Story</a>
+    </div>
+</section>
+
+<div class="container">
+    <div class="trust-strip">
+        <div class="trust-item">
+            <i class="bi bi-truck"></i>
+            <div>
+                <strong>Free Shipping</strong>
+                <span>On all orders over AED 365</span>
+            </div>
+        </div>
+        <div class="trust-item">
+            <i class="bi bi-shield-check"></i>
+            <div>
+                <strong>Field-Tested Quality</strong>
+                <span>Durability you can rely on</span>
+            </div>
+        </div>
+        <div class="trust-item">
+            <i class="bi bi-arrow-repeat"></i>
+            <div>
+                <strong>Easy Returns</strong>
+                <span>Hassle-free 30-day policy</span>
+            </div>
+        </div>
+        <div class="trust-item">
+            <i class="bi bi-lock"></i>
+            <div>
+                <strong>Secure Checkout</strong>
+                <span>Your information stays safe</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+@if (showcaseEvents.Count > 0)
+{
+    <div class="container">
+        <div class="section-title">
+            <h2>🎉 Upcoming Sales &amp; Events in the UAE</h2>
+            <span class="text-muted">Every celebration is a reason to gear up for less.</span>
+        </div>
+        <div class="promo-event-row">
+            @foreach (var promoEvent in showcaseEvents)
+            {
+                var isLive = promoEvent.StartDate <= todayForEvents && promoEvent.EndDate >= todayForEvents;
+                var daysToStart = (promoEvent.StartDate - todayForEvents).Days;
+                var daysToEnd = (promoEvent.EndDate - todayForEvents).Days;
+                <div class="promo-event-card @(isLive ? "is-live" : "")">
+                    @if (isLive)
+                    {
+                        <span class="promo-live-badge"><span class="promo-live-dot"></span> LIVE NOW</span>
+                    }
+                    else
+                    {
+                        <span class="promo-soon-badge">In @daysToStart day@(daysToStart == 1 ? "" : "s")</span>
+                    }
+                    <span class="promo-event-icon">@promoEvent.IconEmoji</span>
+                    <h4>@promoEvent.Name</h4>
+                    @if (!string.IsNullOrWhiteSpace(promoEvent.Description))
+                    {
+                        <p>@promoEvent.Description</p>
+                    }
+                    <span class="promo-event-discount">@promoEvent.DiscountPercent.ToString("0.##")% OFF</span>
+                    <span class="promo-event-dates">
+                        @promoEvent.StartDate.ToString("MMM d") &ndash; @promoEvent.EndDate.ToString("MMM d, yyyy")
+                        @if (isLive)
+                        {
+                            <text> &middot; ends in @daysToEnd day@(daysToEnd == 1 ? "" : "s")</text>
+                        }
+                    </span>
+                    <a class="promo-event-cta" asp-controller="Products" asp-action="Index">Shop the Sale <i class="bi bi-arrow-right"></i></a>
+                </div>
+            }
+        </div>
+    </div>
+}
+
+<div class="container">
+    <div class="section-title">
+        <h2>Shop by Category</h2>
+    </div>
+    <div class="category-tiles">
+        @{ int catIndex = 0; }
+        @foreach (var category in categories)
+        {
+            catIndex++;
+            <a class="category-tile-3d" asp-controller="Products" asp-action="Index" asp-route-categoryId="@category.Id">
+                <div class="category-tile-inner">
+                    <span class="category-tile-badge">0@(catIndex)</span>
+                    <div class="category-tile-image-wrap">
+                        <img src="@category.ImageUrl" alt="@category.Name" />
+                    </div>
+                    <div class="category-tile-card">
+                        <h3>@category.Name</h3>
+                        <span class="category-tile-cta">Shop Now <i class="bi bi-arrow-right"></i></span>
+                    </div>
+                </div>
+            </a>
+        }
+    </div>
+
+    <div class="section-title">
+        <h2>Featured Gear</h2>
+        <a asp-controller="Products" asp-action="Index">View All &rarr;</a>
+    </div>
+    <div class="product-grid">
+        @foreach (var product in Model)
+        {
+            <partial name="_ProductCard" model="product" />
+        }
+    </div>
+</div>

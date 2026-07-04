@@ -1,0 +1,96 @@
+@using WorldLinkMaster.Web.Models.ViewModels
+@model CheckoutViewModel
+@{
+    ViewData["Title"] = "Checkout";
+}
+
+<div class="page-banner">
+    <div class="container"><h1>Checkout</h1></div>
+</div>
+
+<div class="container mb-5">
+    <div class="row">
+        <div class="col-12 col-md-7">
+            <h4 class="mb-3">Shipping Information</h4>
+            <form asp-controller="Checkout" asp-action="PlaceOrder" method="post">
+                <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+                <div class="mb-3">
+                    <label asp-for="ShippingName" class="form-label"></label>
+                    <input asp-for="ShippingName" class="form-control" />
+                    <span asp-validation-for="ShippingName" class="text-danger"></span>
+                </div>
+                <div class="mb-3">
+                    <label asp-for="ShippingAddress" class="form-label"></label>
+                    <input asp-for="ShippingAddress" class="form-control" />
+                    <span asp-validation-for="ShippingAddress" class="text-danger"></span>
+                </div>
+                <div class="row">
+                    <div class="col-12 col-sm-5 mb-3">
+                        <label asp-for="ShippingCity" class="form-label"></label>
+                        <input asp-for="ShippingCity" class="form-control" />
+                        <span asp-validation-for="ShippingCity" class="text-danger"></span>
+                    </div>
+                    <div class="col-6 col-sm-4 mb-3">
+                        <label asp-for="ShippingState" class="form-label"></label>
+                        <input asp-for="ShippingState" class="form-control" />
+                        <span asp-validation-for="ShippingState" class="text-danger"></span>
+                    </div>
+                    <div class="col-6 col-sm-3 mb-3">
+                        <label asp-for="ShippingZip" class="form-label"></label>
+                        <input asp-for="ShippingZip" class="form-control" />
+                        <span asp-validation-for="ShippingZip" class="text-danger"></span>
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <label asp-for="ShippingPhone" class="form-label"></label>
+                    <input asp-for="ShippingPhone" class="form-control" />
+                    <span asp-validation-for="ShippingPhone" class="text-danger"></span>
+                </div>
+                @if (ViewBag.StripeConfigured != true)
+                {
+                    <div class="alert alert-warning">Stripe isn't configured yet. Add your Stripe test API keys to <code>appsettings.json</code> to enable checkout.</div>
+                }
+                <p class="text-muted small"><i class="bi bi-lock"></i> You'll enter your card details on Stripe's secure checkout page.</p>
+                <button type="submit" class="btn-wlm" @(ViewBag.StripeConfigured != true ? "disabled" : null)>
+                    <i class="bi bi-credit-card"></i> Continue to Payment
+                </button>
+            </form>
+        </div>
+        <div class="col-12 col-md-5">
+            <div class="summary-box">
+                <h4>Order Summary</h4>
+                @foreach (var item in Model.Items)
+                {
+                    <div class="d-flex justify-content-between mb-2">
+                        <span>
+                            @item.Name &times; @item.Quantity
+                            @if (!string.IsNullOrEmpty(item.Color) || !string.IsNullOrEmpty(item.Size))
+                            {
+                                <br /><small class="text-muted">@item.Color @(!string.IsNullOrEmpty(item.Color) && !string.IsNullOrEmpty(item.Size) ? " / " : "") @item.Size</small>
+                            }
+                        </span>
+                        <span>@item.LineTotal.ToAed()</span>
+                    </div>
+                }
+                <hr />
+                <div class="d-flex justify-content-between mb-2">
+                    <span>Subtotal</span>
+                    <span>@Model.Subtotal.ToAed()</span>
+                </div>
+                <div class="d-flex justify-content-between mb-2">
+                    <span>Shipping</span>
+                    <span>@(Model.ShippingCost == 0 ? "Free" : Model.ShippingCost.ToAed())</span>
+                </div>
+                <hr />
+                <div class="d-flex justify-content-between fw-bold">
+                    <span>Total</span>
+                    <span>@Model.Total.ToAed()</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

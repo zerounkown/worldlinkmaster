@@ -1,0 +1,42 @@
+@using WorldLinkMaster.Web.Models
+@model Order
+@{
+    ViewData["Title"] = "Order Confirmed";
+}
+
+<div class="container my-5 text-center">
+    <i class="bi bi-check-circle text-success" style="font-size: 3rem;"></i>
+    <h1>Thank you for your order!</h1>
+    <p class="lead">Order #@Model.Id has been placed and is now @Model.Status.</p>
+    <p>A confirmation would normally be emailed to you. You can review this order any time under <a asp-controller="Orders" asp-action="Index">My Orders</a>.</p>
+
+    <div class="row justify-content-center mt-4">
+        <div class="col-12 col-md-6">
+            <div class="summary-box text-start">
+                <h4>Order Details</h4>
+                @foreach (var item in Model.Items)
+                {
+                    <div class="d-flex justify-content-between mb-2">
+                        <span>
+                            @item.ProductName &times; @item.Quantity
+                            @if (!string.IsNullOrEmpty(item.Color) || !string.IsNullOrEmpty(item.Size))
+                            {
+                                <br /><small class="text-muted">@item.Color @(!string.IsNullOrEmpty(item.Color) && !string.IsNullOrEmpty(item.Size) ? " / " : "") @item.Size</small>
+                            }
+                        </span>
+                        <span>@item.LineTotal.ToAed()</span>
+                    </div>
+                }
+                <hr />
+                <div class="d-flex justify-content-between fw-bold">
+                    <span>Total</span>
+                    <span>@Model.Total.ToAed()</span>
+                </div>
+                <hr />
+                <p class="mb-0">Shipping to:<br />@Model.ShippingName<br />@Model.ShippingAddress<br />@Model.ShippingCity, @Model.ShippingState @Model.ShippingZip</p>
+            </div>
+        </div>
+    </div>
+
+    <a class="btn-wlm mt-4 d-inline-block" asp-controller="Products" asp-action="Index">Continue Shopping</a>
+</div>

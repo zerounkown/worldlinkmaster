@@ -1,0 +1,39 @@
+@using WorldLinkMaster.Web.Models.ViewModels
+@model MerchantApplyViewModel
+@{
+    ViewData["Title"] = "Sell on World Link Master";
+}
+
+<div class="page-banner">
+    <div class="container"><h1>Sell on World Link Master</h1></div>
+</div>
+
+<div class="container mb-5">
+    <div class="row">
+        <div class="col-12 col-md-7">
+            <p class="lead">Join our marketplace and reach customers browsing for tactical and outdoor gear. You keep 90% of every sale, paid out directly to your bank account via Stripe.</p>
+            <form asp-action="Apply" method="post">
+                <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+                <div class="mb-3">
+                    <label asp-for="BusinessName" class="form-label"></label>
+                    <input asp-for="BusinessName" class="form-control" />
+                    <span asp-validation-for="BusinessName" class="text-danger"></span>
+                </div>
+                <div class="mb-3">
+                    <label asp-for="Description" class="form-label"></label>
+                    <textarea asp-for="Description" class="form-control" rows="3"></textarea>
+                </div>
+                <button type="submit" class="btn-wlm">Apply &amp; Connect Stripe</button>
+            </form>
+        </div>
+        <div class="col-12 col-md-5">
+            <div class="summary-box">
+                <h4>How it works</h4>
+                <p><i class="bi bi-1-circle"></i> Tell us about your shop</p>
+                <p><i class="bi bi-2-circle"></i> Connect your Stripe account (fast, secure, hosted by Stripe)</p>
+                <p><i class="bi bi-3-circle"></i> List your products from your merchant dashboard</p>
+                <p><i class="bi bi-4-circle"></i> Get paid automatically after every sale</p>
+            </div>
+        </div>
+    </div>
+</div>

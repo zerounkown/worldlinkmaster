@@ -1,0 +1,64 @@
+@using WorldLinkMaster.Web.Models.ViewModels
+@model ProductListViewModel
+@{
+    var currentCategory = Model.Categories.FirstOrDefault(c => c.Id == Model.SelectedCategoryId);
+    ViewData["Title"] = currentCategory?.Name ?? "All Products";
+}
+
+<div class="page-banner">
+    <div class="container">
+        <h1>@(currentCategory?.Name ?? "All Products")</h1>
+        @if (!string.IsNullOrWhiteSpace(Model.SearchTerm))
+        {
+            <p class="mb-0">Search results for "@Model.SearchTerm"</p>
+        }
+    </div>
+</div>
+
+<div class="container mb-5">
+    <div class="row">
+        <div class="col-12 col-md-3 mb-4">
+            <h5>Categories</h5>
+            <ul class="list-unstyled">
+                <li class="mb-2">
+                    <a class="@(Model.SelectedCategoryId == null ? "fw-bold" : "")" asp-action="Index">All Products</a>
+                </li>
+                @foreach (var category in Model.Categories)
+                {
+                    <li class="mb-2">
+                        <a class="@(Model.SelectedCategoryId == category.Id ? "fw-bold" : "")" asp-action="Index" asp-route-categoryId="@category.Id">@category.Name</a>
+                    </li>
+                }
+            </ul>
+        </div>
+        <div class="col-12 col-md-9">
+            @if (Model.Products.Count == 0)
+            {
+                <p>No products found. Try a different category or search term.</p>
+            }
+            else
+            {
+                <div class="product-grid">
+                    @foreach (var product in Model.Products)
+                    {
+                        <partial name="_ProductCard" model="product" />
+                    }
+                </div>
+
+                @if (Model.TotalPages > 1)
+                {
+                    <nav>
+                        <ul class="pagination">
+                            @for (int i = 1; i <= Model.TotalPages; i++)
+                            {
+                                <li class="page-item @(i == Model.Page ? "active" : "")">
+                                    <a class="page-link" asp-action="Index" asp-route-categoryId="@Model.SelectedCategoryId" asp-route-search="@Model.SearchTerm" asp-route-page="@i">@i</a>
+                                </li>
+                            }
+                        </ul>
+                    </nav>
+                }
+            }
+        </div>
+    </div>
+</div>

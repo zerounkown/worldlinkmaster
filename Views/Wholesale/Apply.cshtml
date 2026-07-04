@@ -1,0 +1,38 @@
+@using WorldLinkMaster.Web.Models.ViewModels
+@model WholesaleApplyViewModel
+@{
+    ViewData["Title"] = "Trade Program";
+}
+
+<div class="page-banner">
+    <div class="container"><h1>World Link Master Trade Program</h1></div>
+</div>
+
+<div class="container mb-5">
+    <div class="row">
+        <div class="col-12 col-md-7">
+            <p class="lead">Buying to resell? Join our Trade Program for special wholesale pricing on select gear &mdash; no minimum order, instant approval.</p>
+            <form asp-action="Apply" method="post">
+                <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+                <div class="mb-3">
+                    <label asp-for="CompanyName" class="form-label"></label>
+                    <input asp-for="CompanyName" class="form-control" />
+                    <span asp-validation-for="CompanyName" class="text-danger"></span>
+                </div>
+                <div class="mb-3">
+                    <label asp-for="TradeLicenseNumber" class="form-label"></label>
+                    <input asp-for="TradeLicenseNumber" class="form-control" />
+                </div>
+                <button type="submit" class="btn-wlm">Get Wholesale Pricing</button>
+            </form>
+        </div>
+        <div class="col-12 col-md-5">
+            <div class="summary-box">
+                <h4>Why join?</h4>
+                <p><i class="bi bi-tag"></i> Special trade pricing below retail on select products</p>
+                <p><i class="bi bi-lightning"></i> Instant access, no waiting for approval</p>
+                <p><i class="bi bi-graph-up"></i> See your margin at a glance &mdash; retail vs. your price</p>
+            </div>
+        </div>
+    </div>
+</div>

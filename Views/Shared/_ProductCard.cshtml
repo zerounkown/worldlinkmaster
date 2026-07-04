@@ -1,0 +1,45 @@
+@using WorldLinkMaster.Web.Models
+@model Product
+@{
+    var activeEvent = ViewBag.ActiveEvent as PromoEvent;
+    var salePrice = activeEvent != null ? Model.Price * (1 - activeEvent.DiscountPercent / 100m) : (decimal?)null;
+}
+
+<div class="product-card">
+    <div class="product-card-media">
+        @if (activeEvent != null)
+        {
+            <span class="sale-badge">@activeEvent.DiscountPercent.ToString("0.##")% OFF</span>
+        }
+        else if (Model.IsFeatured)
+        {
+            <span class="featured-badge">Featured</span>
+        }
+        <a class="product-card-tilt" asp-controller="Products" asp-action="Details" asp-route-slug="@Model.Slug">
+            <img src="@Model.ImageUrl" alt="@Model.Name" class="card-product-image" data-default-image="@Model.ImageUrl" />
+        </a>
+    </div>
+    <div class="product-card-body">
+        <partial name="_StarRating" model="Model" />
+        <h3><a asp-controller="Products" asp-action="Details" asp-route-slug="@Model.Slug">@Model.Name</a></h3>
+        @if (salePrice.HasValue)
+        {
+            <span class="price-was">@Model.Price.ToAed()</span>
+            <span class="price price-sale">@salePrice.Value.ToAed()</span>
+        }
+        else
+        {
+            <span class="price">@Model.Price.ToAed()</span>
+        }
+
+        @if (Model.Colors.Count > 0)
+        {
+            <div class="card-color-dots">
+                @foreach (var color in Model.Colors)
+                {
+                    <span class="card-color-dot" style="background-color: @color.HexCode;" title="@color.Name" data-image="@(color.ImageUrl ?? Model.ImageUrl)"></span>
+                }
+            </div>
+        }
+    </div>
+</div>

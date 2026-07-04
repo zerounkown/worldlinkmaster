@@ -1,0 +1,195 @@
+@using Microsoft.EntityFrameworkCore
+@using WorldLinkMaster.Web.Data
+@using WorldLinkMaster.Web.Services
+@inject ApplicationDbContext DbContext
+@inject ICartService CartService
+@inject IPromoService PromoService
+@{
+    var activeSaleEvent = await PromoService.GetTopActiveEventAsync();
+    var navCategories = await DbContext.Categories.OrderBy(c => c.Name).ToListAsync();
+    var categoryPreviews = new Dictionary<int, List<Product>>();
+    foreach (var navCategory in navCategories)
+    {
+        categoryPreviews[navCategory.Id] = await DbContext.Products
+            .Where(p => p.CategoryId == navCategory.Id && p.StockQuantity > 0)
+            .OrderByDescending(p => p.IsFeatured)
+            .ThenByDescending(p => p.Id)
+            .Take(4)
+            .ToListAsync();
+    }
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewData["Title"] - World Link Master</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
+    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+</head>
+<body>
+    @if (activeSaleEvent != null)
+    {
+        <a class="sale-strip" asp-controller="Products" asp-action="Index">
+            <span class="sale-strip-icon">@activeSaleEvent.IconEmoji</span>
+            <span><strong>@activeSaleEvent.Name</strong> is live &mdash; @activeSaleEvent.DiscountPercent.ToString("0.##")% OFF everything, storewide!</span>
+            <span class="sale-strip-cta">Shop Now <i class="bi bi-arrow-right"></i></span>
+        </a>
+    }
+    <div class="topbar">
+        <div class="container topbar-inner">
+            <span><i class="bi bi-truck"></i> Free shipping on orders over AED 365</span>
+            <span class="topbar-contact"><i class="bi bi-telephone"></i> 1-800-555-0199</span>
+        </div>
+    </div>
+
+    <header class="site-header">
+        <div class="container header-inner">
+            <button type="button" class="menu-toggle" id="sideNavToggle" aria-label="Open menu" aria-controls="sideNav" aria-expanded="false">
+                <i class="bi bi-list"></i>
+                <span>Menu</span>
+            </button>
+
+            <a class="brand brand-logo" asp-controller="Home" asp-action="Index">
+                <img src="~/images/logo.png" alt="World Link Masters" />
+            </a>
+
+            <form class="search-form" asp-controller="Products" asp-action="Index" method="get">
+                <input type="text" name="search" class="search-input" placeholder="Search gear, apparel, footwear..." />
+                <button type="submit" class="search-btn"><i class="bi bi-search"></i></button>
+            </form>
+
+            <div class="header-actions">
+                <partial name="_LoginPartial" />
+                <a class="cart-link" asp-controller="Cart" asp-action="Index">
+                    <i class="bi bi-bag"></i>
+                    <span class="cart-count">@CartService.GetItemCount()</span>
+                </a>
+            </div>
+        </div>
+    </header>
+
+    <div class="side-nav-overlay" id="sideNavOverlay"></div>
+    <aside class="side-nav" id="sideNav" aria-hidden="true">
+        <div class="side-nav-header">
+            <span class="side-nav-title">Shop Categories</span>
+            <button type="button" class="side-nav-close" id="sideNavClose" aria-label="Close menu">&times;</button>
+        </div>
+        <nav class="side-nav-links">
+            <a asp-controller="Products" asp-action="Index"><i class="bi bi-grid"></i> All Products</a>
+            @foreach (var category in navCategories)
+            {
+                var previewProducts = categoryPreviews.TryGetValue(category.Id, out var cp) ? cp : new List<Product>();
+                <div class="side-nav-item">
+                    <a class="side-nav-link" asp-controller="Products" asp-action="Index" asp-route-categoryId="@category.Id">@category.Name</a>
+                    @if (previewProducts.Count > 0)
+                    {
+                        <button type="button" class="side-nav-preview-toggle" aria-label="Preview @category.Name products" aria-expanded="false">
+                            <i class="bi bi-chevron-down"></i>
+                        </button>
+                        <div class="category-preview-panel">
+                            <div class="category-preview-row">
+                                @foreach (var product in previewProducts)
+                                {
+                                    <a class="category-preview-card" asp-controller="Products" asp-action="Details" asp-route-slug="@product.Slug">
+                                        <span class="category-preview-image-wrap">
+                                            <img src="@product.ImageUrl" alt="@product.Name" />
+                                        </span>
+                                        <span class="category-preview-name">@product.Name</span>
+                                        <span class="category-preview-price">@product.Price.ToAed()</span>
+                                    </a>
+                                }
+                            </div>
+                            <a class="category-preview-viewall" asp-controller="Products" asp-action="Index" asp-route-categoryId="@category.Id">
+                                View all in @category.Name <i class="bi bi-arrow-right"></i>
+                            </a>
+                        </div>
+                    }
+                </div>
+            }
+            <hr />
+            <a asp-controller="Home" asp-action="About"><i class="bi bi-info-circle"></i> About</a>
+            <a asp-controller="Home" asp-action="Contact"><i class="bi bi-envelope"></i> Contact</a>
+            <a asp-controller="MerchantOnboarding" asp-action="Apply"><i class="bi bi-shop"></i> Sell on World Link Master</a>
+            <a asp-controller="Wholesale" asp-action="Apply"><i class="bi bi-tag"></i> Trade / Wholesale Pricing</a>
+        </nav>
+    </aside>
+
+    <main class="site-main">
+        @RenderBody()
+    </main>
+
+    <div class="nav-fab-stack">
+        <button type="button" class="nav-fab" id="navBackBtn" title="Go back" aria-label="Go back">
+            <i class="bi bi-arrow-left"></i>
+        </button>
+        <button type="button" class="nav-fab" id="navForwardBtn" title="Go forward" aria-label="Go forward">
+            <i class="bi bi-arrow-right"></i>
+        </button>
+        <button type="button" class="nav-fab nav-fab-top" id="scrollTopBtn" title="Scroll to top" aria-label="Scroll to top">
+            <i class="bi bi-arrow-up"></i>
+        </button>
+    </div>
+
+    <footer class="site-footer">
+        <div class="container footer-top">
+            <div class="footer-newsletter">
+                <h5>Join the World Link Master List</h5>
+                <p>Get first access to new gear drops and field reports.</p>
+                <form class="newsletter-form" onsubmit="return false;">
+                    <input type="email" placeholder="Your email address" required />
+                    <button type="submit">Subscribe</button>
+                </form>
+            </div>
+        </div>
+        <div class="container footer-columns">
+            <div class="footer-col">
+                <h6>Shop</h6>
+                <ul>
+                    @foreach (var category in navCategories)
+                    {
+                        <li><a asp-controller="Products" asp-action="Index" asp-route-categoryId="@category.Id">@category.Name</a></li>
+                    }
+                </ul>
+            </div>
+            <div class="footer-col">
+                <h6>Company</h6>
+                <ul>
+                    <li><a asp-controller="Home" asp-action="About">About Us</a></li>
+                    <li><a asp-controller="Home" asp-action="Contact">Contact</a></li>
+                    <li><a asp-controller="Home" asp-action="Privacy">Privacy Policy</a></li>
+                    <li><a asp-controller="MerchantOnboarding" asp-action="Apply">Sell on World Link Master</a></li>
+                    <li><a asp-controller="Wholesale" asp-action="Apply">Trade / Wholesale Pricing</a></li>
+                </ul>
+            </div>
+            <div class="footer-col">
+                <h6>Account</h6>
+                <ul>
+                    <li><a asp-controller="Orders" asp-action="Index">Order History</a></li>
+                    <li><a asp-area="Identity" asp-page="/Account/Login">Sign In</a></li>
+                    <li><a asp-area="Identity" asp-page="/Account/Register">Create Account</a></li>
+                </ul>
+            </div>
+            <div class="footer-col">
+                <h6>Connect</h6>
+                <div class="footer-social">
+                    <a href="#"><i class="bi bi-facebook"></i></a>
+                    <a href="#"><i class="bi bi-instagram"></i></a>
+                    <a href="#"><i class="bi bi-youtube"></i></a>
+                </div>
+            </div>
+        </div>
+        <div class="container footer-bottom">
+            &copy; @DateTime.Now.Year World Link Master. All rights reserved.
+        </div>
+    </footer>
+
+    <script src="~/lib/jquery/dist/jquery.min.js"></script>
+    <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="~/js/site.js" asp-append-version="true"></script>
+    @await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>

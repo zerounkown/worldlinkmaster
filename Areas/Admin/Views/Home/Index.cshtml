@@ -1,0 +1,44 @@
+@using WorldLinkMaster.Web.Models
+@{
+    ViewData["Title"] = "Admin Dashboard";
+    var recentOrders = ViewBag.RecentOrders as List<Order> ?? new List<Order>();
+}
+
+<h1>Dashboard</h1>
+<div class="row g-3 my-3">
+    <div class="col-6 col-md-4">
+        <div class="summary-box text-center">
+            <h2>@ViewBag.ProductCount</h2>
+            <p class="mb-0">Products</p>
+        </div>
+    </div>
+    <div class="col-6 col-md-4">
+        <div class="summary-box text-center">
+            <h2>@ViewBag.CategoryCount</h2>
+            <p class="mb-0">Categories</p>
+        </div>
+    </div>
+    <div class="col-12 col-md-4">
+        <div class="summary-box text-center">
+            <h2>@ViewBag.OrderCount</h2>
+            <p class="mb-0">Orders</p>
+        </div>
+    </div>
+</div>
+
+<h4 class="mt-4">Recent Orders</h4>
+<table class="table bg-white">
+    <thead><tr><th>Order #</th><th>Date</th><th>Status</th><th>Total</th><th></th></tr></thead>
+    <tbody>
+        @foreach (var order in recentOrders)
+        {
+            <tr>
+                <td>#@order.Id</td>
+                <td>@order.OrderDate.ToLocalTime().ToString("MMM d, yyyy")</td>
+                <td><span class="badge badge-status-@order.Status.ToString().ToLower()">@order.Status</span></td>
+                <td>@order.Total.ToAed()</td>
+                <td><a asp-controller="Orders" asp-action="Details" asp-route-id="@order.Id">View</a></td>
+            </tr>
+        }
+    </tbody>
+</table>

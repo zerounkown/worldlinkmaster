@@ -1,0 +1,12 @@
+@using WorldLinkMaster.Web.Models
+@model PromoEvent
+@{
+    ViewData["Title"] = "Delete Sale Event";
+}
+
+<h1>Delete Sale Event</h1>
+<p>Are you sure you want to delete <strong>@Model.Name</strong>?</p>
+<form asp-action="Delete" asp-route-id="@Model.Id" method="post">
+    <button type="submit" class="btn btn-danger">Delete</button>
+    <a asp-action="Index" class="btn btn-outline-secondary">Cancel</a>
+</form>

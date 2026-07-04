@@ -1,0 +1,40 @@
+@using WorldLinkMaster.Web.Models
+@model List<Merchant>
+@{
+    ViewData["Title"] = "Merchants";
+}
+
+<h1>Merchants</h1>
+
+<table class="table bg-white align-middle mt-3">
+    <thead><tr><th>Business</th><th>Contact</th><th>Products</th><th>Stripe Status</th><th>Joined</th></tr></thead>
+    <tbody>
+        @foreach (var merchant in Model)
+        {
+            <tr>
+                <td>@merchant.BusinessName</td>
+                <td>@merchant.User?.Email</td>
+                <td>@merchant.Products.Count</td>
+                <td>
+                    @if (merchant.StripeOnboardingComplete)
+                    {
+                        <span class="badge badge-status-delivered">Connected</span>
+                    }
+                    else if (!string.IsNullOrEmpty(merchant.StripeAccountId))
+                    {
+                        <span class="badge badge-status-processing">Onboarding started</span>
+                    }
+                    else
+                    {
+                        <span class="badge badge-status-pending">Not connected</span>
+                    }
+                </td>
+                <td>@merchant.CreatedAt.ToLocalTime().ToString("MMM d, yyyy")</td>
+            </tr>
+        }
+        @if (Model.Count == 0)
+        {
+            <tr><td colspan="5" class="text-muted">No merchants yet.</td></tr>
+        }
+    </tbody>
+</table>

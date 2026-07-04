@@ -1,0 +1,31 @@
+@using WorldLinkMaster.Web.Models
+@model List<OrderItem>
+@{
+    ViewData["Title"] = "My Orders";
+    var payouts = ViewBag.Payouts as Dictionary<int, MerchantPayout> ?? new Dictionary<int, MerchantPayout>();
+}
+
+<h1>My Orders</h1>
+
+<table class="table bg-white align-middle mt-3">
+    <thead><tr><th>Order #</th><th>Date</th><th>Product</th><th>Options</th><th>Qty</th><th>Line Total</th><th>Payout Status</th></tr></thead>
+    <tbody>
+        @foreach (var item in Model)
+        {
+            var payout = payouts.TryGetValue(item.OrderId, out var p) ? p : null;
+            <tr>
+                <td>#@item.OrderId</td>
+                <td>@item.Order?.OrderDate.ToLocalTime().ToString("MMM d, yyyy")</td>
+                <td>@item.ProductName</td>
+                <td class="text-muted small">@item.Color @(!string.IsNullOrEmpty(item.Color) && !string.IsNullOrEmpty(item.Size) ? " / " : "") @item.Size</td>
+                <td>@item.Quantity</td>
+                <td>@item.LineTotal.ToAed()</td>
+                <td>@(payout != null ? payout.Status.ToString() : "Pending")</td>
+            </tr>
+        }
+        @if (Model.Count == 0)
+        {
+            <tr><td colspan="7" class="text-muted">No orders yet.</td></tr>
+        }
+    </tbody>
+</table>

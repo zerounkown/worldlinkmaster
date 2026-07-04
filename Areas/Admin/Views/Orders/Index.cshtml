@@ -1,0 +1,23 @@
+@using WorldLinkMaster.Web.Models
+@model List<Order>
+@{
+    ViewData["Title"] = "Manage Orders";
+}
+
+<h1>Orders</h1>
+<table class="table bg-white align-middle mt-3">
+    <thead><tr><th>Order #</th><th>Customer</th><th>Date</th><th>Status</th><th>Total</th><th></th></tr></thead>
+    <tbody>
+        @foreach (var order in Model)
+        {
+            <tr>
+                <td>#@order.Id</td>
+                <td>@order.User?.Email</td>
+                <td>@order.OrderDate.ToLocalTime().ToString("MMM d, yyyy")</td>
+                <td><span class="badge badge-status-@order.Status.ToString().ToLower()">@order.Status</span></td>
+                <td>@order.Total.ToAed()</td>
+                <td><a class="btn btn-sm btn-outline-primary" asp-action="Details" asp-route-id="@order.Id">View</a></td>
+            </tr>
+        }
+    </tbody>
+</table>

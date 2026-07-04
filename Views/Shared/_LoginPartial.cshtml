@@ -1,0 +1,51 @@
+@using Microsoft.AspNetCore.Identity
+@using WorldLinkMaster.Web.Models
+@inject SignInManager<ApplicationUser> SignInManager
+@inject UserManager<ApplicationUser> UserManager
+
+<div class="account-menu dropdown">
+    @if (SignInManager.IsSignedIn(User))
+    {
+        <button class="account-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+            <i class="bi bi-person-circle"></i>
+            <span class="account-label">Hi, @User.Identity?.Name?.Split('@')[0]</span>
+        </button>
+        <ul class="dropdown-menu dropdown-menu-end account-dropdown">
+            <li><a class="dropdown-item" asp-controller="Orders" asp-action="Index">My Orders</a></li>
+            <li><a class="dropdown-item" asp-area="Identity" asp-page="/Account/Manage/Index">Account Settings</a></li>
+            @if (User.IsInRole("Admin"))
+            {
+                <li><a class="dropdown-item" asp-area="Admin" asp-controller="Home" asp-action="Index">Admin Dashboard</a></li>
+            }
+            @if (User.IsInRole("Merchant"))
+            {
+                <li><a class="dropdown-item" asp-area="Merchant" asp-controller="Home" asp-action="Index">Merchant Dashboard</a></li>
+            }
+            else
+            {
+                <li><a class="dropdown-item" asp-area="" asp-controller="MerchantOnboarding" asp-action="Apply">Sell on World Link Master</a></li>
+            }
+            @if (User.IsInRole("Wholesale"))
+            {
+                <li><a class="dropdown-item" asp-area="" asp-controller="Wholesale" asp-action="Index">Trade Catalog</a></li>
+            }
+            else
+            {
+                <li><a class="dropdown-item" asp-area="" asp-controller="Wholesale" asp-action="Apply">Join Trade Program</a></li>
+            }
+            <li><hr class="dropdown-divider" /></li>
+            <li>
+                <form asp-area="Identity" asp-page="/Account/Logout" asp-route-returnUrl="@Url.Action("Index", "Home", new { area = "" })">
+                    <button type="submit" class="dropdown-item">Log out</button>
+                </form>
+            </li>
+        </ul>
+    }
+    else
+    {
+        <a class="account-toggle" asp-area="Identity" asp-page="/Account/Login">
+            <i class="bi bi-person-circle"></i>
+            <span class="account-label">Sign In</span>
+        </a>
+    }
+</div>
