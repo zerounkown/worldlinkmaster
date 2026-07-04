@@ -31,5 +31,10 @@ public class CheckoutViewModel
     public List<CartItem> Items { get; set; } = new();
     public decimal Subtotal => Items.Sum(i => i.LineTotal);
     public decimal ShippingCost => Subtotal >= 365m || Subtotal == 0 ? 0m : 36.99m;
-    public decimal Total => Subtotal + ShippingCost;
+
+    public string? AppliedCouponCode { get; set; }
+    public decimal CouponDiscountPercent { get; set; }
+    public decimal CouponDiscountAmount => Math.Round(Subtotal * CouponDiscountPercent / 100m, 2);
+
+    public decimal Total => Subtotal - CouponDiscountAmount + ShippingCost;
 }

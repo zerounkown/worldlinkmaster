@@ -1,6 +1,10 @@
+using System.Text;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
 using Stripe;
+using StripeCouponService = Stripe.CouponService;
 using WorldLinkMaster.Web.Data;
 using WorldLinkMaster.Web.Models;
 using WorldLinkMaster.Web.Services;
@@ -34,7 +38,30 @@ builder.Services.AddSession(options =>
 builder.Services.AddScoped<ICartService, SessionCartService>();
 builder.Services.AddScoped<IStripeConnectService, StripeConnectService>();
 builder.Services.AddScoped<IPromoService, PromoService>();
-builder.Services.AddScoped<ICouponService, CouponService>();
+builder.Services.AddScoped<ICouponService, WorldLinkMaster.Web.Services.CouponService>();
+builder.Services.AddScoped<IEmailService, SmtpEmailService>();
+builder.Services.AddScoped<IJwtService, JwtService>();
+
+// JWT Bearer auth for the REST API surface (api/auth/*, etc.). This is added as an
+// additional scheme alongside Identity's cookie auth (which stays default for the
+// website itself) — API controllers opt in explicitly via
+// [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)].
+builder.Services.AddAuthentication()
+    .AddJwtBearer(options =>
+    {
+        var jwtKey = builder.Configuration["Jwt:Key"]!;
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidIssuer = builder.Configuration["Jwt:Issuer"],
+            ValidateAudience = true,
+            ValidAudience = builder.Configuration["Jwt:Audience"],
+            ValidateIssuerSigningKey = true,
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey)),
+            ValidateLifetime = true,
+            ClockSkew = TimeSpan.Zero
+        };
+    });
 
 StripeConfiguration.ApiKey = builder.Configuration["Stripe:SecretKey"];
 
@@ -60,6 +87,8 @@ app.UseSession();
 
 app.UseAuthentication();
 app.UseAuthorization();
+
+app.MapControllers();
 
 app.MapControllerRoute(
     name: "areas",

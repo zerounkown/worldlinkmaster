@@ -12,6 +12,7 @@
         </button>
         <ul class="dropdown-menu dropdown-menu-end account-dropdown">
             <li><a class="dropdown-item" asp-controller="Orders" asp-action="Index">My Orders</a></li>
+            <li><a class="dropdown-item" asp-controller="Coupons" asp-action="Index"><i class="bi bi-ticket-perforated"></i> My Coupons</a></li>
             <li><a class="dropdown-item" asp-area="Identity" asp-page="/Account/Manage/Index">Account Settings</a></li>
             @if (User.IsInRole("Admin"))
             {

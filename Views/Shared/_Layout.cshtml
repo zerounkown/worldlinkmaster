@@ -1,11 +1,22 @@
+@using System.Security.Claims
 @using Microsoft.EntityFrameworkCore
 @using WorldLinkMaster.Web.Data
 @using WorldLinkMaster.Web.Services
 @inject ApplicationDbContext DbContext
 @inject ICartService CartService
 @inject IPromoService PromoService
+@inject ICouponService CouponService
 @{
     var activeSaleEvent = await PromoService.GetTopActiveEventAsync();
+    Coupon? newWelcomeCoupon = null;
+    if (User.Identity?.IsAuthenticated == true)
+    {
+        var currentUserId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (!string.IsNullOrEmpty(currentUserId))
+        {
+            newWelcomeCoupon = await CouponService.EnsureWelcomeCouponAsync(currentUserId);
+        }
+    }
     var navCategories = await DbContext.Categories.OrderBy(c => c.Name).ToListAsync();
     var categoryPreviews = new Dictionary<int, List<Product>>();
     foreach (var navCategory in navCategories)
@@ -31,6 +42,14 @@
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
 </head>
 <body>
+    @if (newWelcomeCoupon != null)
+    {
+        <a class="sale-strip welcome-strip" asp-controller="Coupons" asp-action="Index">
+            <span class="sale-strip-icon">🎁</span>
+            <span>Welcome to World Link Master! Enjoy <strong>@newWelcomeCoupon.DiscountPercent.ToString("0.##")% off</strong> your first order with code <strong>@newWelcomeCoupon.Code</strong></span>
+            <span class="sale-strip-cta">View My Coupons <i class="bi bi-arrow-right"></i></span>
+        </a>
+    }
     @if (activeSaleEvent != null)
     {
         <a class="sale-strip" asp-controller="Products" asp-action="Index">
@@ -169,6 +188,7 @@
                 <h6>Account</h6>
                 <ul>
                     <li><a asp-controller="Orders" asp-action="Index">Order History</a></li>
+                    <li><a asp-controller="Coupons" asp-action="Index">My Coupons</a></li>
                     <li><a asp-area="Identity" asp-page="/Account/Login">Sign In</a></li>
                     <li><a asp-area="Identity" asp-page="/Account/Register">Create Account</a></li>
                 </ul>

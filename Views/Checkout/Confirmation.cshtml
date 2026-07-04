@@ -10,6 +10,14 @@
     <p class="lead">Order #@Model.Id has been placed and is now @Model.Status.</p>
     <p>A confirmation would normally be emailed to you. You can review this order any time under <a asp-controller="Orders" asp-action="Index">My Orders</a>.</p>
 
+    @if (TempData["NewLoyaltyCouponCode"] != null)
+    {
+        <div class="loyalty-celebration mx-auto mt-3">
+            🎉 <strong>You've unlocked a loyalty reward!</strong> Enjoy <strong>@TempData["NewLoyaltyDiscountPercent"]% off</strong> your next order with code <strong>@TempData["NewLoyaltyCouponCode"]</strong>.
+            <br /><a asp-controller="Coupons" asp-action="Index">View My Coupons &rarr;</a>
+        </div>
+    }
+
     <div class="row justify-content-center mt-4">
         <div class="col-12 col-md-6">
             <div class="summary-box text-start">

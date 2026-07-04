@@ -9,6 +9,10 @@
 </div>
 
 <div class="container mb-5">
+    @if (TempData["CheckoutMessage"] != null)
+    {
+        <div class="alert alert-info">@TempData["CheckoutMessage"]</div>
+    }
     <div class="row">
         <div class="col-12 col-md-7">
             <h4 class="mb-3">Shipping Information</h4>
@@ -50,9 +54,9 @@
                 {
                     <div class="alert alert-warning">Stripe isn't configured yet. Add your Stripe test API keys to <code>appsettings.json</code> to enable checkout.</div>
                 }
-                <p class="text-muted small"><i class="bi bi-lock"></i> You'll enter your card details on Stripe's secure checkout page.</p>
+                <p class="text-muted small"><i class="bi bi-shield-check"></i> We'll email you a one-time verification code before payment, then you'll enter your card details on Stripe's secure checkout page.</p>
                 <button type="submit" class="btn-wlm" @(ViewBag.StripeConfigured != true ? "disabled" : null)>
-                    <i class="bi bi-credit-card"></i> Continue to Payment
+                    <i class="bi bi-shield-lock"></i> Send Verification Code
                 </button>
             </form>
         </div>
@@ -73,10 +77,37 @@
                     </div>
                 }
                 <hr />
+
+                <form asp-controller="Checkout" asp-action="@(Model.AppliedCouponCode != null ? "RemoveCoupon" : "ApplyCoupon")" method="post" class="mb-3">
+                    @if (Model.AppliedCouponCode != null)
+                    {
+                        <div class="d-flex justify-content-between align-items-center coupon-applied-row">
+                            <span><i class="bi bi-ticket-perforated"></i> Coupon <strong>@Model.AppliedCouponCode</strong> applied (@Model.CouponDiscountPercent.ToString("0.##")% off)</span>
+                            <button type="submit" class="btn btn-sm btn-outline-danger">Remove</button>
+                        </div>
+                    }
+                    else
+                    {
+                        <label class="form-label small mb-1">Have a coupon code?</label>
+                        <div class="d-flex gap-2">
+                            <input type="text" name="couponCode" class="form-control" placeholder="e.g. WELCOME-AB12CD" />
+                            <button type="submit" class="btn btn-outline-primary">Apply</button>
+                        </div>
+                    }
+                </form>
+
+                <hr />
                 <div class="d-flex justify-content-between mb-2">
                     <span>Subtotal</span>
                     <span>@Model.Subtotal.ToAed()</span>
                 </div>
+                @if (Model.CouponDiscountAmount > 0)
+                {
+                    <div class="d-flex justify-content-between mb-2 coupon-discount-line">
+                        <span>Coupon discount</span>
+                        <span>&minus;@Model.CouponDiscountAmount.ToAed()</span>
+                    </div>
+                }
                 <div class="d-flex justify-content-between mb-2">
                     <span>Shipping</span>
                     <span>@(Model.ShippingCost == 0 ? "Free" : Model.ShippingCost.ToAed())</span>

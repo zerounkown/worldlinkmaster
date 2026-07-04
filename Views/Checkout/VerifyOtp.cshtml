@@ -1,0 +1,44 @@
+@{
+    ViewData["Title"] = "Verify Your Order";
+}
+
+<div class="page-banner">
+    <div class="container"><h1>Verify Your Order</h1></div>
+</div>
+
+<div class="container mb-5">
+    <div class="row justify-content-center">
+        <div class="col-12 col-md-6">
+            <div class="summary-box text-center">
+                <i class="bi bi-shield-lock" style="font-size: 2.5rem; color: var(--wlm-forest);"></i>
+                <h4 class="mt-2">Enter Your Verification Code</h4>
+                <p class="text-muted">
+                    For your security, we sent a 6-digit code to
+                    <strong>@ViewBag.OtpEmail</strong>.
+                    Enter it below to finish placing your order.
+                </p>
+
+                @if (ViewBag.EmailConfigured != true)
+                {
+                    <div class="alert alert-warning small">
+                        Email isn't configured yet, so we can't actually deliver this code. For testing, your code is:
+                        <strong style="letter-spacing: 3px;">@ViewBag.DevOtpCode</strong>
+                    </div>
+                }
+
+                <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+
+                <form asp-controller="Checkout" asp-action="VerifyOtp" method="post" class="mt-3">
+                    <input type="text" name="code" class="form-control form-control-lg text-center mb-3" style="letter-spacing: 8px; font-size: 1.5rem;" maxlength="6" pattern="[0-9]{6}" inputmode="numeric" autocomplete="one-time-code" placeholder="000000" autofocus required />
+                    <button type="submit" class="btn-wlm w-100">Confirm &amp; Continue to Payment</button>
+                </form>
+
+                <form asp-controller="Checkout" asp-action="ResendOtp" method="post" class="mt-3">
+                    <button type="submit" class="btn btn-link btn-sm">Didn't get a code? Resend it</button>
+                </form>
+
+                <a asp-controller="Checkout" asp-action="Index" class="d-block mt-2 small">&larr; Back to Checkout</a>
+            </div>
+        </div>
+    </div>
+</div>
