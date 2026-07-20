@@ -1,5 +1,9 @@
+@using Microsoft.Extensions.Configuration
+@model WorldLinkMaster.Web.Models.ViewModels.LeadFormViewModel
+@inject IConfiguration Configuration
 @{
     ViewData["Title"] = Localizer["Contact Us"];
+    var recaptchaSiteKey = Configuration["Recaptcha:SiteKey"];
 }
 <div class="page-banner">
     <div class="container"><h1>@Localizer["Contact Us"]</h1></div>
@@ -14,18 +18,103 @@
         </div>
         <div class="col-12 col-md-6">
             <h5>@Localizer["Send us a message"]</h5>
-            <form onsubmit="return false;">
+
+            <div id="contact-form-alert" style="display:none;" class="alert"></div>
+
+            <form id="contactForm" asp-controller="Lead" asp-action="Create">
+                @Html.AntiForgeryToken()
                 <div class="mb-3">
-                    <input type="text" class="form-control" placeholder="@Localizer["Your name"]" required />
+                    <input asp-for="Name" class="form-control" placeholder="@Localizer["Your name"]" required />
+                    <span asp-validation-for="Name" class="text-danger"></span>
                 </div>
                 <div class="mb-3">
-                    <input type="email" class="form-control" placeholder="@Localizer["Your email"]" required />
+                    <input asp-for="Email" class="form-control" placeholder="@Localizer["Your email"]" required />
+                    <span asp-validation-for="Email" class="text-danger"></span>
                 </div>
                 <div class="mb-3">
-                    <textarea class="form-control" rows="4" placeholder="@Localizer["How can we help?"]" required></textarea>
+                    <input asp-for="Phone" class="form-control" placeholder="@Localizer["Your phone number"]" required />
+                    <span asp-validation-for="Phone" class="text-danger"></span>
                 </div>
-                <button type="submit" class="btn btn-primary">@Localizer["Send Message"]</button>
+                <div class="mb-3">
+                    <textarea asp-for="Message" class="form-control" rows="4" placeholder="@Localizer["How can we help?"]" required></textarea>
+                </div>
+
+                <!-- Honeypot: hidden from real users, bots tend to fill every field -->
+                <div style="position:absolute; left:-9999px;" aria-hidden="true">
+                    <label asp-for="Website">@Localizer["Leave this field blank"]</label>
+                    <input asp-for="Website" tabindex="-1" autocomplete="off" />
+                </div>
+
+                <input type="hidden" asp-for="RecaptchaToken" id="RecaptchaToken" />
+
+                <button type="submit" class="btn btn-primary" id="contactSubmitBtn">@Localizer["Send Message"]</button>
             </form>
         </div>
     </div>
 </div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+
+    @if (!string.IsNullOrWhiteSpace(recaptchaSiteKey))
+    {
+        <script src="https://www.google.com/recaptcha/api.js?render=@recaptchaSiteKey"></script>
+    }
+    <script>
+        const contactForm = document.getElementById("contactForm");
+        const contactAlertBox = document.getElementById("contact-form-alert");
+        const contactSubmitBtn = document.getElementById("contactSubmitBtn");
+        const contactRecaptchaSiteKey = @Html.Raw(string.IsNullOrWhiteSpace(recaptchaSiteKey) ? "null" : $"\"{recaptchaSiteKey}\"");
+        const contactSendLabel = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Localizer["Send Message"].Value));
+        const contactSendingLabel = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Localizer["Sending..."].Value));
+        const contactGenericError = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Localizer["Something went wrong, please try again."].Value));
+
+        async function submitContactForm() {
+            const formData = new FormData(contactForm);
+            const antiForgeryToken = contactForm.querySelector('input[name="__RequestVerificationToken"]').value;
+
+            try {
+                const res = await fetch(contactForm.action, {
+                    method: "POST",
+                    headers: { "RequestVerificationToken": antiForgeryToken },
+                    body: formData
+                });
+                const data = await res.json();
+
+                contactAlertBox.style.display = "block";
+                if (data.success) {
+                    contactAlertBox.className = "alert alert-success";
+                    contactAlertBox.textContent = data.message;
+                    contactForm.reset();
+                } else {
+                    contactAlertBox.className = "alert alert-danger";
+                    contactAlertBox.textContent = data.message || contactGenericError;
+                }
+            } catch (err) {
+                contactAlertBox.style.display = "block";
+                contactAlertBox.className = "alert alert-danger";
+                contactAlertBox.textContent = contactGenericError;
+            } finally {
+                contactSubmitBtn.disabled = false;
+                contactSubmitBtn.textContent = contactSendLabel;
+            }
+        }
+
+        contactForm.addEventListener("submit", function (e) {
+            e.preventDefault();
+            contactSubmitBtn.disabled = true;
+            contactSubmitBtn.textContent = contactSendingLabel;
+
+            if (contactRecaptchaSiteKey && window.grecaptcha) {
+                grecaptcha.ready(function () {
+                    grecaptcha.execute(contactRecaptchaSiteKey, { action: "submit" }).then(function (token) {
+                        document.getElementById("RecaptchaToken").value = token;
+                        submitContactForm();
+                    });
+                });
+            } else {
+                submitContactForm();
+            }
+        });
+    </script>
+}

@@ -5,6 +5,25 @@
     <div class="container"><h1>@ViewData["Title"]</h1></div>
 </div>
 <div class="container mb-5">
-    <p>@Localizer["World Link Master respects your privacy. We only collect the information needed to process your orders and improve your shopping experience, and we never sell your data to third parties."]</p>
-    <p>@Localizer["This is a demo storefront; no real payment or personal data processing occurs here."]</p>
+    <p class="text-muted">@Localizer["Last updated"]: @DateTime.UtcNow.ToString("MMMM yyyy")</p>
+
+    <p>@Localizer["World Link Master (\"we\", \"us\", \"our\") respects your privacy. This policy explains what information we collect, how we use it, and the choices you have."]</p>
+
+    <h5 class="mt-4">@Localizer["Information We Collect"]</h5>
+    <p>@Localizer["When you create an account, place an order, or contact us, we collect information such as your name, email address, phone number, shipping and billing address, and order history. We also collect basic usage data (such as pages visited and device/browser type) to help us improve the site."]</p>
+
+    <h5 class="mt-4">@Localizer["How We Use Your Information"]</h5>
+    <p>@Localizer["We use your information to process and fulfil orders, communicate with you about your account or purchases, provide customer support, and improve our products and services. We do not sell your personal data to third parties."]</p>
+
+    <h5 class="mt-4">@Localizer["Payment Information"]</h5>
+    <p>@Localizer["Payments are processed securely through our payment provider. We do not store your full card details on our servers."]</p>
+
+    <h5 class="mt-4">@Localizer["Sharing Your Information"]</h5>
+    <p>@Localizer["We share information only with trusted service providers who help us operate our business (such as payment processors and shipping carriers), or when required by law."]</p>
+
+    <h5 class="mt-4">@Localizer["Your Rights"]</h5>
+    <p>@Localizer["You may access, update, or request deletion of your personal information at any time by contacting us at"] <a href="mailto:support@worldlinkmaster.com">support@worldlinkmaster.com</a>.</p>
+
+    <h5 class="mt-4">@Localizer["Contact Us"]</h5>
+    <p>@Localizer["If you have any questions about this Privacy Policy, please"] <a asp-controller="Home" asp-action="Contact">@Localizer["contact us"]</a>.</p>
 </div>
