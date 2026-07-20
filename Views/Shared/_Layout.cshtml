@@ -4,10 +4,12 @@
 @using WorldLinkMaster.Web.Data
 @using WorldLinkMaster.Web.Extensions
 @using WorldLinkMaster.Web.Services
+@using Microsoft.Extensions.Configuration
 @inject ApplicationDbContext DbContext
 @inject ICartService CartService
 @inject IPromoService PromoService
 @inject ICouponService CouponService
+@inject IConfiguration Configuration
 @{
     var activeSaleEvent = await PromoService.GetTopActiveEventAsync();
     Coupon? newWelcomeCoupon = null;
@@ -351,6 +353,8 @@
                 <ul>
                     <li><a asp-area="" asp-controller="Home" asp-action="About">@Localizer["About Us"]</a></li>
                     <li><a asp-area="" asp-controller="Home" asp-action="Contact">@Localizer["Contact"]</a></li>
+                    <li><a asp-area="" asp-controller="Home" asp-action="Terms">@Localizer["Terms & Conditions"]</a></li>
+                    <li><a asp-area="" asp-controller="Home" asp-action="ReturnPolicy">@Localizer["Return & Refund Policy"]</a></li>
                     <li><a asp-area="" asp-controller="Home" asp-action="Privacy">@Localizer["Privacy Policy"]</a></li>
                     <li><a asp-area="" asp-controller="MerchantOnboarding" asp-action="Apply">@Localizer["Sell on World Link Master"]</a></li>
                     <li><a asp-area="" asp-controller="Wholesale" asp-action="Apply">@Localizer["Trade / Wholesale Pricing"]</a></li>
@@ -365,14 +369,34 @@
                     <li><a asp-area="Identity" asp-page="/Account/Register">@Localizer["Create Account"]</a></li>
                 </ul>
             </div>
-            <div class="footer-col">
-                <h6>@Localizer["Connect"]</h6>
-                <div class="footer-social">
-                    <a href="#"><i class="bi bi-facebook"></i></a>
-                    <a href="#"><i class="bi bi-instagram"></i></a>
-                    <a href="#"><i class="bi bi-youtube"></i></a>
+            @{
+                var facebookUrl = Configuration["SocialLinks:Facebook"];
+                var instagramUrl = Configuration["SocialLinks:Instagram"];
+                var youtubeUrl = Configuration["SocialLinks:YouTube"];
+                var hasSocialLinks = !string.IsNullOrWhiteSpace(facebookUrl)
+                    || !string.IsNullOrWhiteSpace(instagramUrl)
+                    || !string.IsNullOrWhiteSpace(youtubeUrl);
+            }
+            @if (hasSocialLinks)
+            {
+                <div class="footer-col">
+                    <h6>@Localizer["Connect"]</h6>
+                    <div class="footer-social">
+                        @if (!string.IsNullOrWhiteSpace(facebookUrl))
+                        {
+                            <a href="@facebookUrl" target="_blank" rel="noopener noreferrer"><i class="bi bi-facebook"></i></a>
+                        }
+                        @if (!string.IsNullOrWhiteSpace(instagramUrl))
+                        {
+                            <a href="@instagramUrl" target="_blank" rel="noopener noreferrer"><i class="bi bi-instagram"></i></a>
+                        }
+                        @if (!string.IsNullOrWhiteSpace(youtubeUrl))
+                        {
+                            <a href="@youtubeUrl" target="_blank" rel="noopener noreferrer"><i class="bi bi-youtube"></i></a>
+                        }
+                    </div>
                 </div>
-            </div>
+            }
         </div>
         <div class="container footer-bottom">
             &copy; @DateTime.Now.Year @Localizer["World Link Master. All rights reserved."]

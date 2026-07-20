@@ -1,0 +1,35 @@
+@{
+    ViewData["Title"] = Localizer["Return & Refund Policy"];
+}
+<div class="page-banner">
+    <div class="container"><h1>@ViewData["Title"]</h1></div>
+</div>
+<div class="container mb-5">
+    <p class="text-muted">@Localizer["Last updated"]: @DateTime.UtcNow.ToString("MMMM yyyy")</p>
+
+    <p>@Localizer["We want you to be fully satisfied with your purchase. If something isn't right, here's how our returns process works."]</p>
+
+    <h5 class="mt-4">@Localizer["Return Window"]</h5>
+    <p>@Localizer["You may return most items within 30 days of delivery for a full refund or exchange, provided the item is unused, unworn, and in its original packaging with tags attached."]</p>
+
+    <h5 class="mt-4">@Localizer["Non-Returnable Items"]</h5>
+    <p>@Localizer["For hygiene and safety reasons, certain items (such as underwear, swimwear, and used or damaged consumables) cannot be returned unless they arrived defective."]</p>
+
+    <h5 class="mt-4">@Localizer["How to Start a Return"]</h5>
+    <p>@Localizer["To start a return, sign in to your account and go to Order History, or"] <a asp-controller="Home" asp-action="Contact">@Localizer["contact our support team"]</a> @Localizer["with your order number. We'll provide instructions and, where applicable, a return shipping label."]</p>
+
+    <h5 class="mt-4">@Localizer["Refunds"]</h5>
+    <p>@Localizer["Once we receive and inspect your returned item, we'll notify you of the approval status. Approved refunds are issued to your original payment method within 5-10 business days."]</p>
+
+    <h5 class="mt-4">@Localizer["Exchanges"]</h5>
+    <p>@Localizer["If you need a different size or color, the fastest option is to place a new order and return the original item for a refund."]</p>
+
+    <h5 class="mt-4">@Localizer["Damaged or Incorrect Items"]</h5>
+    <p>@Localizer["If your order arrives damaged, defective, or incorrect, please contact us within 7 days of delivery and we'll arrange a free replacement or full refund, including return shipping costs."]</p>
+
+    <h5 class="mt-4">@Localizer["Return Shipping Costs"]</h5>
+    <p>@Localizer["Return shipping is free for damaged, defective, or incorrect items. For all other returns, return shipping costs are the responsibility of the customer unless otherwise stated at checkout."]</p>
+
+    <h5 class="mt-4">@Localizer["Questions"]</h5>
+    <p>@Localizer["If you have any questions about a return or refund, please"] <a asp-controller="Home" asp-action="Contact">@Localizer["contact us"]</a> @Localizer["and we'll be happy to help."]</p>
+</div>

@@ -1,0 +1,38 @@
+@{
+    ViewData["Title"] = Localizer["Terms & Conditions"];
+}
+<div class="page-banner">
+    <div class="container"><h1>@ViewData["Title"]</h1></div>
+</div>
+<div class="container mb-5">
+    <p class="text-muted">@Localizer["Last updated"]: @DateTime.UtcNow.ToString("MMMM yyyy")</p>
+
+    <p>@Localizer["Welcome to World Link Master. By accessing or using our website, you agree to be bound by the following terms and conditions. Please read them carefully before placing an order."]</p>
+
+    <h5 class="mt-4">@Localizer["Use of the Site"]</h5>
+    <p>@Localizer["You agree to use this site only for lawful purposes and in a way that does not infringe the rights of, or restrict or inhibit the use and enjoyment of, this site by any third party."]</p>
+
+    <h5 class="mt-4">@Localizer["Products & Pricing"]</h5>
+    <p>@Localizer["We make every effort to display product details, images, and prices accurately. However, we do not warrant that product descriptions or pricing are error-free. We reserve the right to correct any errors and to change or update prices at any time before an order is confirmed."]</p>
+
+    <h5 class="mt-4">@Localizer["Orders & Payment"]</h5>
+    <p>@Localizer["By placing an order, you confirm that the information you provide is accurate and complete. All orders are subject to acceptance and availability. Payment must be received in full before an order is shipped, except where wholesale or trade account terms apply."]</p>
+
+    <h5 class="mt-4">@Localizer["Shipping"]</h5>
+    <p>@Localizer["Delivery timeframes are estimates only and are not guaranteed. We are not liable for delays caused by shipping carriers or events outside our control."]</p>
+
+    <h5 class="mt-4">@Localizer["Returns & Refunds"]</h5>
+    <p>@Localizer["Our returns and refunds process is described in full on our"] <a asp-controller="Home" asp-action="ReturnPolicy">@Localizer["Return & Refund Policy"]</a> @Localizer["page."]</p>
+
+    <h5 class="mt-4">@Localizer["Intellectual Property"]</h5>
+    <p>@Localizer["All content on this site, including text, graphics, logos, and images, is the property of World Link Master or its content suppliers and is protected by applicable intellectual property laws."]</p>
+
+    <h5 class="mt-4">@Localizer["Limitation of Liability"]</h5>
+    <p>@Localizer["World Link Master shall not be liable for any indirect, incidental, or consequential damages arising from the use of this site or the purchase of products through it, to the extent permitted by law."]</p>
+
+    <h5 class="mt-4">@Localizer["Changes to These Terms"]</h5>
+    <p>@Localizer["We may update these terms from time to time. Continued use of the site after changes are posted constitutes your acceptance of the revised terms."]</p>
+
+    <h5 class="mt-4">@Localizer["Contact Us"]</h5>
+    <p>@Localizer["If you have any questions about these Terms & Conditions, please"] <a asp-controller="Home" asp-action="Contact">@Localizer["contact us"]</a>.</p>
+</div>

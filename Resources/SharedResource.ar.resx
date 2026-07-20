@@ -225,6 +225,10 @@
   <data name="Your email" xml:space="preserve"><value>بريدك الإلكتروني</value></data>
   <data name="How can we help?" xml:space="preserve"><value>كيف يمكننا مساعدتك؟</value></data>
   <data name="Send Message" xml:space="preserve"><value>إرسال الرسالة</value></data>
+  <data name="Your phone number" xml:space="preserve"><value>رقم هاتفك</value></data>
+  <data name="Leave this field blank" xml:space="preserve"><value>اترك هذا الحقل فارغاً</value></data>
+  <data name="Sending..." xml:space="preserve"><value>جاري الإرسال...</value></data>
+  <data name="Something went wrong, please try again." xml:space="preserve"><value>حدث خطأ، حاول مرة أخرى.</value></data>
   <data name="World Link Master respects your privacy. We only collect the information needed to process your orders and improve your shopping experience, and we never sell your data to third parties." xml:space="preserve"><value>تحترم World Link Master خصوصيتك. نجمع فقط المعلومات اللازمة لمعالجة طلباتك وتحسين تجربة تسوقك، ولا نبيع بياناتك أبداً لأطراف ثالثة.</value></data>
   <data name="This is a demo storefront; no real payment or personal data processing occurs here." xml:space="preserve"><value>هذا متجر تجريبي؛ لا تتم هنا أي معالجة حقيقية للدفع أو البيانات الشخصية.</value></data>
 
@@ -706,4 +710,59 @@
   <data name="Cannot delete a subcategory that still has products assigned." xml:space="preserve"><value>لا يمكن حذف قسم فرعي لا يزال يحتوي على منتجات مُسندة إليه.</value></data>
   <data name="Can't delete '{0}' — it has order history. Set its stock to 0 instead (Edit) to retire it without breaking past orders." xml:space="preserve"><value>لا يمكن حذف '{0}' — فهو يحتوي على سجل طلبات. عيّن مخزونه إلى 0 بدلاً من ذلك (تعديل) لسحبه دون كسر الطلبات السابقة.</value></data>
   <data name="Choose an Excel (.xlsx) file to upload." xml:space="preserve"><value>اختر ملف إكسل (.xlsx) لرفعه.</value></data>
+  <data name="Terms &amp; Conditions" xml:space="preserve"><value>الشروط والأحكام</value></data>
+  <data name="Return &amp; Refund Policy" xml:space="preserve"><value>سياسة الإرجاع والاسترجاع</value></data>
+  <data name="Last updated" xml:space="preserve"><value>آخر تحديث</value></data>
+  <data name="Welcome to World Link Master. By accessing or using our website, you agree to be bound by the following terms and conditions. Please read them carefully before placing an order." xml:space="preserve"><value>مرحباً بك في World Link Master. باستخدامك لموقعنا فإنك توافق على الالتزام بالشروط والأحكام التالية. يرجى قراءتها بعناية قبل إتمام أي طلب.</value></data>
+  <data name="Use of the Site" xml:space="preserve"><value>استخدام الموقع</value></data>
+  <data name="You agree to use this site only for lawful purposes and in a way that does not infringe the rights of, or restrict or inhibit the use and enjoyment of, this site by any third party." xml:space="preserve"><value>توافق على استخدام هذا الموقع لأغراض مشروعة فقط وبطريقة لا تنتهك حقوق أي طرف ثالث أو تعيق استخدامه للموقع.</value></data>
+  <data name="Products &amp; Pricing" xml:space="preserve"><value>المنتجات والأسعار</value></data>
+  <data name="We make every effort to display product details, images, and prices accurately. However, we do not warrant that product descriptions or pricing are error-free. We reserve the right to correct any errors and to change or update prices at any time before an order is confirmed." xml:space="preserve"><value>نبذل قصارى جهدنا لعرض تفاصيل المنتجات والصور والأسعار بدقة. مع ذلك، لا نضمن خلو الأوصاف أو الأسعار من الأخطاء، ونحتفظ بالحق في تصحيح أي خطأ أو تعديل الأسعار في أي وقت قبل تأكيد الطلب.</value></data>
+  <data name="Orders &amp; Payment" xml:space="preserve"><value>الطلبات والدفع</value></data>
+  <data name="By placing an order, you confirm that the information you provide is accurate and complete. All orders are subject to acceptance and availability. Payment must be received in full before an order is shipped, except where wholesale or trade account terms apply." xml:space="preserve"><value>بإتمامك للطلب فإنك تؤكد أن البيانات التي قدمتها صحيحة وكاملة. جميع الطلبات خاضعة للقبول وتوفر المخزون، ويجب استلام كامل قيمة الدفع قبل شحن الطلب، ما عدا حالات حسابات الجملة أو التجارة.</value></data>
+  <data name="Shipping" xml:space="preserve"><value>الشحن</value></data>
+  <data name="Delivery timeframes are estimates only and are not guaranteed. We are not liable for delays caused by shipping carriers or events outside our control." xml:space="preserve"><value>مدد التوصيل هي تقديرات فقط وغير مضمونة. لا نتحمل مسؤولية أي تأخير ناتج عن شركات الشحن أو ظروف خارجة عن إرادتنا.</value></data>
+  <data name="Returns &amp; Refunds" xml:space="preserve"><value>الإرجاع والاسترداد</value></data>
+  <data name="Our returns and refunds process is described in full on our" xml:space="preserve"><value>تجد تفاصيل عملية الإرجاع والاسترداد كاملة في صفحة</value></data>
+  <data name="page." xml:space="preserve"><value>.</value></data>
+  <data name="Intellectual Property" xml:space="preserve"><value>الملكية الفكرية</value></data>
+  <data name="All content on this site, including text, graphics, logos, and images, is the property of World Link Master or its content suppliers and is protected by applicable intellectual property laws." xml:space="preserve"><value>جميع المحتويات في هذا الموقع، بما فيها النصوص والرسومات والشعارات والصور، هي ملك لشركة World Link Master أو مورّدي المحتوى ومحمية بموجب قوانين الملكية الفكرية المعمول بها.</value></data>
+  <data name="Limitation of Liability" xml:space="preserve"><value>حدود المسؤولية</value></data>
+  <data name="World Link Master shall not be liable for any indirect, incidental, or consequential damages arising from the use of this site or the purchase of products through it, to the extent permitted by law." xml:space="preserve"><value>لا تتحمل World Link Master مسؤولية أي أضرار غير مباشرة أو عرضية أو تبعية ناتجة عن استخدام هذا الموقع أو شراء المنتجات من خلاله، وذلك في حدود ما يسمح به القانون.</value></data>
+  <data name="Changes to These Terms" xml:space="preserve"><value>التعديلات على هذه الشروط</value></data>
+  <data name="We may update these terms from time to time. Continued use of the site after changes are posted constitutes your acceptance of the revised terms." xml:space="preserve"><value>قد نقوم بتحديث هذه الشروط من وقت لآخر. استمرارك في استخدام الموقع بعد نشر أي تعديلات يعني موافقتك على الشروط المحدّثة.</value></data>
+  <data name="We want you to be fully satisfied with your purchase. If something isn't right, here's how our returns process works." xml:space="preserve"><value>نريدك أن تكون راضياً تماماً عن مشترياتك. إذا كان هناك أي مشكلة، إليك كيفية عمل نظام الإرجاع لدينا.</value></data>
+  <data name="Return Window" xml:space="preserve"><value>مدة الإرجاع</value></data>
+  <data name="You may return most items within 30 days of delivery for a full refund or exchange, provided the item is unused, unworn, and in its original packaging with tags attached." xml:space="preserve"><value>يمكنك إرجاع معظم المنتجات خلال 30 يوماً من الاستلام للحصول على استرداد كامل أو استبدال، شريطة أن يكون المنتج غير مستخدم وبعبوته الأصلية مع البطاقات الملحقة.</value></data>
+  <data name="Non-Returnable Items" xml:space="preserve"><value>المنتجات غير القابلة للإرجاع</value></data>
+  <data name="For hygiene and safety reasons, certain items (such as underwear, swimwear, and used or damaged consumables) cannot be returned unless they arrived defective." xml:space="preserve"><value>لأسباب صحية وأمنية، لا يمكن إرجاع بعض المنتجات (مثل الملابس الداخلية وملابس السباحة والمواد المستهلكة المستخدمة أو التالفة) إلا إذا وصلت معيبة.</value></data>
+  <data name="How to Start a Return" xml:space="preserve"><value>كيفية بدء عملية الإرجاع</value></data>
+  <data name="To start a return, sign in to your account and go to Order History, or" xml:space="preserve"><value>لبدء عملية الإرجاع، سجّل الدخول إلى حسابك وانتقل إلى سجل الطلبات، أو</value></data>
+  <data name="contact our support team" xml:space="preserve"><value>تواصل مع فريق الدعم لدينا</value></data>
+  <data name="with your order number. We'll provide instructions and, where applicable, a return shipping label." xml:space="preserve"><value>مع ذكر رقم طلبك. سنزودك بالتعليمات وملصق شحن الإرجاع عند الحاجة.</value></data>
+  <data name="Refunds" xml:space="preserve"><value>الاسترداد</value></data>
+  <data name="Once we receive and inspect your returned item, we'll notify you of the approval status. Approved refunds are issued to your original payment method within 5-10 business days." xml:space="preserve"><value>بمجرد استلام وفحص المنتج المرتجع، سنخبرك بحالة الموافقة. يتم إصدار المبالغ المستردة المعتمدة إلى وسيلة الدفع الأصلية خلال 5-10 أيام عمل.</value></data>
+  <data name="Exchanges" xml:space="preserve"><value>الاستبدال</value></data>
+  <data name="If you need a different size or color, the fastest option is to place a new order and return the original item for a refund." xml:space="preserve"><value>إذا احتجت مقاساً أو لوناً مختلفاً، فأسرع طريقة هي تقديم طلب جديد وإرجاع المنتج الأصلي لاسترداد قيمته.</value></data>
+  <data name="Damaged or Incorrect Items" xml:space="preserve"><value>المنتجات التالفة أو الخاطئة</value></data>
+  <data name="If your order arrives damaged, defective, or incorrect, please contact us within 7 days of delivery and we'll arrange a free replacement or full refund, including return shipping costs." xml:space="preserve"><value>إذا وصل طلبك تالفاً أو معيباً أو خاطئاً، يرجى التواصل معنا خلال 7 أيام من الاستلام وسنقوم بترتيب استبدال مجاني أو استرداد كامل يشمل تكاليف شحن الإرجاع.</value></data>
+  <data name="Return Shipping Costs" xml:space="preserve"><value>تكاليف شحن الإرجاع</value></data>
+  <data name="Return shipping is free for damaged, defective, or incorrect items. For all other returns, return shipping costs are the responsibility of the customer unless otherwise stated at checkout." xml:space="preserve"><value>شحن الإرجاع مجاني للمنتجات التالفة أو المعيبة أو الخاطئة. أما باقي حالات الإرجاع، فتكون تكلفة الشحن على مسؤولية العميل ما لم يُذكر خلاف ذلك عند الدفع.</value></data>
+  <data name="Questions" xml:space="preserve"><value>أسئلة؟</value></data>
+  <data name="If you have any questions about a return or refund, please" xml:space="preserve"><value>إذا كان لديك أي استفسار حول الإرجاع أو الاسترداد، يرجى</value></data>
+  <data name="and we'll be happy to help." xml:space="preserve"><value>وسنكون سعداء بمساعدتك.</value></data>
+  <data name="World Link Master (&quot;we&quot;, &quot;us&quot;, &quot;our&quot;) respects your privacy. This policy explains what information we collect, how we use it, and the choices you have." xml:space="preserve"><value>تحترم World Link Master ("نحن") خصوصيتك. توضح هذه السياسة البيانات التي نجمعها وكيفية استخدامها والخيارات المتاحة لك.</value></data>
+  <data name="Information We Collect" xml:space="preserve"><value>البيانات التي نجمعها</value></data>
+  <data name="When you create an account, place an order, or contact us, we collect information such as your name, email address, phone number, shipping and billing address, and order history. We also collect basic usage data (such as pages visited and device/browser type) to help us improve the site." xml:space="preserve"><value>عندما تنشئ حساباً أو تقدم طلباً أو تتواصل معنا، نقوم بجمع بيانات مثل اسمك وبريدك الإلكتروني ورقم هاتفك وعنوان الشحن والفوترة وسجل طلباتك. كما نجمع بيانات استخدام أساسية (مثل الصفحات التي تزورها ونوع الجهاز/المتصفح) لمساعدتنا على تحسين الموقع.</value></data>
+  <data name="How We Use Your Information" xml:space="preserve"><value>كيفية استخدام بياناتك</value></data>
+  <data name="We use your information to process and fulfil orders, communicate with you about your account or purchases, provide customer support, and improve our products and services. We do not sell your personal data to third parties." xml:space="preserve"><value>نستخدم بياناتك لمعالجة وتنفيذ الطلبات، والتواصل معك بخصوص حسابك أو مشترياتك، وتقديم الدعم، وتحسين منتجاتنا وخدماتنا. لا نبيع بياناتك الشخصية لأي طرف ثالث.</value></data>
+  <data name="Payment Information" xml:space="preserve"><value>معلومات الدفع</value></data>
+  <data name="Payments are processed securely through our payment provider. We do not store your full card details on our servers." xml:space="preserve"><value>تتم معالجة المدفوعات بشكل آمن عبر مزود خدمة الدفع الخاص بنا. نحن لا نخزّن بيانات بطاقتك الكاملة على خوادمنا.</value></data>
+  <data name="Sharing Your Information" xml:space="preserve"><value>مشاركة بياناتك</value></data>
+  <data name="We share information only with trusted service providers who help us operate our business (such as payment processors and shipping carriers), or when required by law." xml:space="preserve"><value>لا نشارك بياناتك إلا مع مزودي خدمات موثوقين يساعدوننا في تشغيل أعمالنا (مثل معالجات الدفع وشركات الشحن)، أو عند الالتزام بذلك قانونياً.</value></data>
+  <data name="Your Rights" xml:space="preserve"><value>حقوقك</value></data>
+  <data name="You may access, update, or request deletion of your personal information at any time by contacting us at" xml:space="preserve"><value>يمكنك الوصول إلى بياناتك الشخصية أو تحديثها أو طلب حذفها في أي وقت من خلال التواصل معنا على</value></data>
+  <data name="If you have any questions about this Privacy Policy, please" xml:space="preserve"><value>إذا كان لديك أي استفسار حول سياسة الخصوصية هذه، يرجى</value></data>
+  <data name="If you have any questions about these Terms &amp; Conditions, please" xml:space="preserve"><value>إذا كان لديك أي استفسار حول الشروط والأحكام هذه، يرجى</value></data>
+  <data name="contact us" xml:space="preserve"><value>التواصل معنا</value></data>
 </root>
