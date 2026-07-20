@@ -1,0 +1,16 @@
+@{
+    // Intermediate layout for all Identity UI pages. The compiled Identity pages emit their
+    // markup with no .container wrapper, so on the site layout they rendered flush against the
+    // viewport edge. This wraps them in the site container + an auth wrapper for styling, then
+    // forwards the child's optional Scripts section up to the main layout.
+    Layout = "/Views/Shared/_Layout.cshtml";
+}
+<div class="auth-page">
+    <div class="container">
+        @RenderBody()
+    </div>
+</div>
+@section Scripts {
+    @await RenderSectionAsync("Scripts", required: false)
+    <script src="~/js/auth.js" asp-append-version="true"></script>
+}

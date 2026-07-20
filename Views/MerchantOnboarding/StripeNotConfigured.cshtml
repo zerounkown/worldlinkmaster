@@ -1,0 +1,25 @@
+@using WorldLinkMaster.Web.Models
+@{
+    ViewData["Title"] = Localizer["Connect Stripe"];
+    var merchant = ViewBag.Merchant as Merchant;
+    var stripeError = ViewBag.StripeError as string;
+}
+
+<div class="page-banner">
+    <div class="container"><h1>@Localizer["Connect Stripe"]</h1></div>
+</div>
+
+<div class="container mb-5">
+    <div class="summary-box">
+        <p>@Localizer["Thanks for applying,"] <strong>@merchant?.BusinessName</strong>! @Localizer["Before you can start selling, you need to connect a Stripe account so we can pay you."]</p>
+        @if (!string.IsNullOrEmpty(stripeError))
+        {
+            <div class="alert alert-warning">@Localizer["Stripe couldn't complete this step:"] @stripeError</div>
+        }
+        else
+        {
+            <div class="alert alert-warning">@Localizer["Stripe isn't configured on this site yet. Once the site owner adds Stripe API keys, come back here and try again."]</div>
+        }
+        <a class="btn-wlm" asp-controller="MerchantOnboarding" asp-action="StartOnboarding">@Localizer["Try Again"]</a>
+    </div>
+</div>

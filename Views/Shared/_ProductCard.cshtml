@@ -1,0 +1,82 @@
+@using WorldLinkMaster.Web.Models
+@using WorldLinkMaster.Web.Extensions
+@model Product
+@{
+    var activeEvent = ViewBag.ActiveEvent as PromoEvent;
+    var salePrice = activeEvent != null ? Model.Price * (1 - activeEvent.DiscountPercent / 100m) : (decimal?)null;
+    var hasColors = Model.Colors.Count > 0;
+    var hasSizes = Model.Sizes.Count > 0;
+    var hasVariants = hasColors || hasSizes;
+}
+
+<div class="product-card">
+    <div class="product-card-media">
+        @if (activeEvent != null)
+        {
+            <span class="sale-badge">@activeEvent.DiscountPercent.ToString("0.##")% @Localizer["OFF (badge)"]</span>
+        }
+        else if (Model.IsFeatured)
+        {
+            <span class="featured-badge">@Localizer["Featured"]</span>
+        }
+        <a class="product-card-tilt" asp-area="" asp-controller="Products" asp-action="Details" asp-route-slug="@Model.Slug">
+            <img src="@Model.ImageUrl" alt="@Model.LocalizedName()" class="card-product-image" data-default-image="@Model.ImageUrl" />
+        </a>
+    </div>
+    <div class="product-card-body">
+        <h3><a asp-area="" asp-controller="Products" asp-action="Details" asp-route-slug="@Model.Slug">@Model.LocalizedName()</a></h3>
+
+        <div class="product-card-price-row">
+            @if (salePrice.HasValue)
+            {
+                <span class="price-was">@Model.Price.ToDisplayCurrency()</span>
+                <span class="price price-sale">@salePrice.Value.ToDisplayCurrency()</span>
+            }
+            else
+            {
+                <span class="price">@Model.Price.ToDisplayCurrency()</span>
+            }
+        </div>
+
+        @if (hasVariants)
+        {
+            <select class="product-card-variant" aria-label="@Localizer["Choose options"]">
+                @if (hasColors && hasSizes)
+                {
+                    foreach (var color in Model.Colors)
+                    {
+                        foreach (var size in Model.Sizes)
+                        {
+                            <option value="@(color.Name)|@(size.Label)">@color.Name / @size.Label</option>
+                        }
+                    }
+                }
+                else if (hasColors)
+                {
+                    foreach (var color in Model.Colors)
+                    {
+                        <option value="@(color.Name)|">@color.Name</option>
+                    }
+                }
+                else
+                {
+                    foreach (var size in Model.Sizes)
+                    {
+                        <option value="|@(size.Label)">@size.Label</option>
+                    }
+                }
+            </select>
+        }
+
+        @if (Model.StockQuantity > 0)
+        {
+            <button type="button" class="product-card-add-btn js-inline-add" data-product-id="@Model.Id" data-product-name="@Model.Name">
+                @Localizer["Add to Cart"]
+            </button>
+        }
+        else
+        {
+            <button type="button" class="product-card-add-btn" disabled>@Localizer["Out of Stock"]</button>
+        }
+    </div>
+</div>

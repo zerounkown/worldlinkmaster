@@ -1,0 +1,49 @@
+@using WorldLinkMaster.Web.Models
+@model PromoEvent
+
+<div asp-validation-summary="ModelOnly" class="text-danger"></div>
+@if (Model.Id != 0)
+{
+    <input type="hidden" asp-for="Id" />
+}
+<input type="hidden" asp-for="CreatedAt" />
+
+<div class="mb-3">
+    <label asp-for="Name" class="form-label">@Localizer["Name"]</label>
+    <input asp-for="Name" class="form-control" placeholder="e.g. UAE National Day Sale" />
+    <span asp-validation-for="Name" class="text-danger"></span>
+</div>
+<div class="mb-3">
+    <label asp-for="Description" class="form-label">@Localizer["Description"]</label>
+    <textarea asp-for="Description" class="form-control" rows="2" placeholder="A short, cheerful line about the sale"></textarea>
+</div>
+<div class="row">
+    <div class="col-12 col-sm-4 mb-3">
+        <label asp-for="IconEmoji" class="form-label">@Localizer["Icon (emoji)"]</label>
+        <input asp-for="IconEmoji" class="form-control" placeholder="🎉" />
+    </div>
+    <div class="col-6 col-sm-4 mb-3">
+        <label asp-for="DiscountPercent" class="form-label">@Localizer["Discount %"]</label>
+        <input asp-for="DiscountPercent" class="form-control" />
+        <span asp-validation-for="DiscountPercent" class="text-danger"></span>
+    </div>
+    <div class="col-6 col-sm-4 mb-3 d-flex align-items-end">
+        <div class="form-check">
+            <input asp-for="IsActive" class="form-check-input" />
+            <label asp-for="IsActive" class="form-check-label">@Localizer["Active"]</label>
+        </div>
+    </div>
+</div>
+<div class="row">
+    <div class="col-12 col-sm-6 mb-3">
+        <label asp-for="StartDate" class="form-label">@Localizer["Start Date"]</label>
+        <input asp-for="StartDate" class="form-control" />
+    </div>
+    <div class="col-12 col-sm-6 mb-3">
+        <label asp-for="EndDate" class="form-label">@Localizer["End Date"]</label>
+        <input asp-for="EndDate" class="form-control" />
+    </div>
+</div>
+
+<button type="submit" class="btn btn-primary">@Localizer["Save"]</button>
+<a asp-action="Index" class="btn btn-outline-secondary">@Localizer["Cancel"]</a>

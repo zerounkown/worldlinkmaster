@@ -1,0 +1,27 @@
+# Build output
+bin/
+obj/
+.vs/
+*.user
+
+# Local development configuration & secrets — keep out of source control
+appsettings.Development.json
+appsettings.*.Local.json
+secrets.json
+.env
+*.env
+
+# ASP.NET user secrets (stored outside the repo, but ignore any stray copies)
+**/UserSecrets/
+
+# Data Protection keys (never commit — invalidate all cookies/tokens if leaked)
+keys/
+DataProtection-Keys/
+
+# Logs
+logs/
+*.log
+
+# User-uploaded content
+wwwroot/uploads/
+ChatUploads/

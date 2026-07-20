@@ -1,0 +1,29 @@
+@using WorldLinkMaster.Web.Models
+@model WholesaleAccount
+@{
+    ViewData["Title"] = Localizer["Quote Request Confirmed"];
+    var requestNumber = $"WLM-Q-{Model.Id:D6}";
+}
+
+<div class="container my-5 text-center">
+    <i class="bi bi-check-circle text-success" style="font-size: 3rem;"></i>
+    <h1>@Localizer["Thank you for your request!"]</h1>
+    <p class="lead">@Localizer["Your quote request has been submitted successfully."]</p>
+
+    <div class="row justify-content-center mt-4">
+        <div class="col-12 col-md-6">
+            <div class="summary-box text-center">
+                <p class="text-muted small mb-1">@Localizer["Request Number"]</p>
+                <p class="quote-request-number">@requestNumber</p>
+                <hr />
+                <p class="mb-1"><strong>@Localizer["Company:"]</strong> @Model.CompanyName</p>
+                <p class="mb-0"><strong>@Localizer["Submitted:"]</strong> @Model.CreatedAt.ToLocalTime().ToString("MMM d, yyyy h:mm tt")</p>
+                <hr />
+                <p class="mb-0 text-muted small">@Localizer["We've activated wholesale pricing on your account — browse the Trade Catalog to see it in action. Keep your request number for your records."]</p>
+            </div>
+        </div>
+    </div>
+
+    <a class="btn-wlm mt-4 d-inline-block" asp-action="Index">@Localizer["View Trade Catalog"]</a>
+    <a class="btn-wlm-outline-dark mt-4 ms-2 d-inline-block" asp-controller="Products" asp-action="Index">@Localizer["Continue Shopping"]</a>
+</div>

@@ -1,0 +1,154 @@
+@using WorldLinkMaster.Web.Models
+@model ChatConversation
+@{
+    ViewData["Title"] = Localizer["Conversation"];
+    var customerName = $"{Model.Customer?.FirstName} {Model.Customer?.LastName}".Trim();
+}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+        <h1 class="mb-0">@(string.IsNullOrWhiteSpace(customerName) ? Model.Customer?.Email : customerName)</h1>
+        <div class="text-muted">@Model.Customer?.Email</div>
+    </div>
+    <div>
+        <span id="statusBadge" class="badge @(Model.Status == ChatConversationStatus.Open ? "bg-success" : "bg-secondary")">@Localizer[Model.Status.ToString()]</span>
+        @if (Model.Status == ChatConversationStatus.Open)
+        {
+            <button id="closeBtn" class="btn btn-outline-danger btn-sm ms-2">@Localizer["Close conversation"]</button>
+        }
+    </div>
+</div>
+
+<div class="chat-widget-panel chat-widget-panel-static" style="max-width: 480px;">
+    <div id="chatMessages" class="chat-widget-messages"></div>
+    <form id="chatForm" class="chat-widget-form">
+        @Html.AntiForgeryToken()
+        <input type="file" id="chatFile" hidden accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt,.csv,.zip" />
+        <button type="button" id="chatAttachBtn" class="btn btn-outline-secondary btn-sm" title="@Localizer["Attach a file or photo"]"><i class="bi bi-paperclip"></i></button>
+        <input type="text" id="chatInput" class="form-control" placeholder="@Localizer["Type a reply…"]" autocomplete="off" />
+        <button type="submit" class="btn btn-primary btn-sm"><i class="bi bi-send"></i></button>
+    </form>
+</div>
+
+<a class="mt-3 d-inline-block" asp-action="Index">&larr; @Localizer["Back to Conversations"]</a>
+
+@section Scripts {
+<script>
+(function () {
+    var conversationId = @Model.Id;
+    var messagesEl = document.getElementById("chatMessages");
+    var form = document.getElementById("chatForm");
+    var input = document.getElementById("chatInput");
+    var closeBtn = document.getElementById("closeBtn");
+    var statusBadge = document.getElementById("statusBadge");
+    var attachBtn = document.getElementById("chatAttachBtn");
+    var fileInput = document.getElementById("chatFile");
+
+    function escapeHtml(text) {
+        var div = document.createElement("div");
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    function renderAttachment(m) {
+        if (!m.attachmentUrl) {
+            return "";
+        }
+        var downloadUrl = m.attachmentUrl + "?download=true";
+        var fileName = escapeHtml(m.attachmentFileName || "attachment");
+        var downloadBtn = '<a href="' + downloadUrl + '" download="' + fileName + '" class="chat-attachment-download" title="Download" aria-label="Download ' + fileName + '"><i class="bi bi-download"></i></a>';
+
+        var viewLink = m.isImage
+            ? '<a href="' + m.attachmentUrl + '" target="_blank" rel="noopener noreferrer" class="chat-attachment-image-link">' +
+              '<img src="' + m.attachmentUrl + '" alt="' + fileName + '" class="chat-attachment-image" /></a>'
+            : '<a href="' + m.attachmentUrl + '" target="_blank" rel="noopener noreferrer" class="chat-attachment-file">' +
+              '<i class="bi bi-paperclip"></i> <span class="chat-attachment-file-name">' + fileName + '</span></a>';
+
+        return '<div class="chat-attachment">' + viewLink + downloadBtn + '</div>';
+    }
+
+    function renderMessage(m) {
+        var wrap = document.createElement("div");
+        wrap.className = "chat-bubble " + (m.isFromSupport ? "chat-bubble-support" : "chat-bubble-me");
+        var bodyHtml = m.body ? '<div>' + escapeHtml(m.body) + '</div>' : "";
+        wrap.innerHTML =
+            '<div class="chat-bubble-sender">' + escapeHtml(m.senderName) + '</div>' +
+            renderAttachment(m) + bodyHtml;
+        messagesEl.appendChild(wrap);
+        messagesEl.scrollTop = messagesEl.scrollHeight;
+    }
+
+    var connection = new signalR.HubConnectionBuilder()
+        .withUrl("/hubs/chat")
+        .withAutomaticReconnect()
+        .build();
+
+    connection.on("ReceiveMessage", function (convoId, message) {
+        if (convoId === conversationId) {
+            renderMessage(message);
+        }
+    });
+
+    connection.on("ConversationClosed", function (convoId) {
+        if (convoId === conversationId) {
+            statusBadge.textContent = "Closed";
+            statusBadge.className = "badge bg-secondary";
+            if (closeBtn) closeBtn.remove();
+        }
+    });
+
+    connection.start()
+        .then(function () { return connection.invoke("JoinConversation", conversationId); })
+        .then(function (history) {
+            history.forEach(renderMessage);
+        })
+        .catch(function (err) { console.error(err); });
+
+    form.addEventListener("submit", function (e) {
+        e.preventDefault();
+        var text = input.value.trim();
+        if (!text) return;
+        connection.invoke("SendMessage", conversationId, text).catch(function (err) { console.error(err); });
+        input.value = "";
+    });
+
+    if (closeBtn) {
+        closeBtn.addEventListener("click", function () {
+            connection.invoke("CloseConversation", conversationId).catch(function (err) { console.error(err); });
+        });
+    }
+
+    attachBtn.addEventListener("click", function () {
+        fileInput.click();
+    });
+
+    fileInput.addEventListener("change", function () {
+        var file = fileInput.files[0];
+        if (!file) return;
+
+        var token = form.querySelector('input[name="__RequestVerificationToken"]').value;
+        var formData = new FormData();
+        formData.append("conversationId", conversationId);
+        formData.append("file", file);
+        formData.append("caption", input.value.trim());
+        formData.append("__RequestVerificationToken", token);
+
+        attachBtn.disabled = true;
+        fetch("/chat/attachments", { method: "POST", body: formData })
+            .then(function (resp) {
+                if (!resp.ok) {
+                    return resp.text().then(function (t) { throw new Error(t || "Upload failed."); });
+                }
+                input.value = "";
+            })
+            .catch(function (err) {
+                alert(err.message || "Couldn't send that file.");
+            })
+            .finally(function () {
+                attachBtn.disabled = false;
+                fileInput.value = "";
+            });
+    });
+})();
+</script>
+}

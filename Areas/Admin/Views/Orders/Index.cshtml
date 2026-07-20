@@ -1,0 +1,25 @@
+@using WorldLinkMaster.Web.Models
+@model List<Order>
+@{
+    ViewData["Title"] = Localizer["Manage Orders"];
+}
+
+<h1>@Localizer["Orders"]</h1>
+<div class="table-responsive">
+<table class="table bg-white align-middle mt-3">
+    <thead><tr><th>@Localizer["Order #"]</th><th>@Localizer["Customer"]</th><th>@Localizer["Date"]</th><th>@Localizer["Status"]</th><th>@Localizer["Total"]</th><th></th></tr></thead>
+    <tbody>
+        @foreach (var order in Model)
+        {
+            <tr>
+                <td>#@order.Id</td>
+                <td>@order.User?.Email</td>
+                <td>@order.OrderDate.ToLocalTime().ToString("MMM d, yyyy")</td>
+                <td><span class="badge badge-status-@order.Status.ToString().ToLower()">@Localizer[order.Status.ToString()]</span></td>
+                <td>@order.Total.ToAed()</td>
+                <td><a class="btn btn-sm btn-outline-primary" asp-action="Details" asp-route-id="@order.Id">@Localizer["View"]</a></td>
+            </tr>
+        }
+    </tbody>
+</table>
+</div>

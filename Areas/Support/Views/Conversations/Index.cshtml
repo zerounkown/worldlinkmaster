@@ -1,0 +1,66 @@
+@using WorldLinkMaster.Web.Models.ViewModels
+@model List<ConversationListItemViewModel>
+@{
+    ViewData["Title"] = Localizer["Support Conversations"];
+    string tab = ViewBag.Tab;
+}
+
+<h1>@Localizer["Support Chat"]</h1>
+
+<ul class="nav nav-tabs mb-3">
+    <li class="nav-item">
+        <a class="nav-link @(tab != "closed" ? "active" : "")" asp-action="Index" asp-route-tab="open">@Localizer["Open"]</a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link @(tab == "closed" ? "active" : "")" asp-action="Index" asp-route-tab="closed">@Localizer["Closed"]</a>
+    </li>
+</ul>
+
+<div id="conversationListRoot">
+<div class="table-responsive">
+<table class="table bg-white align-middle">
+    <thead><tr><th>@Localizer["Customer"]</th><th>@Localizer["Last message"]</th><th>@Localizer["Assigned to"]</th><th>@Localizer["Started"]</th><th></th></tr></thead>
+    <tbody>
+        @if (Model.Count == 0)
+        {
+            <tr><td colspan="5" class="text-muted">@Localizer["No {0} conversations.", tab == "closed" ? Localizer["Closed"].Value : Localizer["Open"].Value]</td></tr>
+        }
+        @foreach (var c in Model)
+        {
+            <tr>
+                <td>
+                    <div>@(string.IsNullOrWhiteSpace(c.CustomerName) ? c.CustomerEmail : c.CustomerName)</div>
+                    <div class="text-muted small">@c.CustomerEmail</div>
+                </td>
+                <td class="text-truncate" style="max-width: 320px;">@c.LastMessagePreview</td>
+                <td>@(c.AssignedAgentName ?? "—")</td>
+                <td>@c.CreatedAt.ToLocalTime().ToString("MMM d, yyyy h:mm tt")</td>
+                <td><a class="btn btn-sm btn-outline-primary" asp-action="Details" asp-route-id="@c.Id">@Localizer["Open Chat"]</a></td>
+            </tr>
+        }
+    </tbody>
+</table>
+</div>
+</div>
+
+@section Scripts {
+<script>
+(function () {
+    var connection = new signalR.HubConnectionBuilder()
+        .withUrl("/hubs/chat")
+        .withAutomaticReconnect()
+        .build();
+
+    connection.on("NewConversation", function () {
+        if ('@tab' === 'open') {
+            location.reload();
+        }
+    });
+    connection.on("ConversationUpdated", function () {
+        location.reload();
+    });
+
+    connection.start().catch(function (err) { console.error(err); });
+})();
+</script>
+}

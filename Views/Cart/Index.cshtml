@@ -1,0 +1,93 @@
+@using WorldLinkMaster.Web.Models.ViewModels
+@model CartViewModel
+@{
+    ViewData["Title"] = Localizer["Your Cart"];
+}
+
+<div class="page-banner">
+    <div class="container"><h1>@Localizer["Your Cart"]</h1></div>
+</div>
+
+<div class="container mb-5">
+    @if (TempData["CartMessage"] != null)
+    {
+        <div class="alert alert-info">@TempData["CartMessage"]</div>
+    }
+    @if (Model.Items.Count == 0)
+    {
+        <p>@Localizer["Your cart is empty."] <a asp-controller="Products" asp-action="Index">@Localizer["Continue Shopping"]</a>.</p>
+    }
+    else
+    {
+        <div class="row">
+            <div class="col-12 col-md-8">
+                <div class="table-responsive">
+                <table class="table cart-table align-middle">
+                    <thead>
+                        <tr>
+                            <th>@Localizer["Product"]</th>
+                            <th>@Localizer["Price"]</th>
+                            <th>@Localizer["Quantity"]</th>
+                            <th>@Localizer["Total"]</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var item in Model.Items)
+                        {
+                            <tr>
+                                <td class="d-flex align-items-center gap-3">
+                                    <img src="@item.ImageUrl" alt="@item.Name" style="width:60px;height:60px;object-fit:cover;border-radius:4px;" />
+                                    <span>
+                                        @item.Name
+                                        @if (!string.IsNullOrEmpty(item.Color) || !string.IsNullOrEmpty(item.Size))
+                                        {
+                                            <br />
+                                            <small class="text-muted">
+                                                @if (!string.IsNullOrEmpty(item.Color)) { <text>@Localizer["Color"]: @item.Color</text> }
+                                                @if (!string.IsNullOrEmpty(item.Color) && !string.IsNullOrEmpty(item.Size)) { <text> &middot; </text> }
+                                                @if (!string.IsNullOrEmpty(item.Size)) { <text>@Localizer["Size"]: @item.Size</text> }
+                                            </small>
+                                        }
+                                    </span>
+                                </td>
+                                <td>@item.UnitPrice.ToDisplayCurrency()</td>
+                                <td>
+                                    <form asp-controller="Cart" asp-action="UpdateQuantity" method="post" class="d-flex gap-2">
+                                        <input type="hidden" name="productId" value="@item.ProductId" />
+                                        <input type="hidden" name="color" value="@item.Color" />
+                                        <input type="hidden" name="size" value="@item.Size" />
+                                        <input type="number" name="quantity" value="@item.Quantity" min="1" class="form-control" style="width: 70px;" />
+                                        <button type="submit" class="btn btn-sm btn-outline-primary">@Localizer["Update"]</button>
+                                    </form>
+                                </td>
+                                <td>@item.LineTotal.ToDisplayCurrency()</td>
+                                <td>
+                                    <form asp-controller="Cart" asp-action="Remove" method="post">
+                                        <input type="hidden" name="productId" value="@item.ProductId" />
+                                        <input type="hidden" name="color" value="@item.Color" />
+                                        <input type="hidden" name="size" value="@item.Size" />
+                                        <partial name="_AnimatedDeleteButton" model="@((string?)null)" />
+                                    </form>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+                </div>
+            </div>
+            <div class="col-12 col-md-4">
+                <div class="summary-box">
+                    <h4>@Localizer["Order Summary"]</h4>
+                    <div class="d-flex justify-content-between mb-2">
+                        <span>@Localizer["Subtotal"]</span>
+                        <span>@Model.Subtotal.ToDisplayCurrency()</span>
+                    </div>
+                    <p class="text-muted small">@Localizer["Shipping and taxes calculated at checkout."]</p>
+                    <a class="btn-wlm w-100 text-center d-block" asp-controller="Checkout" asp-action="Index">@Localizer["Proceed to Checkout"]</a>
+                    <a class="d-block text-center mt-3" asp-controller="Products" asp-action="Index">@Localizer["Continue Shopping"]</a>
+                </div>
+            </div>
+        </div>
+    }
+</div>

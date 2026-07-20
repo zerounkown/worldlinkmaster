@@ -1,0 +1,23 @@
+# Build output
+bin/
+obj/
+**/bin/
+**/obj/
+
+# IDE / VCS
+.vs/
+.git/
+.gitignore
+*.user
+
+# Local-only secrets & environment config — must never enter the image
+appsettings.Development.json
+appsettings.*.Local.json
+**/secrets.json
+.env
+*.env
+
+# Docs / logs / uploads
+*.md
+logs/
+wwwroot/uploads/

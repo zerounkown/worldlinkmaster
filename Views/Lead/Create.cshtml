@@ -1,0 +1,115 @@
+@using Microsoft.Extensions.Configuration
+@model WorldLinkMaster.Web.Models.ViewModels.LeadFormViewModel
+@inject IConfiguration Configuration
+@{
+    ViewData["Title"] = "تواصل معنا";
+    var recaptchaSiteKey = Configuration["Recaptcha:SiteKey"];
+}
+
+<div class="container" style="max-width: 520px; margin-top: 40px;">
+    <h2>تواصل معنا</h2>
+
+    <div id="lead-form-alert" style="display:none;" class="alert"></div>
+
+    <form id="leadForm" asp-action="Create" asp-controller="Lead">
+        @Html.AntiForgeryToken()
+
+        <div class="form-group mb-3">
+            <label asp-for="Name"></label>
+            <input asp-for="Name" class="form-control" />
+            <span asp-validation-for="Name" class="text-danger"></span>
+        </div>
+
+        <div class="form-group mb-3">
+            <label asp-for="Email"></label>
+            <input asp-for="Email" class="form-control" />
+            <span asp-validation-for="Email" class="text-danger"></span>
+        </div>
+
+        <div class="form-group mb-3">
+            <label asp-for="Phone"></label>
+            <input asp-for="Phone" class="form-control" />
+            <span asp-validation-for="Phone" class="text-danger"></span>
+        </div>
+
+        <div class="form-group mb-3">
+            <label asp-for="Message"></label>
+            <textarea asp-for="Message" class="form-control" rows="4"></textarea>
+        </div>
+
+        <!-- Honeypot: مخفي بالـ CSS، المستخدم الحقيقي مش هيشوفه أو يملاه -->
+        <div style="position:absolute; left:-9999px;" aria-hidden="true">
+            <label asp-for="Website">لا تملأ هذا الحقل</label>
+            <input asp-for="Website" tabindex="-1" autocomplete="off" />
+        </div>
+
+        <input type="hidden" asp-for="RecaptchaToken" id="RecaptchaToken" />
+
+        <button type="submit" class="btn btn-primary" id="submitBtn">أرسل</button>
+    </form>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+
+    @if (!string.IsNullOrWhiteSpace(recaptchaSiteKey))
+    {
+        <script src="https://www.google.com/recaptcha/api.js?render=@recaptchaSiteKey"></script>
+    }
+    <script>
+        const form = document.getElementById("leadForm");
+        const alertBox = document.getElementById("lead-form-alert");
+        const submitBtn = document.getElementById("submitBtn");
+        const recaptchaSiteKey = @Html.Raw(string.IsNullOrWhiteSpace(recaptchaSiteKey) ? "null" : $"\"{recaptchaSiteKey}\"");
+
+        async function submitLeadForm() {
+            const formData = new FormData(form);
+            const antiForgeryToken = document.querySelector('input[name="__RequestVerificationToken"]').value;
+
+            try {
+                const res = await fetch(form.action, {
+                    method: "POST",
+                    headers: { "RequestVerificationToken": antiForgeryToken },
+                    body: formData
+                });
+                const data = await res.json();
+
+                alertBox.style.display = "block";
+                if (data.success) {
+                    alertBox.className = "alert alert-success";
+                    alertBox.textContent = data.message;
+                    form.reset();
+                } else {
+                    alertBox.className = "alert alert-danger";
+                    alertBox.textContent = data.message;
+                }
+            } catch (err) {
+                alertBox.style.display = "block";
+                alertBox.className = "alert alert-danger";
+                alertBox.textContent = "حدث خطأ، حاول مرة أخرى";
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.textContent = "أرسل";
+            }
+        }
+
+        form.addEventListener("submit", function (e) {
+            e.preventDefault();
+            submitBtn.disabled = true;
+            submitBtn.textContent = "جاري الإرسال...";
+
+            // reCAPTCHA is optional until Recaptcha:SiteKey is configured — same
+            // "skip gracefully" pattern as the server-side check in RecaptchaService.
+            if (recaptchaSiteKey && window.grecaptcha) {
+                grecaptcha.ready(function () {
+                    grecaptcha.execute(recaptchaSiteKey, { action: "submit" }).then(function (token) {
+                        document.getElementById("RecaptchaToken").value = token;
+                        submitLeadForm();
+                    });
+                });
+            } else {
+                submitLeadForm();
+            }
+        });
+    </script>
+}

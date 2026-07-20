@@ -1,0 +1,48 @@
+@using WorldLinkMaster.Web.Models
+@model QuoteRequest
+@{
+    ViewData["Title"] = Localizer["Quote Request Confirmed"];
+    var requestNumber = $"WLM-Q-{Model.Id:D6}";
+}
+
+<div class="container my-5 text-center">
+    <i class="bi bi-check-circle text-success" style="font-size: 3rem;"></i>
+    <h1>@Localizer["Thank you for your request!"]</h1>
+    <p class="lead">@Localizer["Your quote request has been submitted successfully."]</p>
+
+    <div class="row justify-content-center mt-4">
+        <div class="col-12 col-md-6">
+            <div class="summary-box text-start">
+                <p class="text-muted small mb-1 text-center">@Localizer["Request Number"]</p>
+                <p class="quote-request-number text-center">@requestNumber</p>
+                <hr />
+                <p class="mb-1"><strong>@Localizer["Company:"]</strong> @Model.CompanyName</p>
+                <p class="mb-1"><strong>@Localizer["Email:"]</strong> @Model.Email</p>
+                <p class="mb-1"><strong>@Localizer["Phone"]:</strong> @Model.Phone</p>
+                <p class="mb-1"><strong>@Localizer["Quantity"]:</strong> @Model.Quantity</p>
+                <p class="mb-0"><strong>@Localizer["Submitted:"]</strong> @Model.CreatedAt.ToLocalTime().ToString("MMM d, yyyy h:mm tt")</p>
+
+                @if (Model.RespondedAt.HasValue)
+                {
+                    <hr />
+                    <p class="mb-1"><strong>@Localizer["Status"]:</strong> @Localizer[Model.Status.ToString()]</p>
+                    @if (Model.QuotedPrice.HasValue)
+                    {
+                        <p class="mb-1"><strong>@Localizer["Quoted Price"]:</strong> @Model.QuotedPrice.Value.ToDisplayCurrency()</p>
+                    }
+                    @if (!string.IsNullOrWhiteSpace(Model.AdminNotes))
+                    {
+                        <p class="mb-0" style="white-space: pre-wrap;">@Model.AdminNotes</p>
+                    }
+                }
+                else
+                {
+                    <hr />
+                    <p class="mb-0 text-muted small">@Localizer["Our team will review your request and follow up by email or phone with your pricing. Keep your request number for your records."]</p>
+                }
+            </div>
+        </div>
+    </div>
+
+    <a class="btn-wlm mt-4 d-inline-block" asp-controller="Products" asp-action="Index">@Localizer["Continue Shopping"]</a>
+</div>

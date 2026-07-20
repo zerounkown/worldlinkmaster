@@ -1,0 +1,49 @@
+@page
+@model RegisterModel
+
+@{
+    ViewData["Title"] = Localizer["Register"];
+}
+
+<div class="row justify-content-center">
+    <div class="col-md-4">
+        <section class="auth-card">
+            <div class="auth-card-icon">
+                <i class="bi bi-person-plus"></i>
+            </div>
+            <h1 class="auth-card-title">@Localizer["Create your account"]</h1>
+            <p class="auth-card-subtitle">@Localizer["Join World Link Master for faster checkout, order tracking, and member-only coupons."]</p>
+
+            <form id="registerForm" asp-route-returnUrl="@Model.ReturnUrl" method="post">
+                <div asp-validation-summary="ModelOnly" class="text-danger" role="alert"></div>
+                <div class="form-floating mb-3">
+                    <input asp-for="Input.Email" class="form-control" autocomplete="username" aria-required="true" placeholder="name@example.com" />
+                    <label asp-for="Input.Email" class="form-label">@Localizer["Email"]</label>
+                    <span asp-validation-for="Input.Email" class="text-danger"></span>
+                </div>
+                <div class="form-floating mb-3">
+                    <input asp-for="Input.Password" class="form-control" autocomplete="new-password" aria-required="true" placeholder="password" />
+                    <label asp-for="Input.Password" class="form-label">@Localizer["Password"]</label>
+                    <span asp-validation-for="Input.Password" class="text-danger"></span>
+                </div>
+                <div class="form-floating mb-3">
+                    <input asp-for="Input.ConfirmPassword" class="form-control" autocomplete="new-password" aria-required="true" placeholder="password" />
+                    <label asp-for="Input.ConfirmPassword" class="form-label">@Localizer["Confirm password"]</label>
+                    <span asp-validation-for="Input.ConfirmPassword" class="text-danger"></span>
+                </div>
+                <div>
+                    <button id="registerSubmit" type="submit" class="w-100 btn btn-lg btn-primary">@Localizer["Register"]</button>
+                </div>
+                <div class="auth-card-links">
+                    <p>
+                        @Localizer["Already have an account?"] <a asp-page="./Login" asp-route-returnUrl="@Model.ReturnUrl">@Localizer["Log in"]</a>
+                    </p>
+                </div>
+            </form>
+        </section>
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

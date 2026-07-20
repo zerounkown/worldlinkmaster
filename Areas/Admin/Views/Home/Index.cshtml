@@ -1,0 +1,54 @@
+@using WorldLinkMaster.Web.Models
+@{
+    ViewData["Title"] = Localizer["Admin Dashboard"];
+    var recentOrders = ViewBag.RecentOrders as List<Order> ?? new List<Order>();
+}
+
+<h1>@Localizer["Dashboard"]</h1>
+<div class="row g-3 my-3">
+    <div class="col-6 col-md-4">
+        <div class="summary-box text-center">
+            <h2>@ViewBag.ProductCount</h2>
+            <p class="mb-0">@Localizer["Products"]</p>
+        </div>
+    </div>
+    <div class="col-6 col-md-4">
+        <div class="summary-box text-center">
+            <h2>@ViewBag.CategoryCount</h2>
+            <p class="mb-0">@Localizer["Categories"]</p>
+        </div>
+    </div>
+    <div class="col-6 col-md-4">
+        <div class="summary-box text-center">
+            <h2>@ViewBag.OrderCount</h2>
+            <p class="mb-0">@Localizer["Orders"]</p>
+        </div>
+    </div>
+    <div class="col-6 col-md-4">
+        <div class="summary-box text-center">
+            <a asp-controller="Customers" asp-action="Index" class="text-decoration-none">
+                <h2>@ViewBag.CustomerCount</h2>
+                <p class="mb-0">@Localizer["Customers"]</p>
+            </a>
+        </div>
+    </div>
+</div>
+
+<h4 class="mt-4">@Localizer["Recent Orders"]</h4>
+<div class="table-responsive">
+<table class="table bg-white">
+    <thead><tr><th>@Localizer["Order #"]</th><th>@Localizer["Date"]</th><th>@Localizer["Status"]</th><th>@Localizer["Total"]</th><th></th></tr></thead>
+    <tbody>
+        @foreach (var order in recentOrders)
+        {
+            <tr>
+                <td>#@order.Id</td>
+                <td>@order.OrderDate.ToLocalTime().ToString("MMM d, yyyy")</td>
+                <td><span class="badge badge-status-@order.Status.ToString().ToLower()">@Localizer[order.Status.ToString()]</span></td>
+                <td>@order.Total.ToAed()</td>
+                <td><a asp-controller="Orders" asp-action="Details" asp-route-id="@order.Id">@Localizer["View"]</a></td>
+            </tr>
+        }
+    </tbody>
+</table>
+</div>

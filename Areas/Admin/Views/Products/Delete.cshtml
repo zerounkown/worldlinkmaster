@@ -1,0 +1,25 @@
+@using WorldLinkMaster.Web.Models
+@model Product
+@{
+    ViewData["Title"] = Localizer["Delete Product"];
+    int orderCount = ViewBag.OrderCount;
+}
+
+<h1>@Localizer["Delete Product"]</h1>
+<p>@Localizer["Are you sure you want to delete {0} ({1})?", Model.Name, Model.Category?.Name]</p>
+
+@if (orderCount > 0)
+{
+    <div class="alert alert-warning">
+        @Localizer["This product can't be deleted — it appears in {0} order(s). Deleting it would break that order history.", orderCount]
+        <br />@Localizer["Instead,"] <a asp-action="Edit" asp-route-id="@Model.Id">@Localizer["edit it"]</a> @Localizer["and set"] <strong>@Localizer["Stock"]</strong> @Localizer["to 0 to retire it from the storefront."]
+    </div>
+    <a asp-action="Index" class="btn btn-outline-secondary">@Localizer["Back to Products"]</a>
+}
+else
+{
+    <form asp-action="Delete" asp-route-id="@Model.Id" method="post">
+        <partial name="_AnimatedDeleteButton" model="@Localizer["Delete"].Value" />
+        <a asp-action="Index" class="btn btn-outline-secondary">@Localizer["Cancel"]</a>
+    </form>
+}

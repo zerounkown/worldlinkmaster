@@ -1,0 +1,68 @@
+@using WorldLinkMaster.Web.Models.ViewModels
+@model CustomerEditViewModel
+@{
+    ViewData["Title"] = Localizer["Edit Customer"];
+}
+
+<h1>@Localizer["Edit Customer"]</h1>
+
+<div asp-validation-summary="ModelOnly" class="text-danger"></div>
+
+<form asp-action="Edit" asp-route-id="@Model.Id" method="post" class="col-12 col-md-8">
+    <input type="hidden" asp-for="Id" />
+
+    <div class="mb-3">
+        <label asp-for="Email" class="form-label">@Localizer["Email"]</label>
+        <input asp-for="Email" class="form-control" />
+        <span asp-validation-for="Email" class="text-danger"></span>
+    </div>
+    <div class="row">
+        <div class="col-6 mb-3">
+            <label asp-for="FirstName" class="form-label">@Localizer["First Name"]</label>
+            <input asp-for="FirstName" class="form-control" />
+        </div>
+        <div class="col-6 mb-3">
+            <label asp-for="LastName" class="form-label">@Localizer["Last Name"]</label>
+            <input asp-for="LastName" class="form-control" />
+        </div>
+    </div>
+    <div class="mb-3">
+        <label asp-for="PhoneNumber" class="form-label">@Localizer["Phone"]</label>
+        <input asp-for="PhoneNumber" class="form-control" />
+        <span asp-validation-for="PhoneNumber" class="text-danger"></span>
+    </div>
+
+    <div class="form-check mb-2">
+        <input asp-for="EmailConfirmed" class="form-check-input" />
+        <label asp-for="EmailConfirmed" class="form-check-label">@Localizer["Email confirmed"]</label>
+    </div>
+    <div class="form-check mb-3">
+        <input asp-for="LockedOut" class="form-check-input" />
+        <label asp-for="LockedOut" class="form-check-label">@Localizer["Lock account (customer can't sign in)"]</label>
+    </div>
+
+    <h5>@Localizer["Roles"]</h5>
+    <div class="form-check">
+        <input asp-for="IsAdmin" class="form-check-input" />
+        <label asp-for="IsAdmin" class="form-check-label">@Localizer["Admin"]</label>
+    </div>
+    <div class="form-check">
+        <input asp-for="IsMerchant" class="form-check-input" />
+        <label asp-for="IsMerchant" class="form-check-label">@Localizer["Merchant"]</label>
+    </div>
+    <div class="form-check">
+        <input asp-for="IsWholesale" class="form-check-input" />
+        <label asp-for="IsWholesale" class="form-check-label">@Localizer["Wholesale Account"]</label>
+    </div>
+    <div class="form-check mb-2">
+        <input asp-for="IsCustomer" class="form-check-input" />
+        <label asp-for="IsCustomer" class="form-check-label">@Localizer["Customer"]</label>
+    </div>
+    <div class="form-check mb-3">
+        <input asp-for="IsSupport" class="form-check-input" />
+        <label asp-for="IsSupport" class="form-check-label">@Localizer["Support (access to the support chat console)"]</label>
+    </div>
+
+    <button type="submit" class="btn btn-primary">@Localizer["Save"]</button>
+    <a asp-action="Details" asp-route-id="@Model.Id" class="btn btn-outline-secondary">@Localizer["Cancel"]</a>
+</form>

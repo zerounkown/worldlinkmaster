@@ -1,0 +1,25 @@
+@using WorldLinkMaster.Web.Models
+@using WorldLinkMaster.Web.Extensions
+@model List<Category>
+@{
+    ViewData["Title"] = Localizer["Collections"];
+}
+
+<div class="page-banner">
+    <div class="container">
+        <h1>@Localizer["Collections"]</h1>
+        <p class="mb-0">@Localizer["Pick a category to see everything we carry in it."]</p>
+    </div>
+</div>
+
+<div class="container mb-5">
+    <div class="collections-grid">
+        @foreach (var category in Model)
+        {
+            <a class="collections-tile" asp-controller="Products" asp-action="Index" asp-route-categoryId="@category.Id">
+                <img src="@category.ImageUrl" alt="@category.LocalizedName()" />
+                <span class="collections-tile-label">@category.LocalizedName()</span>
+            </a>
+        }
+    </div>
+</div>

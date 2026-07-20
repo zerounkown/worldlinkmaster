@@ -1,0 +1,10 @@
+@using WorldLinkMaster.Web.Models
+@model Subcategory
+@{
+    ViewData["Title"] = Localizer["New Subcategory"];
+}
+
+<h1>@Localizer["New Subcategory"]</h1>
+<form asp-action="Create" method="post">
+    <partial name="_Form" />
+</form>

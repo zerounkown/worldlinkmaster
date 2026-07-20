@@ -1,0 +1,143 @@
+@using WorldLinkMaster.Web.Models
+@using WorldLinkMaster.Web.Extensions
+@model Product
+@{
+    ViewData["Title"] = Model.LocalizedName();
+    var related = ViewBag.Related as List<Product> ?? new List<Product>();
+    var gallery = new List<string>();
+    if (!string.IsNullOrEmpty(Model.ImageUrl)) { gallery.Add(Model.ImageUrl); }
+    gallery.AddRange(Model.Images.Select(i => i.ImageUrl));
+    var activeEvent = ViewBag.ActiveEvent as PromoEvent;
+    var salePrice = activeEvent != null ? Model.Price * (1 - activeEvent.DiscountPercent / 100m) : (decimal?)null;
+}
+
+<div class="container mt-4 mb-5">
+    @if (TempData["CartMessage"] != null)
+    {
+        <div class="alert alert-success">@TempData["CartMessage"]</div>
+    }
+    <nav class="mb-3">
+        <a asp-controller="Products" asp-action="Index">@Localizer["All Products"]</a> /
+        <a asp-controller="Products" asp-action="Index" asp-route-categoryId="@Model.CategoryId">@Model.Category?.LocalizedName()</a> /
+        <span>@Model.LocalizedName()</span>
+    </nav>
+
+    <div class="row g-5">
+        <div class="col-12 col-md-5">
+            <div class="product-zoom-container" id="zoomContainer">
+                <img src="@gallery[0]" alt="@Model.LocalizedName()" class="product-zoom-image" id="mainProductImage" />
+                <span class="zoom-hint"><i class="bi bi-zoom-in"></i> @Localizer["Hover to zoom · Click to enlarge"]</span>
+            </div>
+            @if (gallery.Count > 1)
+            {
+                <div class="product-thumbs">
+                    @for (int i = 0; i < gallery.Count; i++)
+                    {
+                        <img src="@gallery[i]" class="product-thumb @(i == 0 ? "active" : "")" data-full="@gallery[i]" alt="@Model.LocalizedName() view @(i + 1)" />
+                    }
+                </div>
+            }
+        </div>
+        <div class="col-12 col-md-7">
+            <span class="category-tag">@Model.Category?.LocalizedName()</span>
+            <h1>@Model.LocalizedName()</h1>
+            <partial name="_StarRating" model="Model" />
+            <p class="text-muted mt-1">@Localizer["SKU"]: @Model.Sku &middot; @Localizer["{0} reviews", Model.ReviewCount]</p>
+            @if (Model.Merchant != null)
+            {
+                <p class="text-muted small mb-2"><i class="bi bi-shop"></i> @Localizer["Sold by"] <strong>@Model.Merchant.BusinessName</strong></p>
+            }
+            @if (salePrice.HasValue)
+            {
+                <div class="d-flex align-items-center gap-2 mb-3">
+                    <span class="sale-ribbon"><i class="bi bi-stars"></i> @activeEvent!.Name &mdash; @activeEvent.DiscountPercent.ToString("0.##")% @Localizer["OFF (badge)"]</span>
+                </div>
+                <h3 class="price-detail mb-3">
+                    <span class="price-was">@Model.Price.ToDisplayCurrency()</span>
+                    <span class="price price-sale">@salePrice.Value.ToDisplayCurrency()</span>
+                </h3>
+            }
+            else
+            {
+                <h3 class="price mb-3">@Model.Price.ToDisplayCurrency()</h3>
+            }
+            <p>@Model.LocalizedDescription()</p>
+
+            @if (Model.StockQuantity > 0)
+            {
+                <p class="text-success"><i class="bi bi-check-circle"></i> @Localizer["In Stock ({0} available)", Model.StockQuantity]</p>
+                <form asp-controller="Cart" asp-action="Add" method="post">
+                    <input type="hidden" name="productId" value="@Model.Id" />
+
+                    @if (Model.Colors.Count > 0)
+                    {
+                        <div class="mb-3">
+                            <label class="option-label">@Localizer["Color"]</label>
+                            <div class="color-options">
+                                @for (int i = 0; i < Model.Colors.Count; i++)
+                                {
+                                    var color = Model.Colors.ElementAt(i);
+                                    var swatchStyle = string.IsNullOrEmpty(color.ImageUrl)
+                                        ? $"background-color: {color.HexCode};"
+                                        : $"background-color: {color.HexCode}; background-image: url('{color.ImageUrl}');";
+                                    <label class="color-swatch" style="@swatchStyle" title="@color.Name">
+                                        <input type="radio" name="color" value="@color.Name" data-image="@(color.ImageUrl ?? Model.ImageUrl)" data-label="@color.Name" required="@(i == 0 ? "required" : null)" checked="@(i == 0 ? "checked" : null)" />
+                                    </label>
+                                }
+                            </div>
+                            <span class="option-value" id="selectedColorLabel">@Model.Colors.First().Name</span>
+                        </div>
+                    }
+
+                    @if (Model.Sizes.Count > 0)
+                    {
+                        <div class="mb-3">
+                            <label class="option-label">@Localizer["Size"]</label>
+                            <div class="size-options">
+                                @for (int i = 0; i < Model.Sizes.Count; i++)
+                                {
+                                    var size = Model.Sizes.ElementAt(i);
+                                    <label class="size-pill">
+                                        <input type="radio" name="size" value="@size.Label" required="@(i == 0 ? "required" : null)" checked="@(i == 0 ? "checked" : null)" />
+                                        <span>@size.Label</span>
+                                    </label>
+                                }
+                            </div>
+                        </div>
+                    }
+
+                    <div class="d-flex align-items-center gap-2">
+                        <input type="number" name="quantity" value="1" min="1" max="@Model.StockQuantity" class="form-control" style="width: 90px;" />
+                        <button type="submit" class="btn-wlm">@Localizer["Add to Cart"]</button>
+                    </div>
+                </form>
+            }
+            else
+            {
+                <p class="text-danger"><i class="bi bi-x-circle"></i> @Localizer["Out of Stock"]</p>
+            }
+        </div>
+    </div>
+
+    @if (related.Count > 0)
+    {
+        <div class="section-title mt-5">
+            <h2>@Localizer["You May Also Like"]</h2>
+        </div>
+        <div class="product-grid">
+            @foreach (var product in related)
+            {
+                <partial name="_ProductCard" model="product" />
+            }
+        </div>
+    }
+</div>
+
+<div class="zoom-lightbox" id="zoomLightbox">
+    <button type="button" class="zoom-lightbox-close" id="zoomLightboxClose">&times;</button>
+    <img src="" alt="" id="zoomLightboxImage" />
+</div>
+
+@section Scripts {
+    <script src="~/js/product-gallery.js" asp-append-version="true"></script>
+}

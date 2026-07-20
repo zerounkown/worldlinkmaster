@@ -1,0 +1,50 @@
+@using WorldLinkMaster.Web.Models
+@model List<QuoteRequest>
+@{
+    ViewData["Title"] = Localizer["Quote Requests"];
+    QuoteStatus? selectedStatus = ViewBag.SelectedStatus;
+}
+
+<h1>@Localizer["Quote Requests"]</h1>
+
+<ul class="nav nav-tabs mb-3">
+    <li class="nav-item">
+        <a class="nav-link @(selectedStatus == null ? "active" : "")" asp-action="Index">@Localizer["All"]</a>
+    </li>
+    @foreach (var status in Enum.GetValues<QuoteStatus>())
+    {
+        <li class="nav-item">
+            <a class="nav-link @(selectedStatus == status ? "active" : "")" asp-action="Index" asp-route-status="@status">@Localizer[status.ToString()]</a>
+        </li>
+    }
+</ul>
+
+<div class="table-responsive">
+<table class="table bg-white align-middle mt-3">
+    <thead><tr><th>@Localizer["Request #"]</th><th>@Localizer["Company"]</th><th>@Localizer["Contact"]</th><th>@Localizer["Quantity"]</th><th>@Localizer["Quoted Price"]</th><th>@Localizer["Submitted"]</th><th>@Localizer["Status"]</th><th></th></tr></thead>
+    <tbody>
+        @foreach (var request in Model)
+        {
+            <tr>
+                <td>WLM-Q-@(request.Id.ToString("D6"))</td>
+                <td>@request.CompanyName</td>
+                <td>
+                    <div class="small">@request.Email</div>
+                    <div class="small text-muted">@request.Phone</div>
+                </td>
+                <td>@request.Quantity</td>
+                <td>@(request.QuotedPrice.HasValue ? request.QuotedPrice.Value.ToAed() : "—")</td>
+                <td>@request.CreatedAt.ToLocalTime().ToString("MMM d, yyyy")</td>
+                <td>
+                    <span class="badge bg-@(request.Status switch { QuoteStatus.Pending => "warning text-dark", QuoteStatus.Quoted => "info text-dark", QuoteStatus.Approved => "success", QuoteStatus.Rejected => "danger", _ => "secondary" })">@Localizer[request.Status.ToString()]</span>
+                </td>
+                <td><a class="btn btn-sm btn-outline-primary" asp-action="Details" asp-route-id="@request.Id">@Localizer["View"]</a></td>
+            </tr>
+        }
+        @if (Model.Count == 0)
+        {
+            <tr><td colspan="8" class="text-muted">@Localizer["No quote requests found."]</td></tr>
+        }
+    </tbody>
+</table>
+</div>

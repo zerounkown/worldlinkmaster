@@ -1,0 +1,62 @@
+@using WorldLinkMaster.Web.Models
+@model List<Product>
+@{
+    ViewData["Title"] = Localizer["Sales"];
+    var activeEvent = ViewBag.ActiveEvent as PromoEvent;
+    var totalCount = ViewBag.TotalCount is int tc ? tc : 0;
+    var page = ViewBag.Page is int p ? p : 1;
+    var totalPages = ViewBag.TotalPages is int tp ? tp : 1;
+}
+
+<div class="page-banner page-banner-sale">
+    <div class="container">
+        <h1>@Localizer["Sales"]</h1>
+        @if (activeEvent != null)
+        {
+            <p class="mb-0">@activeEvent.Name &mdash; @activeEvent.DiscountPercent.ToString("0.##")% @Localizer["OFF everything, storewide!"]</p>
+        }
+    </div>
+</div>
+
+<div class="container mb-5">
+    @if (activeEvent == null)
+    {
+        <div class="no-sale-state">
+            <i class="bi bi-tag"></i>
+            <h3>@Localizer["No active sales right now"]</h3>
+            <p>@Localizer["Check back soon for the next storewide discount."]</p>
+            <a class="btn-wlm" asp-action="Index">@Localizer["Continue Shopping"]</a>
+        </div>
+    }
+    else if (Model.Count == 0)
+    {
+        <p>@Localizer["No products found. Try a different category or search term."]</p>
+    }
+    else
+    {
+        <div class="sort-bar">
+            <span class="sort-bar-count">@Localizer["{0} product(s)", totalCount]</span>
+        </div>
+
+        <div class="product-grid">
+            @foreach (var product in Model)
+            {
+                <partial name="_ProductCard" model="product" />
+            }
+        </div>
+
+        @if (totalPages > 1)
+        {
+            <nav>
+                <ul class="pagination">
+                    @for (int i = 1; i <= totalPages; i++)
+                    {
+                        <li class="page-item @(i == page ? "active" : "")">
+                            <a class="page-link" asp-action="Sales" asp-route-page="@i">@i</a>
+                        </li>
+                    }
+                </ul>
+            </nav>
+        }
+    }
+</div>

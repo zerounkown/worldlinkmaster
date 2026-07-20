@@ -1,0 +1,50 @@
+@using WorldLinkMaster.Web.Models
+@model Order
+@{
+    ViewData["Title"] = Localizer["Order Confirmed"];
+}
+
+<div class="container my-5 text-center">
+    <i class="bi bi-check-circle text-success" style="font-size: 3rem;"></i>
+    <h1>@Localizer["Thank you for your order!"]</h1>
+    <p class="lead">@Localizer["Order #{0} has been placed and is now {1}.", Model.Id, Model.Status]</p>
+    <p>@Localizer["A confirmation would normally be emailed to you. You can review this order any time under"] <a asp-controller="Orders" asp-action="Index">@Localizer["My Orders"]</a>.</p>
+
+    @if (TempData["NewLoyaltyCouponCode"] != null)
+    {
+        <div class="loyalty-celebration mx-auto mt-3">
+            🎉 <strong>@Localizer["You've unlocked a loyalty reward!"]</strong> @Localizer["Enjoy {0}% off your next order with code {1}.", TempData["NewLoyaltyDiscountPercent"]!, TempData["NewLoyaltyCouponCode"]!]
+            <br /><a asp-controller="Coupons" asp-action="Index">@Localizer["View My Coupons"] &rarr;</a>
+        </div>
+    }
+
+    <div class="row justify-content-center mt-4">
+        <div class="col-12 col-md-6">
+            <div class="summary-box text-start">
+                <h4>@Localizer["Order Details"]</h4>
+                @foreach (var item in Model.Items)
+                {
+                    <div class="d-flex justify-content-between mb-2">
+                        <span>
+                            @item.ProductName &times; @item.Quantity
+                            @if (!string.IsNullOrEmpty(item.Color) || !string.IsNullOrEmpty(item.Size))
+                            {
+                                <br /><small class="text-muted">@item.Color @(!string.IsNullOrEmpty(item.Color) && !string.IsNullOrEmpty(item.Size) ? " / " : "") @item.Size</small>
+                            }
+                        </span>
+                        <span>@item.LineTotal.ToDisplayCurrency()</span>
+                    </div>
+                }
+                <hr />
+                <div class="d-flex justify-content-between fw-bold">
+                    <span>@Localizer["Total"]</span>
+                    <span>@Model.Total.ToDisplayCurrency()</span>
+                </div>
+                <hr />
+                <p class="mb-0">@Localizer["Shipping to:"]<br />@Model.ShippingName<br />@Model.ShippingAddress<br />@Model.ShippingCity, @Model.ShippingState @Model.ShippingZip</p>
+            </div>
+        </div>
+    </div>
+
+    <a class="btn-wlm mt-4 d-inline-block" asp-controller="Products" asp-action="Index">@Localizer["Continue Shopping"]</a>
+</div>

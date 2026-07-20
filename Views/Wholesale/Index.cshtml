@@ -1,0 +1,63 @@
+@using WorldLinkMaster.Web.Models
+@using WorldLinkMaster.Web.Extensions
+@model List<Product>
+@{
+    ViewData["Title"] = Localizer["Trade Catalog"];
+}
+
+<div class="page-banner">
+    <div class="container"><h1>@Localizer["Trade Catalog"]</h1><p class="mb-0">@Localizer["Wholesale pricing for approved trade accounts."]</p></div>
+</div>
+
+<div class="container mb-5">
+    @if (TempData["CartMessage"] != null)
+    {
+        <div class="alert alert-success">@TempData["CartMessage"]</div>
+    }
+
+    @if (Model.Count == 0)
+    {
+        <p>@Localizer["No products are enrolled in the trade program yet. Check back soon."]</p>
+    }
+    else
+    {
+        <div class="table-responsive">
+        <table class="table bg-white align-middle">
+            <thead>
+                <tr>
+                    <th></th>
+                    <th>@Localizer["Product"]</th>
+                    <th>@Localizer["Category"]</th>
+                    <th>@Localizer["Retail Price"]</th>
+                    <th>@Localizer["Your Price"]</th>
+                    <th>@Localizer["You Save"]</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var product in Model)
+                {
+                    var savingsPct = product.WholesalePrice.HasValue && product.Price > 0
+                        ? Math.Round((1 - (product.WholesalePrice.Value / product.Price)) * 100, 0)
+                        : 0;
+                    <tr>
+                        <td><img src="@product.ImageUrl" style="width:56px;height:56px;object-fit:cover;border-radius:4px;" /></td>
+                        <td><a asp-controller="Products" asp-action="Details" asp-route-slug="@product.Slug">@product.LocalizedName()</a></td>
+                        <td>@product.Category?.LocalizedName()</td>
+                        <td class="text-muted"><s>@product.Price.ToDisplayCurrency()</s></td>
+                        <td class="fw-bold">@product.WholesalePrice!.Value.ToDisplayCurrency()</td>
+                        <td><span class="badge badge-status-delivered">-@savingsPct%</span></td>
+                        <td>
+                            <form asp-controller="Cart" asp-action="Add" method="post">
+                                <input type="hidden" name="productId" value="@product.Id" />
+                                <input type="hidden" name="quantity" value="1" />
+                                <button type="submit" class="btn btn-sm btn-primary">@Localizer["Add to Cart"]</button>
+                            </form>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+        </div>
+    }
+</div>

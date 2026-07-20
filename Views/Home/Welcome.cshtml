@@ -1,0 +1,85 @@
+@using WorldLinkMaster.Web.Models
+@using WorldLinkMaster.Web.Extensions
+@{
+    ViewData["Title"] = Localizer["Welcome"];
+    var scrollProducts = ViewBag.ScrollProducts as List<Product> ?? new List<Product>();
+    var welcomeCategories = ViewBag.Categories as List<Category> ?? new List<Category>();
+}
+
+<section class="hero">
+    <div class="container">
+        <div class="hero-logo">
+            <img src="~/images/logo.png" alt="World Link Masters" />
+        </div>
+        <span class="hero-eyebrow">@Localizer["Welcome to World Link Master"]</span>
+        <h1>@Localizer["Gear Built for the"] <span class="accent">@Localizer["Long Haul"]</span></h1>
+        <p>
+            @Localizer["World Link Master was founded on a simple idea: gear should work as hard as the people who rely on it. We're a tactical and outdoor gear retailer, working directly with manufacturers to bring you field-tested apparel, footwear, packs, and equipment — cutting out the markup so operators, adventurers, and everyday professionals get real durability at a fair price."]
+        </p>
+        <a class="btn-wlm" asp-controller="Products" asp-action="Index">@Localizer["Start Shopping With Us"]</a>
+        <a class="btn-wlm-outline ms-2" asp-controller="QuoteRequests" asp-action="Create">@Localizer["Request Price List"]</a>
+        <a class="btn-wlm-outline ms-2" asp-controller="Home" asp-action="About">@Localizer["Our Story"]</a>
+    </div>
+</section>
+
+@if (welcomeCategories.Count > 0)
+{
+    <div class="container">
+        <h2 class="collections-title">@Localizer["Collections"]</h2>
+        <div class="collections-grid">
+            @foreach (var category in welcomeCategories)
+            {
+                <a class="collections-tile" asp-controller="Products" asp-action="Index" asp-route-categoryId="@category.Id">
+                    <img src="@category.ImageUrl" alt="@category.LocalizedName()" />
+                    <span class="collections-tile-label">@category.LocalizedName()</span>
+                </a>
+            }
+        </div>
+    </div>
+}
+
+<div class="container">
+    <div class="section-title">
+        <h2>@Localizer["What We Sell"]</h2>
+        <span class="text-muted">@Localizer["Everything chosen for durability, function, and value."]</span>
+    </div>
+
+    @if (scrollProducts.Count > 0)
+    {
+        <!-- Auto-scrolling "what we sell" product strip — the list is duplicated so the CSS
+             animation can loop seamlessly; pauses on hover so shoppers can click through. -->
+        <div class="product-scroller" aria-label="@Localizer["Product showcase"]">
+            <div class="product-scroller-track">
+                @for (int pass = 0; pass < 2; pass++)
+                {
+                    @foreach (var product in scrollProducts)
+                    {
+                        <a class="product-scroller-item" asp-controller="Products" asp-action="Details" asp-route-slug="@product.Slug" aria-hidden="@(pass == 1 ? "true" : null)" tabindex="@(pass == 1 ? "-1" : null)">
+                            <img src="@product.ImageUrl" alt="@product.LocalizedName()" />
+                            <span class="product-scroller-name">@product.LocalizedName()</span>
+                            <span class="product-scroller-price">@product.Price.ToDisplayCurrency()</span>
+                        </a>
+                    }
+                }
+            </div>
+        </div>
+    }
+</div>
+
+<div class="container mb-5">
+    <div class="row">
+        <div class="col-12 col-md-8">
+            <div class="section-title">
+                <h2>@Localizer["What We Do"]</h2>
+            </div>
+            <p>
+                @Localizer["Whether you're heading into the field, the backcountry, or just need gear you can trust every day, World Link Master has you covered. We stock everything from combat shirts and field pants to rucksacks, tactical boots, belts, pouches, and camp equipment — all tested for the same standard: reinforced stress points, reliable materials, and field-ready durability."]
+            </p>
+            <p>
+                @Localizer["Free shipping on orders over AED 365, a hassle-free 30-day return policy, and secure checkout on every order. Ready to gear up?"]
+            </p>
+            <a class="btn-wlm" asp-controller="Products" asp-action="Index">@Localizer["Start Shopping With Us"]</a>
+            <a class="btn-wlm-outline-dark ms-2" asp-controller="QuoteRequests" asp-action="Create">@Localizer["Request Price List"]</a>
+        </div>
+    </div>
+</div>

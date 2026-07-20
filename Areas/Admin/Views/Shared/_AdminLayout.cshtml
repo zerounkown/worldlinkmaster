@@ -1,0 +1,80 @@
+@using System.Globalization
+@{
+    var currentCulture = CultureInfo.CurrentUICulture.TwoLetterISOLanguageName;
+    var isRtl = currentCulture == "ar";
+    var returnUrl = Context.Request.Path + Context.Request.QueryString;
+}
+<!DOCTYPE html>
+<html lang="@currentCulture" dir="@(isRtl ? "rtl" : "ltr")">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewData["Title"] - World Link Master Admin</title>
+    <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
+    @if (isRtl)
+    {
+        <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.rtl.min.css" />
+    }
+    else
+    {
+        <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+    }
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+    @if (isRtl)
+    {
+        <link rel="stylesheet" href="~/css/site-rtl.css" asp-append-version="true" />
+    }
+</head>
+<body>
+    <div class="topbar">
+        <div class="container-fluid topbar-inner px-4">
+            <span><i class="bi bi-shield-lock"></i> @Localizer["World Link Master — Admin Console"]</span>
+            <div class="d-flex align-items-center gap-3">
+                <div class="lang-switch">
+                    <form asp-controller="Localization" asp-action="SetLanguage" asp-area="" method="post" class="d-inline">
+                        <input type="hidden" name="returnUrl" value="@returnUrl" />
+                        <input type="hidden" name="culture" value="ar" />
+                        <button type="submit" class="lang-switch-btn @(isRtl ? "active" : "")">العربية</button>
+                    </form>
+                    <span class="lang-switch-sep">|</span>
+                    <form asp-controller="Localization" asp-action="SetLanguage" asp-area="" method="post" class="d-inline">
+                        <input type="hidden" name="returnUrl" value="@returnUrl" />
+                        <input type="hidden" name="culture" value="en" />
+                        <button type="submit" class="lang-switch-btn @(!isRtl ? "active" : "")">English</button>
+                    </form>
+                </div>
+                <a class="text-white" asp-area="" asp-controller="Home" asp-action="Index"><i class="bi bi-box-arrow-left"></i> @Localizer["Back to Storefront"]</a>
+            </div>
+        </div>
+    </div>
+
+    <div class="admin-shell">
+        <aside class="admin-sidebar">
+            <a asp-area="Admin" asp-controller="Home" asp-action="Index"><i class="bi bi-speedometer2"></i> @Localizer["Dashboard"]</a>
+            <a asp-area="Admin" asp-controller="Products" asp-action="Index"><i class="bi bi-box-seam"></i> @Localizer["Products"]</a>
+            <a asp-area="Admin" asp-controller="Categories" asp-action="Index"><i class="bi bi-tags"></i> @Localizer["Categories"]</a>
+            <a asp-area="Admin" asp-controller="Subcategories" asp-action="Index"><i class="bi bi-tag"></i> @Localizer["Subcategories"]</a>
+            <a asp-area="Admin" asp-controller="Orders" asp-action="Index"><i class="bi bi-receipt"></i> @Localizer["Orders"]</a>
+            <a asp-area="Admin" asp-controller="Customers" asp-action="Index"><i class="bi bi-people"></i> @Localizer["Customers"]</a>
+            <a asp-area="Admin" asp-controller="Merchants" asp-action="Index"><i class="bi bi-shop"></i> @Localizer["Merchants"]</a>
+            <a asp-area="Admin" asp-controller="QuoteRequests" asp-action="Index"><i class="bi bi-file-earmark-text"></i> @Localizer["Quote Requests"]</a>
+            <a asp-area="Admin" asp-controller="PromoEvents" asp-action="Index"><i class="bi bi-stars"></i> @Localizer["Sale Events"]</a>
+            <a asp-area="Admin" asp-controller="Coupons" asp-action="Index"><i class="bi bi-ticket-perforated"></i> @Localizer["Coupons"]</a>
+            <a asp-area="Support" asp-controller="Conversations" asp-action="Index"><i class="bi bi-headset"></i> @Localizer["Support Chat"]</a>
+        </aside>
+        <div class="admin-content">
+            @if (TempData["AdminMessage"] != null)
+            {
+                <div class="alert alert-success">@TempData["AdminMessage"]</div>
+            }
+            @RenderBody()
+        </div>
+    </div>
+
+    <script src="~/lib/jquery/dist/jquery.min.js"></script>
+    <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="~/js/delete-button.js" asp-append-version="true"></script>
+    @await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>

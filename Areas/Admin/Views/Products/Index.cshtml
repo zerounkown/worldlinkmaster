@@ -1,0 +1,82 @@
+@using WorldLinkMaster.Web.Models.ViewModels
+@model AdminProductListViewModel
+@{
+    ViewData["Title"] = Localizer["Manage Products"];
+}
+
+<div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+    <h1 class="mb-0">@Localizer["Products"]</h1>
+    <div class="d-flex gap-2 flex-wrap">
+        <a class="btn btn-outline-secondary" asp-action="BulkUpdate"><i class="bi bi-file-earmark-spreadsheet"></i> @Localizer["Bulk Update (Excel)"]</a>
+        <a class="btn btn-primary" asp-action="Create"><i class="bi bi-plus-lg"></i> @Localizer["New Product"]</a>
+    </div>
+</div>
+
+<form method="get" class="d-flex gap-2 my-3" style="max-width: 420px;">
+    <input type="text" name="search" class="form-control" placeholder="@Localizer["Search by name or SKU…"]" value="@Model.SearchTerm" />
+    <button type="submit" class="btn btn-outline-primary"><i class="bi bi-search"></i> @Localizer["Search"]</button>
+    @if (!string.IsNullOrWhiteSpace(Model.SearchTerm))
+    {
+        <a asp-action="Index" class="btn btn-outline-secondary">@Localizer["Clear"]</a>
+    }
+</form>
+
+<p class="text-muted">@Localizer["{0} product(s)", Model.TotalCount]@(string.IsNullOrWhiteSpace(Model.SearchTerm) ? "" : " " + Localizer["matching '{0}'", Model.SearchTerm])</p>
+
+<div class="table-responsive">
+<table class="table bg-white align-middle">
+    <thead>
+        <tr><th></th><th>@Localizer["Name"]</th><th>@Localizer["SKU"]</th><th>@Localizer["Category"]</th><th>@Localizer["Price"]</th><th>@Localizer["Wholesale"]</th><th>@Localizer["Stock"]</th><th>@Localizer["Featured"]</th><th></th></tr>
+    </thead>
+    <tbody>
+        @if (Model.Products.Count == 0)
+        {
+            <tr><td colspan="9" class="text-muted">@Localizer["No products found."]</td></tr>
+        }
+        @foreach (var product in Model.Products)
+        {
+            <tr>
+                <td><img src="@product.ImageUrl" style="width:48px;height:48px;object-fit:cover;border-radius:4px;" /></td>
+                <td>@product.Name</td>
+                <td class="text-muted small">@product.Sku</td>
+                <td>@product.Category?.Name</td>
+                <td>@product.Price.ToAed()</td>
+                <td>@(product.WholesalePrice.HasValue ? product.WholesalePrice.Value.ToAed() : "—")</td>
+                <td>
+                    @if (product.StockQuantity <= 0)
+                    {
+                        <span class="badge bg-danger">@Localizer["Out of Stock"]</span>
+                    }
+                    else if (product.StockQuantity <= 10)
+                    {
+                        <span class="badge bg-warning text-dark">@Localizer["Low ({0})", product.StockQuantity]</span>
+                    }
+                    else
+                    {
+                        @product.StockQuantity
+                    }
+                </td>
+                <td>@(product.IsFeatured ? Localizer["Yes"].Value : "")</td>
+                <td class="text-nowrap">
+                    <a class="btn btn-sm btn-outline-primary" asp-action="Edit" asp-route-id="@product.Id">@Localizer["Edit"]</a>
+                    <a class="btn btn-sm btn-outline-danger" asp-action="Delete" asp-route-id="@product.Id">@Localizer["Delete"]</a>
+                </td>
+            </tr>
+        }
+    </tbody>
+</table>
+</div>
+
+@if (Model.TotalPages > 1)
+{
+    <nav>
+        <ul class="pagination">
+            @for (int i = 1; i <= Model.TotalPages; i++)
+            {
+                <li class="page-item @(i == Model.Page ? "active" : "")">
+                    <a class="page-link" asp-action="Index" asp-route-search="@Model.SearchTerm" asp-route-page="@i">@i</a>
+                </li>
+            }
+        </ul>
+    </nav>
+}

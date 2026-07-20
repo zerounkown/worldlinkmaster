@@ -1,0 +1,26 @@
+@Html.AntiForgeryToken()
+<div class="modal fade quick-add-modal" id="quickAddModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div>
+                    <h5 class="modal-title">@Localizer["Select the Color & Size"]</h5>
+                    <div class="modal-subtitle" id="quickAddProductName"></div>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="@Localizer["Close"]"></button>
+            </div>
+            <div class="modal-body">
+                <div id="quickAddColorSection" class="mb-3">
+                    <label class="option-label">@Localizer["Color"]: <span id="quickAddColorLabel"></span></label>
+                    <div class="color-options" id="quickAddColorOptions"></div>
+                </div>
+                <div id="quickAddSizeSection" class="mb-3">
+                    <label class="option-label">@Localizer["Size"]</label>
+                    <div class="size-options" id="quickAddSizeOptions"></div>
+                </div>
+                <div class="quick-add-error" id="quickAddError">@Localizer["Please select a color and size."]</div>
+                <button type="button" class="btn-wlm w-100 mt-2" id="quickAddSubmitBtn">@Localizer["Add To Basket"]</button>
+            </div>
+        </div>
+    </div>
+</div>

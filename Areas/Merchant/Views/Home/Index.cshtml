@@ -1,0 +1,64 @@
+@using WorldLinkMaster.Web.Models
+@{
+    ViewData["Title"] = Localizer["Merchant Dashboard"];
+    var merchant = ViewBag.Merchant as Merchant;
+    var payouts = ViewBag.RecentPayouts as List<MerchantPayout> ?? new List<MerchantPayout>();
+}
+
+<h1>@Localizer["Welcome, {0}", merchant?.BusinessName]</h1>
+
+@if (merchant != null && !merchant.StripeOnboardingComplete)
+{
+    <div class="alert alert-warning d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-exclamation-triangle"></i> @Localizer["Your Stripe account isn't fully connected yet. You won't receive payouts until onboarding is complete."]</span>
+        <a class="btn btn-sm btn-primary" asp-area="" asp-controller="MerchantOnboarding" asp-action="StartOnboarding">@Localizer["Finish Setup"]</a>
+    </div>
+}
+else if (merchant != null)
+{
+    <div class="alert alert-success"><i class="bi bi-check-circle"></i> @Localizer["Your Stripe account is connected and ready to receive payouts."]</div>
+}
+
+<div class="row g-3 my-3">
+    <div class="col-6 col-md-4">
+        <div class="summary-box text-center">
+            <h2>@ViewBag.ProductCount</h2>
+            <p class="mb-0">@Localizer["Products"]</p>
+        </div>
+    </div>
+    <div class="col-6 col-md-4">
+        <div class="summary-box text-center">
+            <h2>@ViewBag.OrderCount</h2>
+            <p class="mb-0">@Localizer["Orders"]</p>
+        </div>
+    </div>
+    <div class="col-12 col-md-4">
+        <div class="summary-box text-center">
+            <h2>@(((decimal)ViewBag.TotalSales).ToAed())</h2>
+            <p class="mb-0">@Localizer["Total Sales"]</p>
+        </div>
+    </div>
+</div>
+
+<h4 class="mt-4">@Localizer["Recent Payouts"]</h4>
+<div class="table-responsive">
+<table class="table bg-white">
+    <thead><tr><th>@Localizer["Order #"]</th><th>@Localizer["Amount"]</th><th>@Localizer["Platform Fee"]</th><th>@Localizer["Status"]</th><th>@Localizer["Date"]</th></tr></thead>
+    <tbody>
+        @foreach (var payout in payouts)
+        {
+            <tr>
+                <td>#@payout.OrderId</td>
+                <td>@payout.Amount.ToAed()</td>
+                <td>@payout.PlatformFee.ToAed()</td>
+                <td>@Localizer[payout.Status.ToString()]</td>
+                <td>@payout.CreatedAt.ToLocalTime().ToString("MMM d, yyyy")</td>
+            </tr>
+        }
+        @if (payouts.Count == 0)
+        {
+            <tr><td colspan="5" class="text-muted">@Localizer["No payouts yet."]</td></tr>
+        }
+    </tbody>
+</table>
+</div>

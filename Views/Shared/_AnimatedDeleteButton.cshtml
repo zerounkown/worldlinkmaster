@@ -1,0 +1,22 @@
+@model string
+@{
+    // Reusable animated "trash can" delete button — meant for the actual submit button of a
+    // delete <form>. On click it plays a short open-lid / drop / checkmark animation, then
+    // submits the form for real (see wwwroot/js/delete-button.js).
+    // Pass a label string as the model for an icon + text button; omit it for an icon-only
+    // button (used in compact contexts like a cart line-item row).
+    var label = Model;
+}
+<button type="submit" class="btn-delete-animated @(string.IsNullOrEmpty(label) ? "btn-delete-icon-only" : "")" aria-label="@Localizer["Delete"]">
+    <span class="btn-delete-trash">
+        <span class="btn-delete-top"><span class="btn-delete-paper"></span></span>
+        <span class="btn-delete-box"></span>
+        <span class="btn-delete-check">
+            <svg viewBox="0 0 8 6"><polyline points="1 3.4 2.71428571 5 7 1"></polyline></svg>
+        </span>
+    </span>
+    @if (!string.IsNullOrEmpty(label))
+    {
+        <span class="btn-delete-label">@label</span>
+    }
+</button>

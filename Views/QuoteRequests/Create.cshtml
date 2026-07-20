@@ -1,0 +1,64 @@
+@using WorldLinkMaster.Web.Models.ViewModels
+@model QuoteRequestViewModel
+@{
+    ViewData["Title"] = Localizer["Request a Quote"];
+}
+
+<div class="page-banner">
+    <div class="container"><h1>@Localizer["Request a Quote"]</h1></div>
+</div>
+
+<div class="container mb-5">
+    <div class="row">
+        <div class="col-12 col-md-7">
+            <p class="lead">@Localizer["Tell us what you need and how many, and our team will get back to you with pricing — no account or login required."]</p>
+            <form asp-action="Create" method="post">
+                <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+                <div class="mb-3">
+                    <label asp-for="CompanyName" class="form-label"></label>
+                    <input asp-for="CompanyName" class="form-control" />
+                    <span asp-validation-for="CompanyName" class="text-danger"></span>
+                </div>
+                <div class="row">
+                    <div class="col-12 col-sm-6 mb-3">
+                        <label asp-for="Email" class="form-label"></label>
+                        <input asp-for="Email" class="form-control" />
+                        <span asp-validation-for="Email" class="text-danger"></span>
+                    </div>
+                    <div class="col-12 col-sm-6 mb-3">
+                        <label asp-for="Phone" class="form-label"></label>
+                        <input asp-for="Phone" class="form-control" />
+                        <span asp-validation-for="Phone" class="text-danger"></span>
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <label asp-for="TradeLicenseNumber" class="form-label"></label>
+                    <input asp-for="TradeLicenseNumber" class="form-control" />
+                </div>
+                <div class="mb-3">
+                    <label asp-for="ProductDetails" class="form-label"></label>
+                    <textarea asp-for="ProductDetails" class="form-control" rows="4" placeholder="@Localizer["e.g. product names, categories, sizes/colors needed..."]"></textarea>
+                    <span asp-validation-for="ProductDetails" class="text-danger"></span>
+                </div>
+                <div class="mb-3" style="max-width: 160px;">
+                    <label asp-for="Quantity" class="form-label"></label>
+                    <input asp-for="Quantity" class="form-control" />
+                    <span asp-validation-for="Quantity" class="text-danger"></span>
+                </div>
+                <button type="submit" class="btn-wlm">@Localizer["Submit Quote Request"]</button>
+            </form>
+        </div>
+        <div class="col-12 col-md-5">
+            <div class="summary-box">
+                <h4>@Localizer["How it works"]</h4>
+                <p><i class="bi bi-1-circle"></i> @Localizer["Tell us what you need and how much"]</p>
+                <p><i class="bi bi-2-circle"></i> @Localizer["Our team reviews it and works out your pricing"]</p>
+                <p><i class="bi bi-3-circle"></i> @Localizer["We follow up by email or phone with your quote"]</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

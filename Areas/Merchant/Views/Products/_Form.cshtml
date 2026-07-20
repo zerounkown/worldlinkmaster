@@ -1,0 +1,116 @@
+@using WorldLinkMaster.Web.Models
+@using Microsoft.AspNetCore.Mvc.Rendering
+@model Product
+@{
+    var categories = ViewBag.Categories as List<Category> ?? new List<Category>();
+    var subcategories = ViewBag.Subcategories as List<Subcategory> ?? new List<Subcategory>();
+    var subcategoriesByCategory = subcategories
+        .GroupBy(s => s.CategoryId)
+        .ToDictionary(g => g.Key, g => g.Select(s => new { id = s.Id, name = s.Name }));
+}
+
+<div asp-validation-summary="ModelOnly" class="text-danger"></div>
+@if (Model.Id != 0)
+{
+    <input type="hidden" asp-for="Id" />
+}
+<input type="hidden" asp-for="CreatedAt" />
+
+<div class="mb-3">
+    <label asp-for="Name" class="form-label">@Localizer["Name"]</label>
+    <input asp-for="Name" class="form-control" />
+    <span asp-validation-for="Name" class="text-danger"></span>
+</div>
+<div class="mb-3">
+    <label asp-for="Slug" class="form-label">@Localizer["Slug"]</label>
+    <input asp-for="Slug" class="form-control" />
+    <span asp-validation-for="Slug" class="text-danger"></span>
+</div>
+<div class="mb-3">
+    <label asp-for="CategoryId" class="form-label">@Localizer["Category"]</label>
+    <select asp-for="CategoryId" id="categorySelect" class="form-select" asp-items="@(new SelectList(categories, "Id", "Name"))"></select>
+</div>
+<div class="mb-3">
+    <label asp-for="SubcategoryId" class="form-label">@Localizer["Subcategory (optional)"]</label>
+    <select asp-for="SubcategoryId" id="subcategorySelect" class="form-select">
+        <option value="">@Localizer["None"]</option>
+    </select>
+</div>
+<div class="mb-3">
+    <label asp-for="ShortDescription" class="form-label">@Localizer["Short Description"]</label>
+    <input asp-for="ShortDescription" class="form-control" />
+</div>
+<div class="mb-3">
+    <label asp-for="Description" class="form-label">@Localizer["Description"]</label>
+    <textarea asp-for="Description" class="form-control" rows="4"></textarea>
+</div>
+<div class="row">
+    <div class="col-12 col-sm-4 mb-3">
+        <label asp-for="Price" class="form-label">@Localizer["Price (AED)"]</label>
+        <div class="input-group">
+            <span class="input-group-text">AED</span>
+            <input asp-for="Price" class="form-control" />
+        </div>
+        <span asp-validation-for="Price" class="text-danger"></span>
+    </div>
+    <div class="col-6 col-sm-4 mb-3">
+        <label asp-for="Sku" class="form-label">@Localizer["SKU"]</label>
+        <input asp-for="Sku" class="form-control" />
+        <span asp-validation-for="Sku" class="text-danger"></span>
+    </div>
+    <div class="col-6 col-sm-4 mb-3">
+        <label asp-for="StockQuantity" class="form-label">@Localizer["Stock Quantity"]</label>
+        <input asp-for="StockQuantity" class="form-control" />
+    </div>
+</div>
+<div class="mb-3">
+    <label asp-for="WholesalePrice" class="form-label">@Localizer["Wholesale Price (AED, optional)"]</label>
+    <div class="input-group" style="max-width: 300px;">
+        <span class="input-group-text">AED</span>
+        <input asp-for="WholesalePrice" class="form-control" />
+    </div>
+    <span class="form-text">@Localizer["Leave blank to keep this product retail-only. Set a price to enroll it in the Trade Program."]</span>
+</div>
+<div class="mb-3">
+    <label asp-for="ImageUrl" class="form-label">@Localizer["Image URL"]</label>
+    <input asp-for="ImageUrl" class="form-control" />
+</div>
+<div class="form-check mb-3">
+    <input asp-for="IsFeatured" class="form-check-input" />
+    <label asp-for="IsFeatured" class="form-check-label">@Localizer["Featured"]</label>
+</div>
+
+<button type="submit" class="btn btn-primary">@Localizer["Save"]</button>
+<a asp-action="Index" class="btn btn-outline-secondary">@Localizer["Cancel"]</a>
+
+<script>
+    (function () {
+        var subcategoriesByCategory = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(subcategoriesByCategory));
+        var categorySelect = document.getElementById("categorySelect");
+        var subcategorySelect = document.getElementById("subcategorySelect");
+        var initialSubcategoryId = @(Model.SubcategoryId?.ToString() ?? "null");
+
+        function renderSubcategories(categoryId, selectedId) {
+            var list = subcategoriesByCategory[categoryId] || [];
+            subcategorySelect.innerHTML = "";
+            var noneOption = document.createElement("option");
+            noneOption.value = "";
+            noneOption.textContent = "@Localizer["None"]";
+            subcategorySelect.appendChild(noneOption);
+            list.forEach(function (sub) {
+                var opt = document.createElement("option");
+                opt.value = sub.id;
+                opt.textContent = sub.name;
+                if (selectedId !== null && String(sub.id) === String(selectedId)) {
+                    opt.selected = true;
+                }
+                subcategorySelect.appendChild(opt);
+            });
+        }
+
+        renderSubcategories(categorySelect.value, initialSubcategoryId);
+        categorySelect.addEventListener("change", function () {
+            renderSubcategories(categorySelect.value, null);
+        });
+    })();
+</script>

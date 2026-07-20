@@ -1,0 +1,59 @@
+@using WorldLinkMaster.Web.Models.ViewModels
+@model BulkImportResult
+@{
+    ViewData["Title"] = Localizer["Bulk Update (Excel)"];
+    var hasResult = Model.UpdatedCount > 0 || Model.CreatedCount > 0 || Model.Errors.Count > 0;
+}
+
+<h1>@Localizer["Bulk Update & Add Products (Excel)"]</h1>
+<p class="text-muted">@Localizer["Update prices, wholesale prices, and stock quantities — or add brand-new products — for many items at once."]</p>
+
+@if (hasResult)
+{
+    <div class="alert @(Model.Errors.Count > 0 ? "alert-warning" : "alert-success")">
+        <div><strong>@Localizer["{0} product(s) updated.", Model.UpdatedCount]</strong></div>
+        <div><strong>@Localizer["{0} new product(s) created.", Model.CreatedCount]</strong></div>
+
+        @if (Model.Errors.Count > 0)
+        {
+            <div class="mt-2">
+                <strong>@Localizer["{0} row(s) had invalid data", Model.Errors.Count]</strong> (@Localizer["row skipped"]):
+                <ul class="mb-0">
+                    @foreach (var error in Model.Errors)
+                    {
+                        <li>@error</li>
+                    }
+                </ul>
+            </div>
+        }
+    </div>
+}
+
+<div asp-validation-summary="All" class="text-danger"></div>
+
+<div class="row g-4">
+    <div class="col-12 col-md-6">
+        <div class="summary-box">
+            <h4>@Localizer["1. Download the current catalog"]</h4>
+            <p>@Localizer["Get an Excel file with every product's SKU, name, category, price, wholesale price, stock quantity, and image URL."]</p>
+            <a class="btn btn-outline-primary" asp-action="ExportExcel"><i class="bi bi-download"></i> @Localizer["Download Products.xlsx"]</a>
+        </div>
+    </div>
+    <div class="col-12 col-md-6">
+        <div class="summary-box">
+            <h4>@Localizer["2. Edit it, then upload it back"]</h4>
+            <p>
+                @Localizer["To update an existing product, change its"] <strong>@Localizer["Price (AED)"]</strong>, <strong>@Localizer["Wholesale Price (AED)"]</strong>, @Localizer["and/or"] <strong>@Localizer["Stock Quantity"]</strong> @Localizer["and keep its"] <strong>@Localizer["SKU"]</strong> @Localizer["unchanged — that's how the row is matched."]
+            </p>
+            <p>
+                @Localizer["To add a brand-new product, add a new row with a SKU that doesn't exist yet, and fill in"] <strong>@Localizer["Name"]</strong>, <strong>@Localizer["Category"]</strong> (@Localizer["must exactly match an existing category name"]), <strong>@Localizer["Price (AED)"]</strong>, <strong>@Localizer["Stock Quantity"]</strong>, @Localizer["and, ideally,"] <strong>@Localizer["Image URL"]</strong>.
+            </p>
+            <form asp-action="BulkUpdate" method="post" enctype="multipart/form-data" class="d-flex gap-2">
+                <input type="file" name="file" class="form-control" accept=".xlsx" required />
+                <button type="submit" class="btn btn-primary text-nowrap"><i class="bi bi-upload"></i> @Localizer["Upload"]</button>
+            </form>
+        </div>
+    </div>
+</div>
+
+<a class="mt-4 d-inline-block" asp-action="Index">&larr; @Localizer["Back to Products"]</a>

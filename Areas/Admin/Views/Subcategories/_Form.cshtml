@@ -1,0 +1,30 @@
+@using WorldLinkMaster.Web.Models
+@using Microsoft.AspNetCore.Mvc.Rendering
+@model Subcategory
+@{
+    var categories = ViewBag.Categories as SelectList;
+}
+
+<div asp-validation-summary="ModelOnly" class="text-danger"></div>
+@if (Model.Id != 0)
+{
+    <input type="hidden" asp-for="Id" />
+}
+
+<div class="mb-3">
+    <label asp-for="CategoryId" class="form-label">@Localizer["Category"]</label>
+    <select asp-for="CategoryId" class="form-select" asp-items="categories"></select>
+</div>
+<div class="mb-3">
+    <label asp-for="Name" class="form-label">@Localizer["Name"]</label>
+    <input asp-for="Name" class="form-control" />
+    <span asp-validation-for="Name" class="text-danger"></span>
+</div>
+<div class="mb-3">
+    <label asp-for="Slug" class="form-label">@Localizer["Slug"]</label>
+    <input asp-for="Slug" class="form-control" />
+    <span asp-validation-for="Slug" class="text-danger"></span>
+</div>
+
+<button type="submit" class="btn btn-primary">@Localizer["Save"]</button>
+<a asp-action="Index" class="btn btn-outline-secondary">@Localizer["Cancel"]</a>

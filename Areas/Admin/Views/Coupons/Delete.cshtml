@@ -1,0 +1,16 @@
+@using WorldLinkMaster.Web.Models
+@model Coupon
+@{
+    ViewData["Title"] = Localizer["Delete Coupon"];
+}
+
+<h1>@Localizer["Delete Coupon"]</h1>
+<p>@Localizer["Are you sure you want to delete {0} ({1}% off)?", Model.Code, Model.DiscountPercent.ToString("0.##")]</p>
+@if (Model.RedemptionCount > 0)
+{
+    <div class="alert alert-warning">@Localizer["This coupon has already been redeemed {0} time(s). Deleting it won't reverse those orders.", Model.RedemptionCount]</div>
+}
+<form asp-action="Delete" asp-route-id="@Model.Id" method="post">
+    <partial name="_AnimatedDeleteButton" model="@Localizer["Delete"].Value" />
+    <a asp-action="Index" class="btn btn-outline-secondary">@Localizer["Cancel"]</a>
+</form>

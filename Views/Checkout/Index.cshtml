@@ -1,0 +1,127 @@
+@using WorldLinkMaster.Web.Models.ViewModels
+@model CheckoutViewModel
+@{
+    ViewData["Title"] = Localizer["Checkout"];
+}
+
+<div class="page-banner">
+    <div class="container"><h1>@Localizer["Checkout"]</h1></div>
+</div>
+
+<div class="container mb-5">
+    @if (TempData["CheckoutMessage"] != null)
+    {
+        <div class="alert alert-info">@TempData["CheckoutMessage"]</div>
+    }
+    <div class="row">
+        <div class="col-12 col-md-7">
+            <h4 class="mb-3">@Localizer["Shipping Information"]</h4>
+            <form asp-controller="Checkout" asp-action="PlaceOrder" method="post">
+                <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+                <div class="mb-3">
+                    <label asp-for="ShippingName" class="form-label"></label>
+                    <input asp-for="ShippingName" class="form-control" />
+                    <span asp-validation-for="ShippingName" class="text-danger"></span>
+                </div>
+                <div class="mb-3">
+                    <label asp-for="ShippingAddress" class="form-label"></label>
+                    <input asp-for="ShippingAddress" class="form-control" />
+                    <span asp-validation-for="ShippingAddress" class="text-danger"></span>
+                </div>
+                <div class="row">
+                    <div class="col-12 col-sm-5 mb-3">
+                        <label asp-for="ShippingCity" class="form-label"></label>
+                        <input asp-for="ShippingCity" class="form-control" />
+                        <span asp-validation-for="ShippingCity" class="text-danger"></span>
+                    </div>
+                    <div class="col-6 col-sm-4 mb-3">
+                        <label asp-for="ShippingState" class="form-label"></label>
+                        <input asp-for="ShippingState" class="form-control" />
+                        <span asp-validation-for="ShippingState" class="text-danger"></span>
+                    </div>
+                    <div class="col-6 col-sm-3 mb-3">
+                        <label asp-for="ShippingZip" class="form-label"></label>
+                        <input asp-for="ShippingZip" class="form-control" />
+                        <span asp-validation-for="ShippingZip" class="text-danger"></span>
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <label asp-for="ShippingPhone" class="form-label"></label>
+                    <input asp-for="ShippingPhone" class="form-control" />
+                    <span asp-validation-for="ShippingPhone" class="text-danger"></span>
+                </div>
+                @if (ViewBag.StripeConfigured != true)
+                {
+                    <div class="alert alert-warning">@Localizer["Stripe isn't configured yet. Add your Stripe test API keys to"] <code>appsettings.json</code> @Localizer["to enable checkout."]</div>
+                }
+                <p class="text-muted small"><i class="bi bi-shield-check"></i> @Localizer["We'll email you a one-time verification code before payment, then you'll enter your card details on Stripe's secure checkout page."]</p>
+                <button type="submit" class="btn-wlm" @(ViewBag.StripeConfigured != true ? "disabled" : null)>
+                    <i class="bi bi-shield-lock"></i> @Localizer["Send Verification Code"]
+                </button>
+            </form>
+        </div>
+        <div class="col-12 col-md-5">
+            <div class="summary-box">
+                <h4>@Localizer["Order Summary"]</h4>
+                @foreach (var item in Model.Items)
+                {
+                    <div class="d-flex justify-content-between mb-2">
+                        <span>
+                            @item.Name &times; @item.Quantity
+                            @if (!string.IsNullOrEmpty(item.Color) || !string.IsNullOrEmpty(item.Size))
+                            {
+                                <br /><small class="text-muted">@item.Color @(!string.IsNullOrEmpty(item.Color) && !string.IsNullOrEmpty(item.Size) ? " / " : "") @item.Size</small>
+                            }
+                        </span>
+                        <span>@item.LineTotal.ToDisplayCurrency()</span>
+                    </div>
+                }
+                <hr />
+
+                <form asp-controller="Checkout" asp-action="@(Model.AppliedCouponCode != null ? "RemoveCoupon" : "ApplyCoupon")" method="post" class="mb-3">
+                    @if (Model.AppliedCouponCode != null)
+                    {
+                        <div class="d-flex justify-content-between align-items-center coupon-applied-row">
+                            <span><i class="bi bi-ticket-perforated"></i> @Localizer["Coupon"] <strong>@Model.AppliedCouponCode</strong> @Localizer["applied ({0}% off)", Model.CouponDiscountPercent.ToString("0.##")]</span>
+                            <button type="submit" class="btn btn-sm btn-outline-danger">@Localizer["Remove"]</button>
+                        </div>
+                    }
+                    else
+                    {
+                        <label class="form-label small mb-1">@Localizer["Have a coupon code?"]</label>
+                        <div class="d-flex gap-2">
+                            <input type="text" name="couponCode" class="form-control" placeholder="e.g. WELCOME-AB12CD" />
+                            <button type="submit" class="btn btn-outline-primary">@Localizer["Apply"]</button>
+                        </div>
+                    }
+                </form>
+
+                <hr />
+                <div class="d-flex justify-content-between mb-2">
+                    <span>@Localizer["Subtotal"]</span>
+                    <span>@Model.Subtotal.ToDisplayCurrency()</span>
+                </div>
+                @if (Model.CouponDiscountAmount > 0)
+                {
+                    <div class="d-flex justify-content-between mb-2 coupon-discount-line">
+                        <span>@Localizer["Coupon discount"]</span>
+                        <span>&minus;@Model.CouponDiscountAmount.ToDisplayCurrency()</span>
+                    </div>
+                }
+                <div class="d-flex justify-content-between mb-2">
+                    <span>@Localizer["Shipping"]</span>
+                    <span>@(Model.ShippingCost == 0 ? Localizer["Free"].Value : Model.ShippingCost.ToDisplayCurrency())</span>
+                </div>
+                <hr />
+                <div class="d-flex justify-content-between fw-bold">
+                    <span>@Localizer["Total"]</span>
+                    <span>@Model.Total.ToDisplayCurrency()</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

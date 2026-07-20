@@ -1,0 +1,47 @@
+@using WorldLinkMaster.Web.Models
+@model ApplicationUser
+@{
+    ViewData["Title"] = Localizer["Delete Customer"];
+    int orderCount = ViewBag.OrderCount;
+    bool hasMerchantProfile = ViewBag.HasMerchantProfile;
+    bool hasWholesaleAccount = ViewBag.HasWholesaleAccount;
+    int couponCount = ViewBag.CouponCount;
+    var blocked = orderCount > 0 || hasMerchantProfile || hasWholesaleAccount;
+}
+
+<h1>@Localizer["Delete Customer"]</h1>
+<p>@Localizer["Are you sure you want to delete {0}?", Model.Email]</p>
+
+@if (blocked)
+{
+    <div class="alert alert-warning">
+        @Localizer["This customer can't be deleted because they still have:"]
+        <ul class="mb-0">
+            @if (orderCount > 0)
+            {
+                <li>@Localizer["{0} order(s)", orderCount]</li>
+            }
+            @if (hasMerchantProfile)
+            {
+                <li>@Localizer["a merchant profile"]</li>
+            }
+            @if (hasWholesaleAccount)
+            {
+                <li>@Localizer["a wholesale account"]</li>
+            }
+        </ul>
+        @Localizer["Lock the account instead from the"] <a asp-action="Edit" asp-route-id="@Model.Id">@Localizer["Edit"]</a> @Localizer["page."]
+    </div>
+    <a asp-action="Index" class="btn btn-outline-secondary">@Localizer["Back to Customers"]</a>
+}
+else
+{
+    @if (couponCount > 0)
+    {
+        <div class="alert alert-info">@Localizer["This will also remove {0} unused coupon(s) issued to this customer.", couponCount]</div>
+    }
+    <form asp-action="Delete" asp-route-id="@Model.Id" method="post">
+        <partial name="_AnimatedDeleteButton" model="@Localizer["Delete"].Value" />
+        <a asp-action="Index" class="btn btn-outline-secondary">@Localizer["Cancel"]</a>
+    </form>
+}

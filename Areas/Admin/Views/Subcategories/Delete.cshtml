@@ -1,0 +1,12 @@
+@using WorldLinkMaster.Web.Models
+@model Subcategory
+@{
+    ViewData["Title"] = Localizer["Delete Subcategory"];
+}
+
+<h1>@Localizer["Delete Subcategory"]</h1>
+<p>@Localizer["Are you sure you want to delete {0}?", Model.Name]</p>
+<form asp-action="Delete" asp-route-id="@Model.Id" method="post">
+    <partial name="_AnimatedDeleteButton" model="@Localizer["Delete"].Value" />
+    <a asp-action="Index" class="btn btn-outline-secondary">@Localizer["Cancel"]</a>
+</form>

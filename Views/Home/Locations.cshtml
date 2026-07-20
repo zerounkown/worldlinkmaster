@@ -1,0 +1,27 @@
+@{
+    ViewData["Title"] = Localizer["Our Locations"];
+}
+
+<div class="page-banner">
+    <div class="container">
+        <h1>@Localizer["Our Locations"]</h1>
+        <p class="mb-0">@Localizer["Pick up in person, or have it delivered to your door."]</p>
+    </div>
+</div>
+
+<div class="container mb-5">
+    <div class="locations-grid">
+        <div class="location-card">
+            <span class="location-pickup-badge"><i class="bi bi-box-seam"></i> @Localizer["Pickup Available"]</span>
+            <h4><i class="bi bi-geo-alt"></i> @Localizer["Abu Dhabi Branch"]</h4>
+            <p>@Localizer["Call ahead to arrange in-store pickup, or have your order delivered."]</p>
+            <a class="btn-wlm" href="tel:+18005550199"><i class="bi bi-telephone"></i> @Localizer["Call to Arrange Pickup"]</a>
+        </div>
+        <div class="location-card">
+            <span class="location-pickup-badge"><i class="bi bi-box-seam"></i> @Localizer["Pickup Available"]</span>
+            <h4><i class="bi bi-geo-alt"></i> @Localizer["Al Ain Branch"]</h4>
+            <p>@Localizer["Call ahead to arrange in-store pickup, or have your order delivered."]</p>
+            <a class="btn-wlm" href="tel:+18005550199"><i class="bi bi-telephone"></i> @Localizer["Call to Arrange Pickup"]</a>
+        </div>
+    </div>
+</div>

@@ -1,0 +1,79 @@
+@using WorldLinkMaster.Web.Models
+@model List<Coupon>
+@{
+    ViewData["Title"] = Localizer["My Coupons"];
+    var today = DateTime.UtcNow;
+    var publicCoupons = ViewBag.PublicCoupons as List<Coupon> ?? new List<Coupon>();
+}
+
+<div class="page-banner">
+    <div class="container"><h1>@Localizer["My Coupons"]</h1></div>
+</div>
+
+<div class="container mb-5">
+    @if (publicCoupons.Count > 0)
+    {
+        <h2 class="mt-4 mb-3">@Localizer["Promo Codes You Can Use"]</h2>
+        <p class="text-muted">@Localizer["Enter any of these codes in the coupon box at checkout."]</p>
+        <div class="coupon-grid mb-5">
+            @foreach (var coupon in publicCoupons)
+            {
+                <div class="coupon-card coupon-available">
+                    <div class="coupon-card-left">
+                        <span class="coupon-discount">@coupon.DiscountPercent.ToString("0.##")%</span>
+                        <span class="coupon-off">@Localizer["OFF (badge)"]</span>
+                    </div>
+                    <div class="coupon-card-right">
+                        <span class="coupon-source">@(string.IsNullOrWhiteSpace(coupon.Description) ? Localizer["Promo Code"].Value : coupon.Description)</span>
+                        <span class="coupon-code">@coupon.Code</span>
+                        <span class="coupon-status-badge">@Localizer["Available"]</span>
+                        @if (coupon.ExpiresAt.HasValue)
+                        {
+                            <span class="coupon-expiry">@Localizer["Expires {0}", coupon.ExpiresAt.Value.ToString("MMM d, yyyy")]</span>
+                        }
+                    </div>
+                </div>
+            }
+        </div>
+    }
+
+    <h2 class="mt-4 mb-3">@Localizer["Your Personal Coupons"]</h2>
+    @if (Model.Count == 0)
+    {
+        <p>@Localizer["You don't have any personal coupons yet. Keep shopping — every 10th order earns you 50% off, and new perks show up here automatically."]</p>
+    }
+    else
+    {
+        <div class="coupon-grid">
+            @foreach (var coupon in Model)
+            {
+                var expired = coupon.ExpiresAt.HasValue && coupon.ExpiresAt.Value < today;
+                var status = coupon.IsUsed ? Localizer["Used"] : expired ? Localizer["Expired"] : Localizer["Available"];
+                var statusClass = coupon.IsUsed ? "coupon-used" : expired ? "coupon-expired" : "coupon-available";
+                var sourceLabel = coupon.Source switch
+                {
+                    CouponSource.Welcome => Localizer["Welcome Gift"],
+                    CouponSource.LoyaltyMilestone => Localizer["Loyalty Reward"],
+                    _ => Localizer["Promo Code"]
+                };
+                <div class="coupon-card @statusClass">
+                    <div class="coupon-card-left">
+                        <span class="coupon-discount">@coupon.DiscountPercent.ToString("0.##")%</span>
+                        <span class="coupon-off">@Localizer["OFF (badge)"]</span>
+                    </div>
+                    <div class="coupon-card-right">
+                        <span class="coupon-source">@sourceLabel</span>
+                        <span class="coupon-code">@coupon.Code</span>
+                        <span class="coupon-status-badge">@status</span>
+                        @if (coupon.ExpiresAt.HasValue)
+                        {
+                            <span class="coupon-expiry">
+                                @(coupon.IsUsed ? Localizer["Used {0}", coupon.UsedAt!.Value.ToString("MMM d, yyyy")] : Localizer["Expires {0}", coupon.ExpiresAt.Value.ToString("MMM d, yyyy")])
+                            </span>
+                        }
+                    </div>
+                </div>
+            }
+        </div>
+    }
+</div>

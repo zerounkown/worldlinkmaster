@@ -1,0 +1,709 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+    <xsd:import namespace="http://www.w3.org/XML/1998/namespace" />
+    <xsd:element name="root" msdata:IsDataSet="true">
+      <xsd:complexType>
+        <xsd:choice maxOccurs="unbounded">
+          <xsd:element name="metadata">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" />
+              </xsd:sequence>
+              <xsd:attribute name="name" use="required" type="xsd:string" />
+              <xsd:attribute name="type" type="xsd:string" />
+              <xsd:attribute name="mimetype" type="xsd:string" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="assembly">
+            <xsd:complexType>
+              <xsd:attribute name="alias" type="xsd:string" />
+              <xsd:attribute name="name" type="xsd:string" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="data">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+                <xsd:element name="comment" type="xsd:string" minOccurs="0" msdata:Ordinal="2" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" msdata:Ordinal="1" />
+              <xsd:attribute name="type" type="xsd:string" msdata:Ordinal="3" />
+              <xsd:attribute name="mimetype" type="xsd:string" msdata:Ordinal="4" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="resheader">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" />
+            </xsd:complexType>
+          </xsd:element>
+        </xsd:choice>
+      </xsd:complexType>
+    </xsd:element>
+  </xsd:schema>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+
+  <!-- ===================== Shared layout / nav / footer ===================== -->
+  <data name="New Arrivals" xml:space="preserve"><value>وصل حديثاً</value></data>
+  <data name="Specials" xml:space="preserve"><value>عروض خاصة</value></data>
+  <data name="Sales" xml:space="preserve"><value>العروض</value></data>
+  <data name="Find a Store" xml:space="preserve"><value>ابحث عن فرع</value></data>
+  <data name="Welcome to World Link Master! Enjoy" xml:space="preserve"><value>مرحباً بك في World Link Master! استمتع بخصم</value></data>
+  <data name="off" xml:space="preserve"><value></value></data>
+  <data name="your first order with code" xml:space="preserve"><value>على طلبك الأول باستخدام الكود</value></data>
+  <data name="View My Coupons" xml:space="preserve"><value>عرض كوبوناتي</value></data>
+  <data name="is live" xml:space="preserve"><value>مُفعّل الآن</value></data>
+  <data name="OFF everything, storewide!" xml:space="preserve"><value>خصم على كل شيء، في جميع أنحاء المتجر!</value></data>
+  <data name="Shop Now" xml:space="preserve"><value>تسوق الآن</value></data>
+  <data name="Free shipping on orders over AED 365" xml:space="preserve"><value>شحن مجاني للطلبات التي تزيد عن 365 درهم</value></data>
+  <data name="Open menu" xml:space="preserve"><value>فتح القائمة</value></data>
+  <data name="Menu" xml:space="preserve"><value>القائمة</value></data>
+  <data name="Cart" xml:space="preserve"><value>السلة</value></data>
+  <data name="Search gear, apparel, footwear..." xml:space="preserve"><value>ابحث عن المعدات والملابس والأحذية...</value></data>
+  <data name="What are you looking for?" xml:space="preserve"><value>عمّ تبحث؟</value></data>
+  <data name="Search products..." xml:space="preserve"><value>ابحث عن المنتجات...</value></data>
+  <data name="Shop Categories" xml:space="preserve"><value>تصفح الأقسام</value></data>
+  <data name="Close menu" xml:space="preserve"><value>إغلاق القائمة</value></data>
+  <data name="All Products" xml:space="preserve"><value>جميع المنتجات</value></data>
+  <data name="Filter by Price" xml:space="preserve"><value>تصفية حسب السعر</value></data>
+  <data name="Min" xml:space="preserve"><value>الحد الأدنى</value></data>
+  <data name="Max" xml:space="preserve"><value>الحد الأقصى</value></data>
+  <data name="Any" xml:space="preserve"><value>أي سعر</value></data>
+  <data name="Sort by" xml:space="preserve"><value>ترتيب حسب</value></data>
+  <data name="Name (A-Z)" xml:space="preserve"><value>الاسم (أ-ي)</value></data>
+  <data name="Price: Low to High" xml:space="preserve"><value>السعر: من الأقل إلى الأعلى</value></data>
+  <data name="Price: High to Low" xml:space="preserve"><value>السعر: من الأعلى إلى الأقل</value></data>
+  <data name="Newest" xml:space="preserve"><value>الأحدث</value></data>
+  <data name="Top Rated" xml:space="preserve"><value>الأعلى تقييمًا</value></data>
+  <data name="Preview {0} products" xml:space="preserve"><value>معاينة منتجات {0}</value></data>
+  <data name="View all in {0}" xml:space="preserve"><value>عرض الكل في {0}</value></data>
+  <data name="About" xml:space="preserve"><value>من نحن</value></data>
+  <data name="Contact" xml:space="preserve"><value>اتصل بنا</value></data>
+  <data name="Sell on World Link Master" xml:space="preserve"><value>البيع على ورلد لينك ماستر</value></data>
+  <data name="Trade / Wholesale Pricing" xml:space="preserve"><value>أسعار الجملة / التجارة</value></data>
+  <data name="Go back" xml:space="preserve"><value>رجوع</value></data>
+  <data name="Go forward" xml:space="preserve"><value>التالي</value></data>
+  <data name="Scroll to top" xml:space="preserve"><value>التمرير للأعلى</value></data>
+  <data name="Join the World Link Master List" xml:space="preserve"><value>انضم إلى قائمة World Link Master</value></data>
+  <data name="Get first access to new gear drops and field reports." xml:space="preserve"><value>احصل على أول وصول لأحدث المعدات وتقارير الميدان.</value></data>
+  <data name="Your email address" xml:space="preserve"><value>بريدك الإلكتروني</value></data>
+  <data name="Subscribe" xml:space="preserve"><value>اشتراك</value></data>
+  <data name="Shop" xml:space="preserve"><value>المتجر</value></data>
+  <data name="Company" xml:space="preserve"><value>الشركة</value></data>
+  <data name="About Us" xml:space="preserve"><value>من نحن</value></data>
+  <data name="Privacy Policy" xml:space="preserve"><value>سياسة الخصوصية</value></data>
+  <data name="Account" xml:space="preserve"><value>الحساب</value></data>
+  <data name="Order History" xml:space="preserve"><value>سجل الطلبات</value></data>
+  <data name="My Coupons" xml:space="preserve"><value>قسائمي</value></data>
+  <data name="Sign In" xml:space="preserve"><value>تسجيل الدخول</value></data>
+  <data name="Create Account" xml:space="preserve"><value>إنشاء حساب</value></data>
+  <data name="Connect" xml:space="preserve"><value>تواصل معنا</value></data>
+  <data name="World Link Master. All rights reserved." xml:space="preserve"><value>World Link Master. جميع الحقوق محفوظة.</value></data>
+
+  <!-- ===================== Login partial / product card / chat / quick-add ===================== -->
+  <data name="Hi, {0}" xml:space="preserve"><value>مرحباً، {0}</value></data>
+  <data name="My Profile" xml:space="preserve"><value>ملفي الشخصي</value></data>
+  <data name="My Orders" xml:space="preserve"><value>طلباتي</value></data>
+  <data name="Account Settings" xml:space="preserve"><value>إعدادات الحساب</value></data>
+  <data name="Admin Dashboard" xml:space="preserve"><value>لوحة تحكم المشرف</value></data>
+  <data name="Support Console" xml:space="preserve"><value>لوحة الدعم</value></data>
+  <data name="Merchant Dashboard" xml:space="preserve"><value>لوحة تحكم التاجر</value></data>
+  <data name="Trade Catalog" xml:space="preserve"><value>كتالوج التجارة</value></data>
+  <data name="Join Trade Program" xml:space="preserve"><value>انضم إلى برنامج الجملة</value></data>
+  <data name="Log out" xml:space="preserve"><value>تسجيل الخروج</value></data>
+  <data name="OFF (badge)" xml:space="preserve"><value>خصم</value></data>
+  <data name="Featured" xml:space="preserve"><value>مميز</value></data>
+  <data name="Quick add to cart" xml:space="preserve"><value>إضافة سريعة إلى السلة</value></data>
+  <data name="Quick add {0} to cart" xml:space="preserve"><value>إضافة {0} سريعًا إلى السلة</value></data>
+  <data name="Choose options" xml:space="preserve"><value>اختر الخيارات</value></data>
+  <data name="Team Picks" xml:space="preserve"><value>اختيارات الفريق</value></data>
+  <data name="Discover Our Team's Top Picks" xml:space="preserve"><value>اكتشف أفضل اختيارات فريقنا</value></data>
+  <data name="Open support chat" xml:space="preserve"><value>فتح محادثة الدعم</value></data>
+  <data name="Support Chat" xml:space="preserve"><value>محادثة الدعم</value></data>
+  <data name="Close chat" xml:space="preserve"><value>إغلاق المحادثة</value></data>
+  <data name="Attach a file or photo" xml:space="preserve"><value>إرفاق ملف أو صورة</value></data>
+  <data name="Ask us anything…" xml:space="preserve"><value>اسألنا عن أي شيء...</value></data>
+  <data name="Select the Color &amp; Size" xml:space="preserve"><value>اختر اللون والمقاس</value></data>
+  <data name="Close" xml:space="preserve"><value>إغلاق</value></data>
+  <data name="Color" xml:space="preserve"><value>اللون</value></data>
+  <data name="Size" xml:space="preserve"><value>المقاس</value></data>
+  <data name="Please select a color and size." xml:space="preserve"><value>يرجى اختيار اللون والمقاس.</value></data>
+  <data name="Add To Basket" xml:space="preserve"><value>أضف إلى السلة</value></data>
+
+  <!-- ===================== Home / Welcome ===================== -->
+  <data name="Welcome" xml:space="preserve"><value>مرحباً</value></data>
+  <data name="Welcome to World Link Master" xml:space="preserve"><value>مرحباً بك في World Link Master</value></data>
+  <data name="Gear Built for the" xml:space="preserve"><value>معدات مصممة لـ</value></data>
+  <data name="Long Haul" xml:space="preserve"><value>الرحلات الطويلة</value></data>
+  <data name="World Link Master was founded on a simple idea: gear should work as hard as the people who rely on it. We're a tactical and outdoor gear retailer, working directly with manufacturers to bring you field-tested apparel, footwear, packs, and equipment — cutting out the markup so operators, adventurers, and everyday professionals get real durability at a fair price." xml:space="preserve"><value>تأسست World Link Master على فكرة بسيطة: يجب أن تعمل المعدات بجهد لا يقل عن جهد الأشخاص الذين يعتمدون عليها. نحن متجر متخصص في المعدات التكتيكية ومعدات الأنشطة الخارجية، نعمل مباشرة مع الشركات المصنعة لنقدم لك ملابس وأحذية وحقائب ومعدات مُختبرة ميدانياً — مع حذف هامش الربح الإضافي حتى يحصل العاملون الميدانيون والمغامرون والمحترفون في حياتهم اليومية على متانة حقيقية بسعر عادل.</value></data>
+  <data name="Start Shopping With Us" xml:space="preserve"><value>ابدأ التسوق معنا</value></data>
+  <data name="Our Story" xml:space="preserve"><value>قصتنا</value></data>
+  <data name="Request Price List" xml:space="preserve"><value>اطلب قائمة الأسعار</value></data>
+  <data name="Product showcase" xml:space="preserve"><value>عرض المنتجات</value></data>
+  <data name="What We Sell" xml:space="preserve"><value>ماذا نبيع</value></data>
+  <data name="Everything chosen for durability, function, and value." xml:space="preserve"><value>كل شيء مُختار من أجل المتانة والوظيفة والقيمة.</value></data>
+  <data name="What We Do" xml:space="preserve"><value>ماذا نفعل</value></data>
+  <data name="Whether you're heading into the field, the backcountry, or just need gear you can trust every day, World Link Master has you covered. We stock everything from combat shirts and field pants to rucksacks, tactical boots, belts, pouches, and camp equipment — all tested for the same standard: reinforced stress points, reliable materials, and field-ready durability." xml:space="preserve"><value>سواء كنت متجهاً إلى الميدان، أو إلى البرية، أو تحتاج ببساطة إلى معدات يمكنك الوثوق بها كل يوم، فإن World Link Master توفر لك كل ما تحتاجه. نوفر كل شيء بدءاً من قمصان القتال وبناطيل الميدان وحتى حقائب الظهر والأحذية التكتيكية والأحزمة والحقائب الصغيرة ومعدات التخييم — وجميعها مُختبرة وفق نفس المعيار: نقاط تحمل مقواة، مواد موثوقة، ومتانة جاهزة للميدان.</value></data>
+  <data name="Free shipping on orders over AED 365, a hassle-free 30-day return policy, and secure checkout on every order. Ready to gear up?" xml:space="preserve"><value>شحن مجاني للطلبات التي تزيد عن 365 درهم، وسياسة إرجاع سهلة خلال 30 يوماً، ودفع آمن مع كل طلب. هل أنت مستعد لتجهيز نفسك؟</value></data>
+
+  <!-- ===================== Home / Index (shop homepage) ===================== -->
+  <data name="Wherever the mission takes you, we've got you covered. Browse field-tested apparel, packs, footwear, and equipment chosen for durability, function, and value — and built to earn your trust from the first order." xml:space="preserve"><value>أينما تأخذك المهمة، نحن نغطيك. تصفح الملابس والحقائب والأحذية والمعدات المُختبرة ميدانياً والمُختارة من أجل المتانة والوظيفة والقيمة — والمصممة لكسب ثقتك من أول طلب.</value></data>
+  <data name="Free Shipping" xml:space="preserve"><value>شحن مجاني</value></data>
+  <data name="On all orders over AED 365" xml:space="preserve"><value>على جميع الطلبات التي تزيد عن 365 درهم</value></data>
+  <data name="Field-Tested Quality" xml:space="preserve"><value>جودة مُختبرة ميدانياً</value></data>
+  <data name="Durability you can rely on" xml:space="preserve"><value>متانة يمكنك الاعتماد عليها</value></data>
+  <data name="Easy Returns" xml:space="preserve"><value>إرجاع سهل</value></data>
+  <data name="Hassle-free 30-day policy" xml:space="preserve"><value>سياسة إرجاع سهلة خلال 30 يوماً</value></data>
+  <data name="Secure Checkout" xml:space="preserve"><value>دفع آمن</value></data>
+  <data name="Your information stays safe" xml:space="preserve"><value>معلوماتك تبقى آمنة</value></data>
+  <data name="Upcoming Sales &amp; Events in the UAE" xml:space="preserve"><value>العروض والفعاليات القادمة في الإمارات</value></data>
+  <data name="Every celebration is a reason to gear up for less." xml:space="preserve"><value>كل مناسبة هي فرصة للتزود بالمعدات بسعر أقل.</value></data>
+  <data name="LIVE NOW" xml:space="preserve"><value>مُفعّل الآن</value></data>
+  <data name="In {0} day(s)" xml:space="preserve"><value>خلال {0} يوم</value></data>
+  <data name="ends in {0} day(s)" xml:space="preserve"><value>ينتهي خلال {0} يوم</value></data>
+  <data name="Shop the Sale" xml:space="preserve"><value>تسوق العرض</value></data>
+  <data name="Shop by Category" xml:space="preserve"><value>تسوق حسب القسم</value></data>
+  <data name="Collections" xml:space="preserve"><value>المجموعات</value></data>
+  <data name="Browse All Collections" xml:space="preserve"><value>تصفح كل المجموعات</value></data>
+  <data name="Pick a category to see everything we carry in it." xml:space="preserve"><value>اختر قسماً لترى كل ما نوفره فيه.</value></data>
+  <data name="Featured Gear" xml:space="preserve"><value>معدات مميزة</value></data>
+  <data name="View All" xml:space="preserve"><value>عرض الكل</value></data>
+  <data name="Request a Quote" xml:space="preserve"><value>اطلب عرض سعر</value></data>
+  <data name="Bulk Pricing / Request a Quote" xml:space="preserve"><value>أسعار الجملة / اطلب عرض سعر</value></data>
+  <data name="Best Sellers" xml:space="preserve"><value>الأكثر مبيعاً</value></data>
+  <data name="Best Selling" xml:space="preserve"><value>الأكثر مبيعاً</value></data>
+  <data name="Ready For Anything" xml:space="preserve"><value>جاهزون لكل الظروف</value></data>
+  <data name="Shop Mission-Ready Loadouts" xml:space="preserve"><value>تسوق تجهيزات جاهزة للمهمة</value></data>
+  <data name="Field-Tested Favorites" xml:space="preserve"><value>مفضلات مُختبرة ميدانياً</value></data>
+  <data name="See All Best Sellers" xml:space="preserve"><value>عرض كل الأكثر مبيعاً</value></data>
+  <data name="Previous" xml:space="preserve"><value>السابق</value></data>
+  <data name="Next" xml:space="preserve"><value>التالي</value></data>
+  <data name="Trending Now" xml:space="preserve"><value>الأكثر رواجاً الآن</value></data>
+  <data name="Delivery Across the UAE" xml:space="preserve"><value>التوصيل في جميع أنحاء الإمارات</value></data>
+  <data name="We deliver to all seven emirates, with free shipping on orders over AED 365 and tracked delivery on every order." xml:space="preserve"><value>نوصل إلى جميع الإمارات السبع، مع شحن مجاني للطلبات التي تزيد عن 365 درهم وتتبع للشحنة مع كل طلب.</value></data>
+  <data name="Policies &amp; Terms" xml:space="preserve"><value>السياسات والشروط</value></data>
+  <data name="Read our" xml:space="preserve"><value>اطّلع على</value></data>
+  <data name="pages for our full terms and return policy." xml:space="preserve"><value>لمعرفة شروطنا الكاملة وسياسة الإرجاع.</value></data>
+  <data name="Contact &amp; Shipping Coordination" xml:space="preserve"><value>التواصل وتنسيق الشحن</value></data>
+  <data name="Our Locations" xml:space="preserve"><value>فروعنا</value></data>
+  <data name="Pick up in person, or have it delivered to your door." xml:space="preserve"><value>استلم طلبك شخصياً، أو اطلب توصيله إلى باب منزلك.</value></data>
+  <data name="Pickup Available" xml:space="preserve"><value>الاستلام من الفرع متاح</value></data>
+  <data name="Abu Dhabi Branch" xml:space="preserve"><value>فرع أبوظبي</value></data>
+  <data name="Al Ain Branch" xml:space="preserve"><value>فرع العين</value></data>
+  <data name="Call ahead to arrange in-store pickup, or have your order delivered." xml:space="preserve"><value>اتصل مسبقاً لترتيب الاستلام من الفرع، أو اطلب توصيل طلبك.</value></data>
+  <data name="Call to Arrange Pickup" xml:space="preserve"><value>اتصل لترتيب الاستلام</value></data>
+
+  <!-- ===================== Home / About, Contact, Privacy ===================== -->
+  <data name="About World Link Master" xml:space="preserve"><value>عن World Link Master</value></data>
+  <data name="From tactical apparel to trail-ready packs and boots, every product we carry is chosen for durability, function, and value. We work directly with manufacturers to cut out the markup and pass the savings on to operators, adventurers, and everyday professionals alike." xml:space="preserve"><value>من الملابس التكتيكية إلى الحقائب والأحذية الجاهزة للمسارات، كل منتج نقدمه يُختار من أجل المتانة والوظيفة والقيمة. نعمل مباشرة مع الشركات المصنعة لحذف هامش الربح الإضافي ونقل التوفير إلى العاملين الميدانيين والمغامرين والمحترفين في حياتهم اليومية.</value></data>
+  <data name="Whether you're heading into the field, the backcountry, or just need gear you can trust every day, World Link Master has you covered." xml:space="preserve"><value>سواء كنت متجهاً إلى الميدان، أو إلى البرية، أو تحتاج ببساطة إلى معدات يمكنك الوثوق بها كل يوم، فإن World Link Master توفر لك كل ما تحتاجه.</value></data>
+  <data name="Contact Us" xml:space="preserve"><value>اتصل بنا</value></data>
+  <data name="Get in Touch" xml:space="preserve"><value>تواصل معنا</value></data>
+  <data name="Leave your details and our team will reach out to you shortly." xml:space="preserve"><value>اترك بياناتك وسيتواصل معك فريقنا قريباً.</value></data>
+  <data name="Message" xml:space="preserve"><value>الرسالة</value></data>
+  <data name="Submit" xml:space="preserve"><value>إرسال</value></data>
+  <data name="Customer Support" xml:space="preserve"><value>دعم العملاء</value></data>
+  <data name="Mon-Fri, 8am - 6pm EST" xml:space="preserve"><value>الإثنين - الجمعة، 8 صباحاً - 6 مساءً</value></data>
+  <data name="Send us a message" xml:space="preserve"><value>أرسل لنا رسالة</value></data>
+  <data name="Your name" xml:space="preserve"><value>اسمك</value></data>
+  <data name="Your email" xml:space="preserve"><value>بريدك الإلكتروني</value></data>
+  <data name="How can we help?" xml:space="preserve"><value>كيف يمكننا مساعدتك؟</value></data>
+  <data name="Send Message" xml:space="preserve"><value>إرسال الرسالة</value></data>
+  <data name="World Link Master respects your privacy. We only collect the information needed to process your orders and improve your shopping experience, and we never sell your data to third parties." xml:space="preserve"><value>تحترم World Link Master خصوصيتك. نجمع فقط المعلومات اللازمة لمعالجة طلباتك وتحسين تجربة تسوقك، ولا نبيع بياناتك أبداً لأطراف ثالثة.</value></data>
+  <data name="This is a demo storefront; no real payment or personal data processing occurs here." xml:space="preserve"><value>هذا متجر تجريبي؛ لا تتم هنا أي معالجة حقيقية للدفع أو البيانات الشخصية.</value></data>
+
+  <!-- ===================== Products / Index (Categories page) ===================== -->
+  <data name="Order Now" xml:space="preserve"><value>اطلب الآن</value></data>
+  <data name="Buying {0} in bulk?" xml:space="preserve"><value>تشتري {0} بكميات كبيرة؟</value></data>
+
+  <!-- ===================== Products / Index ===================== -->
+  <data name="Search results for &quot;{0}&quot;" xml:space="preserve"><value>نتائج البحث عن "{0}"</value></data>
+  <data name="Categories" xml:space="preserve"><value>الأقسام</value></data>
+  <data name="UAE Dirham" xml:space="preserve"><value>درهم إماراتي</value></data>
+  <data name="US Dollar" xml:space="preserve"><value>دولار أمريكي</value></data>
+  <data name="No products found. Try a different category or search term." xml:space="preserve"><value>لم يتم العثور على منتجات. جرّب قسماً مختلفاً أو كلمة بحث أخرى.</value></data>
+
+  <!-- ===================== Products / Details ===================== -->
+  <data name="Hover to zoom · Click to enlarge" xml:space="preserve"><value>مرّر للتكبير · انقر للتكبير</value></data>
+  <data name="SKU" xml:space="preserve"><value>رمز المنتج</value></data>
+  <data name="{0} reviews" xml:space="preserve"><value>{0} تقييم</value></data>
+  <data name="Sold by" xml:space="preserve"><value>يُباع بواسطة</value></data>
+  <data name="In Stock ({0} available)" xml:space="preserve"><value>متوفر ({0} متاح)</value></data>
+  <data name="Add to Cart" xml:space="preserve"><value>أضف إلى السلة</value></data>
+  <data name="Out of Stock" xml:space="preserve"><value>غير متوفر</value></data>
+  <data name="You May Also Like" xml:space="preserve"><value>قد يعجبك أيضاً</value></data>
+
+  <!-- ===================== Cart ===================== -->
+  <data name="Your Cart" xml:space="preserve"><value>سلة التسوق</value></data>
+  <data name="Your cart is empty." xml:space="preserve"><value>سلة التسوق فارغة.</value></data>
+  <data name="Product" xml:space="preserve"><value>المنتج</value></data>
+  <data name="Price" xml:space="preserve"><value>السعر</value></data>
+  <data name="Quantity" xml:space="preserve"><value>الكمية</value></data>
+  <data name="Total" xml:space="preserve"><value>الإجمالي</value></data>
+  <data name="Update" xml:space="preserve"><value>تحديث</value></data>
+  <data name="Order Summary" xml:space="preserve"><value>ملخص الطلب</value></data>
+  <data name="Subtotal" xml:space="preserve"><value>المجموع الفرعي</value></data>
+  <data name="Shipping and taxes calculated at checkout." xml:space="preserve"><value>يتم احتساب الشحن والضرائب عند إتمام الشراء.</value></data>
+  <data name="Proceed to Checkout" xml:space="preserve"><value>المتابعة إلى إتمام الشراء</value></data>
+  <data name="Continue Shopping" xml:space="preserve"><value>متابعة التسوق</value></data>
+  <data name="No active sales right now" xml:space="preserve"><value>لا توجد عروض نشطة حاليًا</value></data>
+  <data name="Check back soon for the next storewide discount." xml:space="preserve"><value>تابعونا قريبًا لمعرفة أحدث خصومات المتجر.</value></data>
+
+  <!-- ===================== Checkout ===================== -->
+  <data name="Checkout" xml:space="preserve"><value>إتمام الشراء</value></data>
+  <data name="Shipping Information" xml:space="preserve"><value>معلومات الشحن</value></data>
+  <data name="Stripe isn't configured yet. Add your Stripe test API keys to" xml:space="preserve"><value>لم يتم إعداد Stripe بعد. أضف مفاتيح Stripe التجريبية إلى</value></data>
+  <data name="to enable checkout." xml:space="preserve"><value>لتفعيل إتمام الشراء.</value></data>
+  <data name="We'll email you a one-time verification code before payment, then you'll enter your card details on Stripe's secure checkout page." xml:space="preserve"><value>سنرسل لك بريداً إلكترونياً برمز تحقق لمرة واحدة قبل الدفع، ثم ستدخل بيانات بطاقتك في صفحة الدفع الآمنة الخاصة بـ Stripe.</value></data>
+  <data name="Send Verification Code" xml:space="preserve"><value>إرسال رمز التحقق</value></data>
+  <data name="Coupon" xml:space="preserve"><value>القسيمة</value></data>
+  <data name="applied ({0}% off)" xml:space="preserve"><value>مطبّقة (خصم {0}%)</value></data>
+  <data name="Remove" xml:space="preserve"><value>إزالة</value></data>
+  <data name="Have a coupon code?" xml:space="preserve"><value>هل لديك رمز قسيمة؟</value></data>
+  <data name="Apply" xml:space="preserve"><value>تطبيق</value></data>
+  <data name="Coupon discount" xml:space="preserve"><value>خصم القسيمة</value></data>
+  <data name="Shipping" xml:space="preserve"><value>الشحن</value></data>
+  <data name="Free" xml:space="preserve"><value>مجاني</value></data>
+  <data name="Full Name" xml:space="preserve"><value>الاسم الكامل</value></data>
+  <data name="Street Address" xml:space="preserve"><value>عنوان الشارع</value></data>
+  <data name="City" xml:space="preserve"><value>المدينة</value></data>
+  <data name="State" xml:space="preserve"><value>الولاية/المنطقة</value></data>
+  <data name="ZIP Code" xml:space="preserve"><value>الرمز البريدي</value></data>
+  <data name="Phone" xml:space="preserve"><value>الهاتف</value></data>
+
+  <!-- ===================== Checkout / VerifyOtp ===================== -->
+  <data name="Verify Your Order" xml:space="preserve"><value>تحقق من طلبك</value></data>
+  <data name="Enter Your Verification Code" xml:space="preserve"><value>أدخل رمز التحقق الخاص بك</value></data>
+  <data name="For your security, we sent a 6-digit code to" xml:space="preserve"><value>لأمانك، أرسلنا رمزاً مكوناً من 6 أرقام إلى</value></data>
+  <data name="Enter it below to finish placing your order." xml:space="preserve"><value>أدخله أدناه لإتمام تقديم طلبك.</value></data>
+  <data name="Email isn't configured yet, so we can't actually deliver this code. For testing, your code is:" xml:space="preserve"><value>لم يتم إعداد البريد الإلكتروني بعد، لذا لا يمكننا فعلياً إرسال هذا الرمز. للاختبار، رمزك هو:</value></data>
+  <data name="Confirm &amp; Continue to Payment" xml:space="preserve"><value>تأكيد ومتابعة إلى الدفع</value></data>
+  <data name="Didn't get a code? Resend it" xml:space="preserve"><value>لم يصلك رمز؟ أعد إرساله</value></data>
+  <data name="Back to Checkout" xml:space="preserve"><value>العودة إلى إتمام الشراء</value></data>
+
+  <!-- ===================== Checkout / Confirmation ===================== -->
+  <data name="Order Confirmed" xml:space="preserve"><value>تم تأكيد الطلب</value></data>
+  <data name="Thank you for your order!" xml:space="preserve"><value>شكراً لطلبك!</value></data>
+  <data name="Order #{0} has been placed and is now {1}." xml:space="preserve"><value>تم تقديم الطلب رقم #{0} وحالته الآن {1}.</value></data>
+  <data name="A confirmation would normally be emailed to you. You can review this order any time under" xml:space="preserve"><value>عادةً ما يتم إرسال تأكيد إليك عبر البريد الإلكتروني. يمكنك مراجعة هذا الطلب في أي وقت ضمن</value></data>
+  <data name="You've unlocked a loyalty reward!" xml:space="preserve"><value>لقد فتحت مكافأة ولاء!</value></data>
+  <data name="Enjoy {0}% off your next order with code {1}." xml:space="preserve"><value>استمتع بخصم {0}% على طلبك القادم باستخدام الرمز {1}.</value></data>
+  <data name="Order Details" xml:space="preserve"><value>تفاصيل الطلب</value></data>
+  <data name="Shipping to:" xml:space="preserve"><value>الشحن إلى:</value></data>
+
+  <!-- ===================== Orders ===================== -->
+  <data name="You haven't placed any orders yet." xml:space="preserve"><value>لم تقم بتقديم أي طلبات حتى الآن.</value></data>
+  <data name="Start shopping" xml:space="preserve"><value>ابدأ التسوق</value></data>
+  <data name="Order #" xml:space="preserve"><value>رقم الطلب</value></data>
+  <data name="Date" xml:space="preserve"><value>التاريخ</value></data>
+  <data name="Status" xml:space="preserve"><value>الحالة</value></data>
+  <data name="View" xml:space="preserve"><value>عرض</value></data>
+  <data name="Pending" xml:space="preserve"><value>قيد الانتظار</value></data>
+  <data name="Processing" xml:space="preserve"><value>قيد المعالجة</value></data>
+  <data name="Shipped" xml:space="preserve"><value>تم الشحن</value></data>
+  <data name="Delivered" xml:space="preserve"><value>تم التوصيل</value></data>
+  <data name="Order #{0}" xml:space="preserve"><value>الطلب #{0}</value></data>
+  <data name="Placed {0}" xml:space="preserve"><value>تم الطلب في {0}</value></data>
+  <data name="Options" xml:space="preserve"><value>الخيارات</value></data>
+  <data name="Qty" xml:space="preserve"><value>الكمية</value></data>
+  <data name="Summary" xml:space="preserve"><value>الملخص</value></data>
+  <data name="Back to My Orders" xml:space="preserve"><value>العودة إلى طلباتي</value></data>
+
+  <!-- ===================== Coupons ===================== -->
+  <data name="Promo Codes You Can Use" xml:space="preserve"><value>رموز ترويجية يمكنك استخدامها</value></data>
+  <data name="Enter any of these codes in the coupon box at checkout." xml:space="preserve"><value>أدخل أياً من هذه الرموز في مربع القسيمة عند إتمام الشراء.</value></data>
+  <data name="Promo Code" xml:space="preserve"><value>رمز ترويجي</value></data>
+  <data name="Available" xml:space="preserve"><value>متاحة</value></data>
+  <data name="Expires {0}" xml:space="preserve"><value>تنتهي في {0}</value></data>
+  <data name="Your Personal Coupons" xml:space="preserve"><value>قسائمك الشخصية</value></data>
+  <data name="You don't have any personal coupons yet. Keep shopping — every 10th order earns you 50% off, and new perks show up here automatically." xml:space="preserve"><value>ليس لديك أي قسائم شخصية بعد. واصل التسوق — كل طلب عاشر يمنحك خصم 50%، وتظهر المزايا الجديدة هنا تلقائياً.</value></data>
+  <data name="Used" xml:space="preserve"><value>مستخدمة</value></data>
+  <data name="Expired" xml:space="preserve"><value>منتهية</value></data>
+  <data name="Welcome Gift" xml:space="preserve"><value>هدية ترحيبية</value></data>
+  <data name="Loyalty Reward" xml:space="preserve"><value>مكافأة ولاء</value></data>
+  <data name="Used {0}" xml:space="preserve"><value>استُخدمت في {0}</value></data>
+
+  <!-- ===================== Wholesale ===================== -->
+  <data name="Wholesale pricing for approved trade accounts." xml:space="preserve"><value>أسعار جملة للحسابات التجارية المعتمدة.</value></data>
+  <data name="No products are enrolled in the trade program yet. Check back soon." xml:space="preserve"><value>لا توجد منتجات مسجّلة في برنامج التجارة بعد. تحقق مرة أخرى قريباً.</value></data>
+  <data name="Category" xml:space="preserve"><value>القسم</value></data>
+  <data name="Retail Price" xml:space="preserve"><value>سعر التجزئة</value></data>
+  <data name="Your Price" xml:space="preserve"><value>سعرك</value></data>
+  <data name="You Save" xml:space="preserve"><value>توفيرك</value></data>
+  <data name="Trade Program" xml:space="preserve"><value>برنامج التجارة</value></data>
+  <data name="World Link Master Trade Program" xml:space="preserve"><value>برنامج ورلد لينك ماستر التجاري</value></data>
+  <data name="Buying to resell? Join our Trade Program for special wholesale pricing on select gear — no minimum order, instant approval." xml:space="preserve"><value>تشتري لإعادة البيع؟ انضم إلى برنامجنا التجاري للحصول على أسعار جملة خاصة على مجموعة مختارة من المعدات — بدون حد أدنى للطلب، وموافقة فورية.</value></data>
+  <data name="Company Name" xml:space="preserve"><value>اسم الشركة</value></data>
+  <data name="Trade License Number (optional)" xml:space="preserve"><value>رقم الرخصة التجارية (اختياري)</value></data>
+  <data name="Get Wholesale Pricing" xml:space="preserve"><value>احصل على أسعار الجملة</value></data>
+  <data name="Why join?" xml:space="preserve"><value>لماذا تنضم؟</value></data>
+  <data name="Special trade pricing below retail on select products" xml:space="preserve"><value>أسعار تجارية خاصة أقل من التجزئة على منتجات مختارة</value></data>
+  <data name="Instant access, no waiting for approval" xml:space="preserve"><value>وصول فوري، دون انتظار الموافقة</value></data>
+  <data name="See your margin at a glance — retail vs. your price" xml:space="preserve"><value>اطّلع على هامش ربحك بلمحة — سعر التجزئة مقابل سعرك</value></data>
+  <data name="Quote Request Confirmed" xml:space="preserve"><value>تم تأكيد طلب عرض السعر</value></data>
+  <data name="Thank you for your request!" xml:space="preserve"><value>شكراً لطلبك!</value></data>
+  <data name="Your quote request has been submitted successfully." xml:space="preserve"><value>تم تقديم طلب عرض السعر الخاص بك بنجاح.</value></data>
+  <data name="Request Number" xml:space="preserve"><value>رقم الطلب</value></data>
+  <data name="Company:" xml:space="preserve"><value>الشركة:</value></data>
+  <data name="Submitted:" xml:space="preserve"><value>تاريخ التقديم:</value></data>
+  <data name="We've activated wholesale pricing on your account — browse the Trade Catalog to see it in action. Keep your request number for your records." xml:space="preserve"><value>لقد فعّلنا أسعار الجملة على حسابك — تصفح كتالوج التجارة لتراها مطبّقة. احتفظ برقم طلبك لسجلاتك.</value></data>
+  <data name="View Trade Catalog" xml:space="preserve"><value>عرض كتالوج التجارة</value></data>
+
+  <!-- ===================== Quote Requests ===================== -->
+  <data name="Tell us what you need and how many, and our team will get back to you with pricing — no account or login required." xml:space="preserve"><value>أخبرنا بما تحتاجه وكميته، وسيتواصل معك فريقنا بالأسعار — دون الحاجة لحساب أو تسجيل دخول.</value></data>
+  <data name="Product / Service Details" xml:space="preserve"><value>تفاصيل المنتج / الخدمة</value></data>
+  <data name="e.g. product names, categories, sizes/colors needed..." xml:space="preserve"><value>مثال: أسماء المنتجات، الأقسام، المقاسات/الألوان المطلوبة...</value></data>
+  <data name="Submit Quote Request" xml:space="preserve"><value>إرسال طلب عرض السعر</value></data>
+  <data name="Tell us what you need and how much" xml:space="preserve"><value>أخبرنا بما تحتاجه وكميته</value></data>
+  <data name="Our team reviews it and works out your pricing" xml:space="preserve"><value>يراجعه فريقنا ويحدد الأسعار المناسبة لك</value></data>
+  <data name="We follow up by email or phone with your quote" xml:space="preserve"><value>نتواصل معك عبر البريد الإلكتروني أو الهاتف بعرض السعر</value></data>
+  <data name="Quantity must be greater than zero." xml:space="preserve"><value>يجب أن تكون الكمية أكبر من صفر.</value></data>
+  <data name="Our team will review your request and follow up by email or phone with your pricing. Keep your request number for your records." xml:space="preserve"><value>سيراجع فريقنا طلبك ويتواصل معك عبر البريد الإلكتروني أو الهاتف بالأسعار. احتفظ برقم طلبك لسجلاتك.</value></data>
+  <data name="Quote Requests" xml:space="preserve"><value>طلبات عروض الأسعار</value></data>
+  <data name="All" xml:space="preserve"><value>الكل</value></data>
+  <data name="Quoted" xml:space="preserve"><value>تم التسعير</value></data>
+  <data name="Approved" xml:space="preserve"><value>موافق عليه</value></data>
+  <data name="Rejected" xml:space="preserve"><value>مرفوض</value></data>
+  <data name="Request #" xml:space="preserve"><value>رقم الطلب</value></data>
+  <data name="Submitted" xml:space="preserve"><value>تاريخ التقديم</value></data>
+  <data name="No quote requests found." xml:space="preserve"><value>لم يتم العثور على طلبات عروض أسعار.</value></data>
+  <data name="Quote Request Details" xml:space="preserve"><value>تفاصيل طلب عرض السعر</value></data>
+  <data name="Update Status" xml:space="preserve"><value>تحديث الحالة</value></data>
+  <data name="Response to Customer" xml:space="preserve"><value>الرد على العميل</value></data>
+  <data name="Back to Quote Requests" xml:space="preserve"><value>العودة إلى طلبات عروض الأسعار</value></data>
+  <data name="Quote request {0} updated." xml:space="preserve"><value>تم تحديث طلب عرض السعر {0}.</value></data>
+  <data name="Quoted Price" xml:space="preserve"><value>السعر المقترح</value></data>
+  <data name="Quoted Price (AED)" xml:space="preserve"><value>السعر المقترح (درهم)</value></data>
+  <data name="Last Response" xml:space="preserve"><value>آخر رد</value></data>
+  <data name="Responded:" xml:space="preserve"><value>تاريخ الرد:</value></data>
+
+  <!-- ===================== Merchant Onboarding ===================== -->
+  <data name="Join our marketplace and reach customers browsing for tactical and outdoor gear. You keep 90% of every sale, paid out directly to your bank account via Stripe." xml:space="preserve"><value>انضم إلى سوقنا وتواصل مع عملاء يتصفحون معدات تكتيكية وخارجية. تحتفظ بـ 90% من كل عملية بيع، تُدفع مباشرةً إلى حسابك المصرفي عبر Stripe.</value></data>
+  <data name="Business Name" xml:space="preserve"><value>اسم النشاط التجاري</value></data>
+  <data name="Tell customers about your shop" xml:space="preserve"><value>أخبر العملاء عن متجرك</value></data>
+  <data name="Apply &amp; Connect Stripe" xml:space="preserve"><value>تقديم وربط Stripe</value></data>
+  <data name="How it works" xml:space="preserve"><value>كيف يعمل</value></data>
+  <data name="Tell us about your shop" xml:space="preserve"><value>أخبرنا عن متجرك</value></data>
+  <data name="Connect your Stripe account (fast, secure, hosted by Stripe)" xml:space="preserve"><value>اربط حساب Stripe الخاص بك (سريع وآمن ومُستضاف من Stripe)</value></data>
+  <data name="List your products from your merchant dashboard" xml:space="preserve"><value>أدرج منتجاتك من لوحة تحكم التاجر الخاصة بك</value></data>
+  <data name="Get paid automatically after every sale" xml:space="preserve"><value>احصل على أموالك تلقائياً بعد كل عملية بيع</value></data>
+  <data name="Connect Stripe" xml:space="preserve"><value>ربط Stripe</value></data>
+  <data name="Thanks for applying," xml:space="preserve"><value>شكراً لتقديمك الطلب،</value></data>
+  <data name="Before you can start selling, you need to connect a Stripe account so we can pay you." xml:space="preserve"><value>قبل أن تتمكن من البدء بالبيع، تحتاج إلى ربط حساب Stripe حتى نتمكن من دفع مستحقاتك.</value></data>
+  <data name="Stripe couldn't complete this step:" xml:space="preserve"><value>لم يتمكن Stripe من إكمال هذه الخطوة:</value></data>
+  <data name="Stripe isn't configured on this site yet. Once the site owner adds Stripe API keys, come back here and try again." xml:space="preserve"><value>لم يتم إعداد Stripe على هذا الموقع بعد. بمجرد أن يضيف مالك الموقع مفاتيح Stripe API، عد إلى هنا وحاول مرة أخرى.</value></data>
+  <data name="Try Again" xml:space="preserve"><value>حاول مرة أخرى</value></data>
+
+  <!-- ===================== Profile ===================== -->
+  <data name="Profile picture" xml:space="preserve"><value>صورة الملف الشخصي</value></data>
+  <data name="JPG, PNG, GIF, or WEBP — 3 MB max." xml:space="preserve"><value>JPG أو PNG أو GIF أو WEBP — بحد أقصى 3 ميجابايت.</value></data>
+  <data name="Change Picture" xml:space="preserve"><value>تغيير الصورة</value></data>
+  <data name="Upload Picture" xml:space="preserve"><value>رفع صورة</value></data>
+  <data name="Remove Picture" xml:space="preserve"><value>إزالة الصورة</value></data>
+
+  <!-- ===================== Identity / Login ===================== -->
+  <data name="Log in" xml:space="preserve"><value>تسجيل الدخول</value></data>
+  <data name="Welcome back" xml:space="preserve"><value>مرحباً بعودتك</value></data>
+  <data name="Sign in to track orders, use your saved coupons, and check out faster." xml:space="preserve"><value>سجّل الدخول لتتبع طلباتك واستخدام قسائمك المحفوظة وإتمام الشراء بشكل أسرع.</value></data>
+  <data name="Email" xml:space="preserve"><value>البريد الإلكتروني</value></data>
+  <data name="Password" xml:space="preserve"><value>كلمة المرور</value></data>
+  <data name="Remember me?" xml:space="preserve"><value>تذكرني؟</value></data>
+  <data name="Forgot your password?" xml:space="preserve"><value>نسيت كلمة المرور؟</value></data>
+  <data name="Register as a new user" xml:space="preserve"><value>التسجيل كمستخدم جديد</value></data>
+  <data name="Resend email confirmation" xml:space="preserve"><value>إعادة إرسال تأكيد البريد الإلكتروني</value></data>
+  <data name="Use another service to log in." xml:space="preserve"><value>استخدم خدمة أخرى لتسجيل الدخول.</value></data>
+  <data name="Log in using your {0} account" xml:space="preserve"><value>سجّل الدخول باستخدام حساب {0}</value></data>
+  <data name="Register" xml:space="preserve"><value>تسجيل</value></data>
+  <data name="Create your account" xml:space="preserve"><value>أنشئ حسابك</value></data>
+  <data name="Join World Link Master for faster checkout, order tracking, and member-only coupons." xml:space="preserve"><value>انضم إلى World Link Master لإتمام الشراء بشكل أسرع وتتبع الطلبات والحصول على قسائم حصرية للأعضاء.</value></data>
+  <data name="Confirm password" xml:space="preserve"><value>تأكيد كلمة المرور</value></data>
+  <data name="Already have an account?" xml:space="preserve"><value>لديك حساب بالفعل؟</value></data>
+
+  <!-- ===================== Admin / Layout ===================== -->
+  <data name="World Link Master — Admin Console" xml:space="preserve"><value>ورلد لينك ماستر — لوحة تحكم الإدارة</value></data>
+  <data name="Back to Storefront" xml:space="preserve"><value>العودة إلى المتجر</value></data>
+  <data name="Dashboard" xml:space="preserve"><value>لوحة القيادة</value></data>
+  <data name="Merchants" xml:space="preserve"><value>التجار</value></data>
+  <data name="Sale Events" xml:space="preserve"><value>فعاليات البيع</value></data>
+  <data name="Save" xml:space="preserve"><value>حفظ</value></data>
+  <data name="Cancel" xml:space="preserve"><value>إلغاء</value></data>
+  <data name="Edit" xml:space="preserve"><value>تعديل</value></data>
+  <data name="Delete" xml:space="preserve"><value>حذف</value></data>
+  <data name="Image URL" xml:space="preserve"><value>رابط الصورة</value></data>
+  <data name="Are you sure you want to delete {0}?" xml:space="preserve"><value>هل أنت متأكد من رغبتك في حذف {0}؟</value></data>
+
+  <!-- ===================== Admin / Home dashboard ===================== -->
+  <data name="Recent Orders" xml:space="preserve"><value>أحدث الطلبات</value></data>
+
+  <!-- ===================== Admin / Categories ===================== -->
+  <data name="Manage Categories" xml:space="preserve"><value>إدارة الأقسام</value></data>
+  <data name="New Category" xml:space="preserve"><value>قسم جديد</value></data>
+  <data name="Slug" xml:space="preserve"><value>المعرّف النصي</value></data>
+  <data name="Delete Category" xml:space="preserve"><value>حذف القسم</value></data>
+  <data name="Edit Category" xml:space="preserve"><value>تعديل القسم</value></data>
+
+  <!-- ===================== Admin / Coupons ===================== -->
+  <data name="Discount %" xml:space="preserve"><value>نسبة الخصم %</value></data>
+  <data name="Active" xml:space="preserve"><value>مفعّل</value></data>
+  <data name="Starts At" xml:space="preserve"><value>تاريخ البدء</value></data>
+  <data name="Expires At" xml:space="preserve"><value>تاريخ الانتهاء</value></data>
+  <data name="Max Redemptions" xml:space="preserve"><value>الحد الأقصى للاستخدام</value></data>
+  <data name="Promo Coupons" xml:space="preserve"><value>قسائم ترويجية</value></data>
+  <data name="New Coupon" xml:space="preserve"><value>قسيمة جديدة</value></data>
+  <data name="Public discount codes any customer can enter at checkout. Each customer can redeem a given code once, within its date window and up to its redemption limit." xml:space="preserve"><value>رموز خصم عامة يمكن لأي عميل إدخالها عند إتمام الشراء. يمكن لكل عميل استخدام رمز معين مرة واحدة، ضمن فترته الزمنية وحتى حد الاستخدام المسموح.</value></data>
+  <data name="Discount" xml:space="preserve"><value>الخصم</value></data>
+  <data name="Window" xml:space="preserve"><value>الفترة الزمنية</value></data>
+  <data name="Redemptions" xml:space="preserve"><value>مرات الاستخدام</value></data>
+  <data name="Disabled" xml:space="preserve"><value>معطّل</value></data>
+  <data name="Scheduled" xml:space="preserve"><value>مجدولة</value></data>
+  <data name="Fully redeemed" xml:space="preserve"><value>مستنفدة بالكامل</value></data>
+  <data name="Live" xml:space="preserve"><value>نشطة</value></data>
+  <data name="Any time" xml:space="preserve"><value>أي وقت</value></data>
+  <data name="No expiry" xml:space="preserve"><value>بدون انتهاء</value></data>
+  <data name="No promo coupons yet. Create one for customers to use at checkout." xml:space="preserve"><value>لا توجد قسائم ترويجية بعد. أنشئ واحدة ليستخدمها العملاء عند إتمام الشراء.</value></data>
+  <data name="Delete Coupon" xml:space="preserve"><value>حذف القسيمة</value></data>
+  <data name="Edit Coupon" xml:space="preserve"><value>تعديل القسيمة</value></data>
+  <data name="Are you sure you want to delete {0} ({1}% off)?" xml:space="preserve"><value>هل أنت متأكد من رغبتك في حذف {0} (خصم {1}%)؟</value></data>
+  <data name="This coupon has already been redeemed {0} time(s). Deleting it won't reverse those orders." xml:space="preserve"><value>تم استخدام هذه القسيمة {0} مرة/مرات بالفعل. حذفها لن يُلغي تلك الطلبات.</value></data>
+
+  <!-- ===================== Admin / Merchants ===================== -->
+  <data name="Business" xml:space="preserve"><value>النشاط التجاري</value></data>
+  <data name="Contact Info" xml:space="preserve"><value>معلومات التواصل</value></data>
+  <data name="Stripe Status" xml:space="preserve"><value>حالة Stripe</value></data>
+  <data name="Joined" xml:space="preserve"><value>تاريخ الانضمام</value></data>
+  <data name="Connected" xml:space="preserve"><value>متصل</value></data>
+  <data name="Onboarding started" xml:space="preserve"><value>بدأ الإعداد</value></data>
+  <data name="Not connected" xml:space="preserve"><value>غير متصل</value></data>
+  <data name="No merchants yet." xml:space="preserve"><value>لا يوجد تجار بعد.</value></data>
+
+  <!-- ===================== Admin / Orders ===================== -->
+  <data name="Manage Orders" xml:space="preserve"><value>إدارة الطلبات</value></data>
+  <data name="Customer" xml:space="preserve"><value>العميل</value></data>
+  <data name="Customer:" xml:space="preserve"><value>العميل:</value></data>
+  <data name="Back to Orders" xml:space="preserve"><value>العودة إلى الطلبات</value></data>
+
+  <!-- ===================== Admin / Products ===================== -->
+  <data name="Manage Products" xml:space="preserve"><value>إدارة المنتجات</value></data>
+  <data name="Bulk Update (Excel)" xml:space="preserve"><value>تحديث جماعي (إكسل)</value></data>
+  <data name="Bulk Update &amp; Add Products (Excel)" xml:space="preserve"><value>تحديث وإضافة منتجات جماعياً (إكسل)</value></data>
+  <data name="Update prices, wholesale prices, and stock quantities — or add brand-new products — for many items at once." xml:space="preserve"><value>حدّث الأسعار وأسعار الجملة وكميات المخزون — أو أضف منتجات جديدة تماماً — لعدة عناصر دفعة واحدة.</value></data>
+  <data name="{0} new product(s) created." xml:space="preserve"><value>تم إنشاء {0} منتج(ات) جديد.</value></data>
+  <data name="Get an Excel file with every product's SKU, name, category, price, wholesale price, stock quantity, and image URL." xml:space="preserve"><value>احصل على ملف إكسل يحتوي على رمز كل منتج واسمه وقسمه وسعره وسعر الجملة وكمية المخزون ورابط الصورة.</value></data>
+  <data name="To update an existing product, change its" xml:space="preserve"><value>لتحديث منتج موجود، غيّر</value></data>
+  <data name="and keep its" xml:space="preserve"><value>واترك</value></data>
+  <data name="unchanged — that's how the row is matched." xml:space="preserve"><value>دون تغيير — فهذه هي طريقة مطابقة الصف بالمنتج.</value></data>
+  <data name="To add a brand-new product, add a new row with a SKU that doesn't exist yet, and fill in" xml:space="preserve"><value>لإضافة منتج جديد تماماً، أضف صفاً جديداً برمز غير موجود مسبقاً، واملأ</value></data>
+  <data name="must exactly match an existing category name" xml:space="preserve"><value>يجب أن يطابق تماماً اسم قسم موجود</value></data>
+  <data name="and, ideally," xml:space="preserve"><value>ويُفضّل</value></data>
+  <data name="New Product" xml:space="preserve"><value>منتج جديد</value></data>
+  <data name="No merchant account exists to assign this product to." xml:space="preserve"><value>لا يوجد حساب تاجر لإسناد هذا المنتج إليه.</value></data>
+  <data name="Search by name or SKU…" xml:space="preserve"><value>ابحث بالاسم أو رمز المنتج...</value></data>
+  <data name="Search" xml:space="preserve"><value>بحث</value></data>
+  <data name="Clear" xml:space="preserve"><value>مسح</value></data>
+  <data name="{0} product(s)" xml:space="preserve"><value>{0} منتج(ات)</value></data>
+  <data name="matching '{0}'" xml:space="preserve"><value>مطابقة لـ '{0}'</value></data>
+  <data name="Wholesale" xml:space="preserve"><value>الجملة</value></data>
+  <data name="Stock" xml:space="preserve"><value>المخزون</value></data>
+  <data name="No products found." xml:space="preserve"><value>لم يتم العثور على منتجات.</value></data>
+  <data name="Low ({0})" xml:space="preserve"><value>منخفض ({0})</value></data>
+  <data name="Yes" xml:space="preserve"><value>نعم</value></data>
+  <data name="No" xml:space="preserve"><value>لا</value></data>
+  <data name="Short Description" xml:space="preserve"><value>وصف مختصر</value></data>
+  <data name="Price (AED)" xml:space="preserve"><value>السعر (درهم)</value></data>
+  <data name="Stock Quantity" xml:space="preserve"><value>كمية المخزون</value></data>
+  <data name="Wholesale Price (AED, optional)" xml:space="preserve"><value>سعر الجملة (درهم، اختياري)</value></data>
+  <data name="Leave blank to keep this product retail-only. Set a price to enroll it in the Trade Program." xml:space="preserve"><value>اتركه فارغاً للإبقاء على هذا المنتج للتجزئة فقط. حدد سعراً لتسجيله في برنامج التجارة.</value></data>
+  <data name="Edit Product" xml:space="preserve"><value>تعديل المنتج</value></data>
+  <data name="Delete Product" xml:space="preserve"><value>حذف المنتج</value></data>
+  <data name="Are you sure you want to delete {0} ({1})?" xml:space="preserve"><value>هل أنت متأكد من رغبتك في حذف {0} ({1})؟</value></data>
+  <data name="This product can't be deleted — it appears in {0} order(s). Deleting it would break that order history." xml:space="preserve"><value>لا يمكن حذف هذا المنتج — فهو يظهر في {0} طلب(ات). حذفه سيؤدي إلى كسر سجل تلك الطلبات.</value></data>
+  <data name="Instead," xml:space="preserve"><value>بدلاً من ذلك،</value></data>
+  <data name="edit it" xml:space="preserve"><value>عدّله</value></data>
+  <data name="and set" xml:space="preserve"><value>وضع</value></data>
+  <data name="to 0 to retire it from the storefront." xml:space="preserve"><value>إلى 0 لسحبه من المتجر.</value></data>
+  <data name="Back to Products" xml:space="preserve"><value>العودة إلى المنتجات</value></data>
+  <data name="Bulk Update Prices &amp; Stock (Excel)" xml:space="preserve"><value>تحديث جماعي للأسعار والمخزون (إكسل)</value></data>
+  <data name="Update prices, wholesale prices, and stock quantities for many products at once." xml:space="preserve"><value>حدّث الأسعار وأسعار الجملة وكميات المخزون لعدة منتجات دفعة واحدة.</value></data>
+  <data name="{0} product(s) updated." xml:space="preserve"><value>تم تحديث {0} منتج(ات).</value></data>
+  <data name="{0} SKU(s) not found" xml:space="preserve"><value>لم يتم العثور على {0} رمز(رموز) منتج</value></data>
+  <data name="row skipped — check for typos" xml:space="preserve"><value>تم تخطي الصف — تحقق من وجود أخطاء إملائية</value></data>
+  <data name="{0} row(s) had invalid data" xml:space="preserve"><value>احتوى {0} صف(وف) على بيانات غير صالحة</value></data>
+  <data name="row skipped" xml:space="preserve"><value>تم تخطي الصف</value></data>
+  <data name="1. Download the current catalog" xml:space="preserve"><value>1. تنزيل الكتالوج الحالي</value></data>
+  <data name="Get an Excel file with every product's SKU, price, wholesale price, and stock quantity." xml:space="preserve"><value>احصل على ملف إكسل يحتوي على رمز كل منتج وسعره وسعر جملته وكمية مخزونه.</value></data>
+  <data name="Download Products.xlsx" xml:space="preserve"><value>تنزيل Products.xlsx</value></data>
+  <data name="2. Edit it, then upload it back" xml:space="preserve"><value>2. عدّله، ثم أعد رفعه</value></data>
+  <data name="Change the" xml:space="preserve"><value>غيّر</value></data>
+  <data name="Wholesale Price (AED)" xml:space="preserve"><value>سعر الجملة (درهم)</value></data>
+  <data name="and/or" xml:space="preserve"><value>و/أو</value></data>
+  <data name="columns." xml:space="preserve"><value>الأعمدة.</value></data>
+  <data name="Don't change the" xml:space="preserve"><value>لا تغيّر</value></data>
+  <data name="column — that's how each row is matched to a product." xml:space="preserve"><value>العمود — فهذه هي الطريقة التي يتم بها مطابقة كل صف بمنتج.</value></data>
+  <data name="and" xml:space="preserve"><value>و</value></data>
+  <data name="are just for reference and are ignored on upload." xml:space="preserve"><value>هما للمرجعية فقط ويتم تجاهلهما عند الرفع.</value></data>
+  <data name="Upload" xml:space="preserve"><value>رفع</value></data>
+
+  <!-- ===================== Admin / PromoEvents ===================== -->
+  <data name="Icon (emoji)" xml:space="preserve"><value>الأيقونة (إيموجي)</value></data>
+  <data name="Start Date" xml:space="preserve"><value>تاريخ البدء</value></data>
+  <data name="End Date" xml:space="preserve"><value>تاريخ الانتهاء</value></data>
+  <data name="UAE Sale Events" xml:space="preserve"><value>فعاليات البيع في الإمارات</value></data>
+  <data name="New Event" xml:space="preserve"><value>فعالية جديدة</value></data>
+  <data name="These power the &quot;Upcoming Sales &amp; Events&quot; section on the homepage and automatically discount every product's price while an event is running. If more than one is active at the same time, the highest discount wins." xml:space="preserve"><value>تُشغّل هذه قسم "العروض والفعاليات القادمة" في الصفحة الرئيسية وتخصم تلقائياً من سعر كل منتج أثناء تفعيل الفعالية. إذا كانت أكثر من فعالية نشطة في نفس الوقت، يُطبَّق أعلى خصم.</value></data>
+  <data name="Starts" xml:space="preserve"><value>البداية</value></data>
+  <data name="Ends" xml:space="preserve"><value>النهاية</value></data>
+  <data name="Upcoming" xml:space="preserve"><value>قادمة</value></data>
+  <data name="Ended" xml:space="preserve"><value>منتهية</value></data>
+  <data name="Currently Live" xml:space="preserve"><value>مُفعّلة الآن</value></data>
+  <data name="No sale events yet. Create one to feature it on the homepage." xml:space="preserve"><value>لا توجد فعاليات بيع بعد. أنشئ واحدة لعرضها في الصفحة الرئيسية.</value></data>
+  <data name="New Sale Event" xml:space="preserve"><value>فعالية بيع جديدة</value></data>
+  <data name="Edit Sale Event" xml:space="preserve"><value>تعديل فعالية البيع</value></data>
+  <data name="Delete Sale Event" xml:space="preserve"><value>حذف فعالية البيع</value></data>
+
+  <!-- ===================== Admin / Customers ===================== -->
+  <data name="Locked" xml:space="preserve"><value>مقفل</value></data>
+  <data name="Unconfirmed" xml:space="preserve"><value>غير مؤكد</value></data>
+  <data name="Customer Details" xml:space="preserve"><value>تفاصيل العميل</value></data>
+  <data name="Email:" xml:space="preserve"><value>البريد الإلكتروني:</value></data>
+  <data name="Phone:" xml:space="preserve"><value>الهاتف:</value></data>
+  <data name="Roles:" xml:space="preserve"><value>الأدوار:</value></data>
+  <data name="None" xml:space="preserve"><value>لا شيء</value></data>
+  <data name="Email confirmed:" xml:space="preserve"><value>تأكيد البريد الإلكتروني:</value></data>
+  <data name="Status:" xml:space="preserve"><value>الحالة:</value></data>
+  <data name="Other Profiles" xml:space="preserve"><value>ملفات أخرى</value></data>
+  <data name="Merchant:" xml:space="preserve"><value>التاجر:</value></data>
+  <data name="Wholesale account:" xml:space="preserve"><value>الحساب التجاري:</value></data>
+  <data name="No merchant or wholesale profile." xml:space="preserve"><value>لا يوجد ملف تاجر أو حساب تجاري.</value></data>
+  <data name="Coupons issued:" xml:space="preserve"><value>القسائم الصادرة:</value></data>
+  <data name="Orders ({0})" xml:space="preserve"><value>الطلبات ({0})</value></data>
+  <data name="No orders yet." xml:space="preserve"><value>لا توجد طلبات بعد.</value></data>
+  <data name="Back to Customers" xml:space="preserve"><value>العودة إلى العملاء</value></data>
+  <data name="Delete Customer" xml:space="preserve"><value>حذف العميل</value></data>
+  <data name="This customer can't be deleted because they still have:" xml:space="preserve"><value>لا يمكن حذف هذا العميل لأنه لا يزال لديه:</value></data>
+  <data name="{0} order(s)" xml:space="preserve"><value>{0} طلب(ات)</value></data>
+  <data name="a merchant profile" xml:space="preserve"><value>ملف تاجر</value></data>
+  <data name="a wholesale account" xml:space="preserve"><value>حساب تجاري</value></data>
+  <data name="Lock the account instead from the" xml:space="preserve"><value>يمكنك بدلاً من ذلك قفل الحساب من صفحة</value></data>
+  <data name="page." xml:space="preserve"><value>.</value></data>
+  <data name="This will also remove {0} unused coupon(s) issued to this customer." xml:space="preserve"><value>سيؤدي هذا أيضاً إلى إزالة {0} قسيمة(قسائم) غير مستخدمة صادرة لهذا العميل.</value></data>
+  <data name="Edit Customer" xml:space="preserve"><value>تعديل العميل</value></data>
+  <data name="First Name" xml:space="preserve"><value>الاسم الأول</value></data>
+  <data name="Last Name" xml:space="preserve"><value>اسم العائلة</value></data>
+  <data name="Email confirmed" xml:space="preserve"><value>البريد الإلكتروني مؤكد</value></data>
+  <data name="Lock account (customer can't sign in)" xml:space="preserve"><value>قفل الحساب (لن يتمكن العميل من تسجيل الدخول)</value></data>
+  <data name="Roles" xml:space="preserve"><value>الأدوار</value></data>
+  <data name="Wholesale Account" xml:space="preserve"><value>حساب تجارة الجملة</value></data>
+  <data name="Support (access to the support chat console)" xml:space="preserve"><value>الدعم (الوصول إلى لوحة محادثة الدعم)</value></data>
+
+  <!-- ===================== Merchant ===================== -->
+  <data name="World Link Master — Merchant Dashboard" xml:space="preserve"><value>ورلد لينك ماستر — لوحة تحكم التاجر</value></data>
+  <data name="My Products" xml:space="preserve"><value>منتجاتي</value></data>
+  <data name="Welcome, {0}" xml:space="preserve"><value>مرحباً، {0}</value></data>
+  <data name="Your Stripe account isn't fully connected yet. You won't receive payouts until onboarding is complete." xml:space="preserve"><value>لم يتم ربط حساب Stripe الخاص بك بالكامل بعد. لن تتلقى مدفوعات حتى يكتمل الإعداد.</value></data>
+  <data name="Finish Setup" xml:space="preserve"><value>إنهاء الإعداد</value></data>
+  <data name="Your Stripe account is connected and ready to receive payouts." xml:space="preserve"><value>تم ربط حساب Stripe الخاص بك وهو جاهز لاستقبال المدفوعات.</value></data>
+  <data name="Total Sales" xml:space="preserve"><value>إجمالي المبيعات</value></data>
+  <data name="Recent Payouts" xml:space="preserve"><value>أحدث المدفوعات</value></data>
+  <data name="Amount" xml:space="preserve"><value>المبلغ</value></data>
+  <data name="Platform Fee" xml:space="preserve"><value>رسوم المنصة</value></data>
+  <data name="Transferred" xml:space="preserve"><value>تم التحويل</value></data>
+  <data name="Failed" xml:space="preserve"><value>فشل</value></data>
+  <data name="No payouts yet." xml:space="preserve"><value>لا توجد مدفوعات بعد.</value></data>
+  <data name="Line Total" xml:space="preserve"><value>إجمالي السطر</value></data>
+  <data name="Payout Status" xml:space="preserve"><value>حالة الدفع</value></data>
+  <data name="You haven't listed any products yet." xml:space="preserve"><value>لم تقم بإدراج أي منتجات بعد.</value></data>
+
+  <!-- ===================== Support ===================== -->
+  <data name="World Link Master — Support Console" xml:space="preserve"><value>ورلد لينك ماستر — لوحة الدعم</value></data>
+  <data name="Open Conversations" xml:space="preserve"><value>المحادثات المفتوحة</value></data>
+  <data name="Closed Conversations" xml:space="preserve"><value>المحادثات المغلقة</value></data>
+  <data name="Support Conversations" xml:space="preserve"><value>محادثات الدعم</value></data>
+  <data name="Open" xml:space="preserve"><value>مفتوحة</value></data>
+  <data name="Closed" xml:space="preserve"><value>مغلقة</value></data>
+  <data name="Last message" xml:space="preserve"><value>آخر رسالة</value></data>
+  <data name="Assigned to" xml:space="preserve"><value>مُسندة إلى</value></data>
+  <data name="Started" xml:space="preserve"><value>بدأت</value></data>
+  <data name="No {0} conversations." xml:space="preserve"><value>لا توجد محادثات {0}.</value></data>
+  <data name="Open Chat" xml:space="preserve"><value>فتح المحادثة</value></data>
+  <data name="Conversation" xml:space="preserve"><value>المحادثة</value></data>
+  <data name="Close conversation" xml:space="preserve"><value>إغلاق المحادثة</value></data>
+  <data name="Back to Conversations" xml:space="preserve"><value>العودة إلى المحادثات</value></data>
+
+  <!-- ===================== Controller messages ===================== -->
+  <data name="That product couldn't be found." xml:space="preserve"><value>تعذر العثور على هذا المنتج.</value></data>
+  <data name="Sorry, that item just sold out." xml:space="preserve"><value>عذراً، نفدت كمية هذا المنتج للتو.</value></data>
+  <data name="{0} added to your cart at the {1} price ({2}% off)!" xml:space="preserve"><value>تمت إضافة {0} إلى سلتك بسعر {1} (خصم {2}%)!</value></data>
+  <data name="{0} added to your cart at your wholesale price." xml:space="preserve"><value>تمت إضافة {0} إلى سلتك بسعر الجملة الخاص بك.</value></data>
+  <data name="{0} added to your cart." xml:space="preserve"><value>تمت إضافة {0} إلى سلتك.</value></data>
+  <data name="That coupon code isn't valid, has already been used, or has expired." xml:space="preserve"><value>رمز القسيمة هذا غير صالح، أو تم استخدامه بالفعل، أو انتهت صلاحيته.</value></data>
+  <data name="Coupon {0} applied — {1}% off!" xml:space="preserve"><value>تم تطبيق القسيمة {0} — خصم {1}%!</value></data>
+  <data name="Coupon removed." xml:space="preserve"><value>تمت إزالة القسيمة.</value></data>
+  <data name="Stripe isn't configured yet. Set the Stripe__SecretKey environment variable to enable checkout." xml:space="preserve"><value>لم يتم إعداد Stripe بعد. عيّن متغير البيئة Stripe__SecretKey لتفعيل إتمام الشراء.</value></data>
+  <data name="We couldn't find an email address on your account to send a verification code to." xml:space="preserve"><value>لم نتمكن من العثور على بريد إلكتروني في حسابك لإرسال رمز التحقق إليه.</value></data>
+  <data name="Your checkout session expired. Please start again." xml:space="preserve"><value>انتهت جلسة إتمام الشراء الخاصة بك. يرجى البدء من جديد.</value></data>
+  <data name="Too many incorrect attempts. Request a new code." xml:space="preserve"><value>عدد كبير جداً من المحاولات غير الصحيحة. اطلب رمزاً جديداً.</value></data>
+  <data name="That code has expired. Request a new one." xml:space="preserve"><value>انتهت صلاحية هذا الرمز. اطلب رمزاً جديداً.</value></data>
+  <data name="That code isn't correct. Please try again." xml:space="preserve"><value>هذا الرمز غير صحيح. يرجى المحاولة مرة أخرى.</value></data>
+  <data name="We sent you a new code." xml:space="preserve"><value>أرسلنا لك رمزاً جديداً.</value></data>
+  <data name="Stripe couldn't start checkout: {0}" xml:space="preserve"><value>تعذر على Stripe بدء عملية الدفع: {0}</value></data>
+  <data name="We couldn't verify that payment with Stripe. Please try checking out again." xml:space="preserve"><value>لم نتمكن من التحقق من هذه الدفعة مع Stripe. يرجى المحاولة مرة أخرى.</value></data>
+  <data name="Your payment could not be confirmed. Please try again." xml:space="preserve"><value>تعذر تأكيد دفعتك. يرجى المحاولة مرة أخرى.</value></data>
+  <data name="Checkout was cancelled. Your cart is still saved." xml:space="preserve"><value>تم إلغاء عملية الدفع. سلتك لا تزال محفوظة.</value></data>
+  <data name="Welcome to the World Link Master Trade Program! Wholesale pricing is now active on your account." xml:space="preserve"><value>مرحباً بك في برنامج ورلد لينك ماستر التجاري! أسعار الجملة مفعّلة الآن على حسابك.</value></data>
+  <data name="Choose a picture to upload." xml:space="preserve"><value>اختر صورة لرفعها.</value></data>
+  <data name="That picture is too large (3 MB max)." xml:space="preserve"><value>هذه الصورة كبيرة جداً (بحد أقصى 3 ميجابايت).</value></data>
+  <data name="Please upload a JPG, PNG, GIF, or WEBP image." xml:space="preserve"><value>يرجى رفع صورة بصيغة JPG أو PNG أو GIF أو WEBP.</value></data>
+  <data name="Profile picture updated." xml:space="preserve"><value>تم تحديث صورة الملف الشخصي.</value></data>
+  <data name="Profile picture removed." xml:space="preserve"><value>تمت إزالة صورة الملف الشخصي.</value></data>
+  <data name="Product '{0}' created." xml:space="preserve"><value>تم إنشاء المنتج '{0}'.</value></data>
+  <data name="Product '{0}' updated." xml:space="preserve"><value>تم تحديث المنتج '{0}'.</value></data>
+  <data name="Product '{0}' deleted." xml:space="preserve"><value>تم حذف المنتج '{0}'.</value></data>
+  <data name="Customer '{0}' updated." xml:space="preserve"><value>تم تحديث العميل '{0}'.</value></data>
+  <data name="You cannot delete your own account." xml:space="preserve"><value>لا يمكنك حذف حسابك الخاص.</value></data>
+  <data name="Can't delete '{0}' — this customer still has {1}. Lock the account instead (Edit &gt; Lock account) if you need to disable it." xml:space="preserve"><value>لا يمكن حذف '{0}' — لا يزال هذا العميل لديه {1}. قم بقفل الحساب بدلاً من ذلك (تعديل > قفل الحساب) إذا كنت بحاجة إلى تعطيله.</value></data>
+  <data name="Could not delete '{0}': {1}" xml:space="preserve"><value>تعذر حذف '{0}': {1}</value></data>
+  <data name="Customer '{0}' deleted." xml:space="preserve"><value>تم حذف العميل '{0}'.</value></data>
+  <data name="Event '{0}' created." xml:space="preserve"><value>تم إنشاء الفعالية '{0}'.</value></data>
+  <data name="Event '{0}' updated." xml:space="preserve"><value>تم تحديث الفعالية '{0}'.</value></data>
+  <data name="Event '{0}' deleted." xml:space="preserve"><value>تم حذف الفعالية '{0}'.</value></data>
+  <data name="Coupon '{0}' created." xml:space="preserve"><value>تم إنشاء القسيمة '{0}'.</value></data>
+  <data name="Coupon '{0}' updated." xml:space="preserve"><value>تم تحديث القسيمة '{0}'.</value></data>
+  <data name="Coupon '{0}' deleted." xml:space="preserve"><value>تم حذف القسيمة '{0}'.</value></data>
+  <data name="A coupon code is required." xml:space="preserve"><value>رمز القسيمة مطلوب.</value></data>
+  <data name="That code is already in use. Choose a different one." xml:space="preserve"><value>هذا الرمز مستخدم بالفعل. اختر رمزاً آخر.</value></data>
+  <data name="The expiry date must be on or after the start date." xml:space="preserve"><value>يجب أن يكون تاريخ الانتهاء في نفس تاريخ البدء أو بعده.</value></data>
+  <data name="Max redemptions must be at least 1 (leave blank for unlimited)." xml:space="preserve"><value>يجب ألا يقل الحد الأقصى للاستخدام عن 1 (اتركه فارغاً لعدد غير محدود).</value></data>
+  <data name="Order #{0} status updated to {1}." xml:space="preserve"><value>تم تحديث حالة الطلب #{0} إلى {1}.</value></data>
+  <data name="Category '{0}' created." xml:space="preserve"><value>تم إنشاء القسم '{0}'.</value></data>
+  <data name="Category '{0}' updated." xml:space="preserve"><value>تم تحديث القسم '{0}'.</value></data>
+  <data name="Category '{0}' deleted." xml:space="preserve"><value>تم حذف القسم '{0}'.</value></data>
+  <data name="Cannot delete a category that still has products assigned." xml:space="preserve"><value>لا يمكن حذف قسم لا يزال يحتوي على منتجات مُسندة إليه.</value></data>
+  <data name="Subcategories" xml:space="preserve"><value>الأقسام الفرعية</value></data>
+  <data name="Manage Subcategories" xml:space="preserve"><value>إدارة الأقسام الفرعية</value></data>
+  <data name="New Subcategory" xml:space="preserve"><value>قسم فرعي جديد</value></data>
+  <data name="Edit Subcategory" xml:space="preserve"><value>تعديل القسم الفرعي</value></data>
+  <data name="Delete Subcategory" xml:space="preserve"><value>حذف القسم الفرعي</value></data>
+  <data name="Subcategory (optional)" xml:space="preserve"><value>القسم الفرعي (اختياري)</value></data>
+  <data name="Subcategory '{0}' created." xml:space="preserve"><value>تم إنشاء القسم الفرعي '{0}'.</value></data>
+  <data name="Subcategory '{0}' updated." xml:space="preserve"><value>تم تحديث القسم الفرعي '{0}'.</value></data>
+  <data name="Subcategory '{0}' deleted." xml:space="preserve"><value>تم حذف القسم الفرعي '{0}'.</value></data>
+  <data name="Cannot delete a subcategory that still has products assigned." xml:space="preserve"><value>لا يمكن حذف قسم فرعي لا يزال يحتوي على منتجات مُسندة إليه.</value></data>
+  <data name="Can't delete '{0}' — it has order history. Set its stock to 0 instead (Edit) to retire it without breaking past orders." xml:space="preserve"><value>لا يمكن حذف '{0}' — فهو يحتوي على سجل طلبات. عيّن مخزونه إلى 0 بدلاً من ذلك (تعديل) لسحبه دون كسر الطلبات السابقة.</value></data>
+  <data name="Choose an Excel (.xlsx) file to upload." xml:space="preserve"><value>اختر ملف إكسل (.xlsx) لرفعه.</value></data>
+</root>

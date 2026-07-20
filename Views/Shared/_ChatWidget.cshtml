@@ -1,0 +1,19 @@
+<div id="chatWidget" class="chat-widget">
+    <button type="button" id="chatWidgetToggle" class="chat-widget-toggle" aria-label="@Localizer["Open support chat"]">
+        <i class="bi bi-chat-dots-fill"></i>
+    </button>
+    <div id="chatWidgetPanel" class="chat-widget-panel" hidden>
+        <div class="chat-widget-header">
+            <span><i class="bi bi-headset"></i> @Localizer["Support Chat"]</span>
+            <button type="button" id="chatWidgetClose" class="chat-widget-close" aria-label="@Localizer["Close chat"]">&times;</button>
+        </div>
+        <div id="chatWidgetMessages" class="chat-widget-messages"></div>
+        <form id="chatWidgetForm" class="chat-widget-form">
+            @Html.AntiForgeryToken()
+            <input type="file" id="chatWidgetFile" hidden accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt,.csv,.zip" />
+            <button type="button" id="chatWidgetAttachBtn" class="btn btn-outline-secondary btn-sm" title="@Localizer["Attach a file or photo"]"><i class="bi bi-paperclip"></i></button>
+            <input type="text" id="chatWidgetInput" class="form-control" placeholder="@Localizer["Ask us anything…"]" autocomplete="off" />
+            <button type="submit" class="btn btn-primary btn-sm"><i class="bi bi-send"></i></button>
+        </form>
+    </div>
+</div>

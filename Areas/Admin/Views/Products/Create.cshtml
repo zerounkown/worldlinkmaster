@@ -1,0 +1,10 @@
+@using WorldLinkMaster.Web.Models
+@model Product
+@{
+    ViewData["Title"] = Localizer["New Product"];
+}
+
+<h1>@Localizer["New Product"]</h1>
+<form asp-action="Create" method="post">
+    <partial name="_Form" />
+</form>

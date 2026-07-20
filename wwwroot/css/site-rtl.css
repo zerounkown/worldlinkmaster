@@ -1,0 +1,110 @@
+/* ==========================================================================
+   RTL overrides — only loaded when the active culture is Arabic (see
+   _Layout.cshtml). Flexbox/grid layouts already mirror automatically under
+   dir="rtl"; this file only fixes rules that use physical left/right
+   positioning, which CSS does not flip on its own.
+   ========================================================================== */
+
+/* Side nav slides in from the reading-start edge (right, in RTL) instead of the left. */
+.side-nav {
+  left: auto;
+  right: 0;
+  box-shadow: -8px 0 30px rgba(10, 10, 10, 0.4);
+  transform: translateX(100%);
+}
+
+.side-nav.open {
+  transform: translateX(0);
+}
+
+.main-nav-dropdown-panel {
+  left: auto;
+  right: 0;
+}
+
+.currency-switch-panel {
+  right: auto;
+  left: 0;
+}
+
+.currency-switch-panel button {
+  text-align: right;
+}
+
+.topbar-inner i {
+  margin-right: 0;
+  margin-left: 4px;
+}
+
+.section-title h2 {
+  border-left: none;
+  border-right: 5px solid var(--wlm-sand);
+  padding-left: 0;
+  padding-right: 12px;
+}
+
+.hero-search-input {
+  border-radius: 0 4px 4px 0;
+}
+
+.hero-search-btn {
+  border-radius: 4px 0 0 4px;
+}
+
+/* Floating utility clusters swap sides so they don't collide with each other
+   or with content that itself mirrored (e.g. the chat widget and the
+   back/forward/scroll-top stack used to sit on opposite corners). */
+.nav-fab-stack {
+  right: auto;
+  left: 22px;
+}
+
+.chat-widget {
+  left: auto;
+  right: 22px;
+}
+
+.product-card-quickadd {
+  right: auto;
+  left: 10px;
+}
+
+.cart-count {
+  right: auto;
+  left: -12px;
+}
+
+.featured-badge,
+.sale-badge {
+  left: auto;
+  right: 10px;
+}
+
+.zoom-hint {
+  left: auto;
+  right: 10px;
+}
+
+/* "Proceed" arrows (shop now, view all, continue) point the way you actually
+   read next — leftward in RTL — but browser back/forward/scroll controls are
+   tied to real navigation direction, not reading direction, so they're left
+   untouched. */
+.sale-strip-cta i,
+.category-preview-viewall i,
+.promo-event-cta i,
+.category-cta-banner a i {
+  transform: scaleX(-1);
+}
+
+/* Carousel arrows swap sides under the auto-mirrored flex row, so each icon needs to
+   point the other way to still mean "toward the reading start" / "further along". */
+.product-carousel-arrow i {
+  transform: scaleX(-1);
+}
+
+@media (max-width: 575.98px) {
+  .chat-widget,
+  .nav-fab-stack {
+    right: auto;
+  }
+}

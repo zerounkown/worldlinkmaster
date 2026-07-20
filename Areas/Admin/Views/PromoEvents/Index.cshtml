@@ -1,0 +1,53 @@
+@using WorldLinkMaster.Web.Models
+@model List<PromoEvent>
+@{
+    ViewData["Title"] = Localizer["Sale Events"];
+    var today = DateTime.UtcNow.Date;
+}
+
+<div class="d-flex justify-content-between align-items-center">
+    <h1>@Localizer["UAE Sale Events"]</h1>
+    <a class="btn btn-primary" asp-action="Create"><i class="bi bi-plus-lg"></i> @Localizer["New Event"]</a>
+</div>
+<p class="text-muted">@Localizer["These power the \"Upcoming Sales & Events\" section on the homepage and automatically discount every product's price while an event is running. If more than one is active at the same time, the highest discount wins."]</p>
+
+<div class="table-responsive">
+<table class="table bg-white align-middle mt-3">
+    <thead><tr><th></th><th>@Localizer["Name"]</th><th>@Localizer["Discount"]</th><th>@Localizer["Starts"]</th><th>@Localizer["Ends"]</th><th>@Localizer["Status"]</th><th></th></tr></thead>
+    <tbody>
+        @foreach (var promoEvent in Model)
+        {
+            var status = !promoEvent.IsActive
+                ? (Localizer["Disabled"], "secondary")
+                : promoEvent.StartDate > today
+                    ? (Localizer["Upcoming"], "warning")
+                    : promoEvent.EndDate < today
+                        ? (Localizer["Ended"], "secondary")
+                        : (Localizer["Currently Live"], "success");
+            <tr>
+                <td style="font-size:1.5rem;">@promoEvent.IconEmoji</td>
+                <td>
+                    @promoEvent.Name
+                    @if (!string.IsNullOrWhiteSpace(promoEvent.Description))
+                    {
+                        <br />
+                        <small class="text-muted">@promoEvent.Description</small>
+                    }
+                </td>
+                <td>@promoEvent.DiscountPercent.ToString("0.##")% @Localizer["OFF (badge)"]</td>
+                <td>@promoEvent.StartDate.ToString("MMM d, yyyy")</td>
+                <td>@promoEvent.EndDate.ToString("MMM d, yyyy")</td>
+                <td><span class="badge bg-@status.Item2">@status.Item1</span></td>
+                <td>
+                    <a class="btn btn-sm btn-outline-primary" asp-action="Edit" asp-route-id="@promoEvent.Id">@Localizer["Edit"]</a>
+                    <a class="btn btn-sm btn-outline-danger" asp-action="Delete" asp-route-id="@promoEvent.Id">@Localizer["Delete"]</a>
+                </td>
+            </tr>
+        }
+        @if (Model.Count == 0)
+        {
+            <tr><td colspan="7" class="text-muted">@Localizer["No sale events yet. Create one to feature it on the homepage."]</td></tr>
+        }
+    </tbody>
+</table>
+</div>

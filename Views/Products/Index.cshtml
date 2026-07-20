@@ -1,0 +1,190 @@
+@using WorldLinkMaster.Web.Models.ViewModels
+@using WorldLinkMaster.Web.Models
+@using WorldLinkMaster.Web.Extensions
+@model ProductListViewModel
+@{
+    var currentCategory = Model.Categories.FirstOrDefault(c => c.Id == Model.SelectedCategoryId);
+    var currentSubcategory = currentCategory?.Subcategories.FirstOrDefault(s => s.Id == Model.SelectedSubcategoryId);
+    ViewData["Title"] = currentSubcategory?.LocalizedName() ?? currentCategory?.LocalizedName() ?? Localizer["All Products"];
+    var isBrowsingAllCategories = Model.SelectedCategoryId == null && string.IsNullOrWhiteSpace(Model.SearchTerm);
+    var bestSellers = ViewBag.BestSellers as List<Product> ?? new List<Product>();
+}
+
+<div class="page-banner">
+    <div class="container">
+        <h1>@(currentSubcategory?.LocalizedName() ?? currentCategory?.LocalizedName() ?? Localizer["All Products"])</h1>
+        @if (!string.IsNullOrWhiteSpace(Model.SearchTerm))
+        {
+            <p class="mb-0">@Localizer["Search results for \"{0}\"", Model.SearchTerm]</p>
+        }
+    </div>
+</div>
+
+@if (isBrowsingAllCategories)
+{
+    <div class="container mb-5">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <a asp-controller="Categories" asp-action="Index"><i class="bi bi-grid-3x3-gap"></i> @Localizer["Browse All Collections"]</a>
+            <a class="categories-quote-cta" asp-controller="QuoteRequests" asp-action="Create"><i class="bi bi-file-earmark-text"></i> @Localizer["Request a Quote"]</a>
+        </div>
+
+        <!-- Mission-loadout banner: a photo-tile shortcut per category, tactical-brand style -->
+        <div class="loadout-banner">
+            <span class="loadout-eyebrow">@Localizer["Ready For Anything"]</span>
+            <h3 class="loadout-heading">@Localizer["Shop Mission-Ready Loadouts"]</h3>
+            <div class="loadout-grid">
+                @foreach (var category in Model.Categories)
+                {
+                    <a class="loadout-tile" asp-action="Index" asp-route-categoryId="@category.Id">
+                        <img src="@category.ImageUrl" alt="@category.LocalizedName()" />
+                        <span class="loadout-tile-label">@category.LocalizedName()</span>
+                    </a>
+                }
+            </div>
+        </div>
+    </div>
+
+    @if (bestSellers.Count > 0)
+    {
+        <section class="spotlight-banner" style="background-image: url('@bestSellers[0].ImageUrl')">
+            <div class="container">
+                <div class="spotlight-content">
+                    <span class="spotlight-badge">@Localizer["Team Picks"]</span>
+                    <h2>@Localizer["Discover Our Team's Top Picks"]</h2>
+                    <a class="spotlight-cta" asp-action="Index">@Localizer["Shop Now"]</a>
+                </div>
+            </div>
+        </section>
+
+        <div class="container">
+            <div class="best-selling-section">
+                <span class="best-selling-eyebrow">@Localizer["Best Selling"]</span>
+                <h2 class="best-selling-heading">@Localizer["Field-Tested Favorites"]</h2>
+                <div class="product-carousel">
+                    <button type="button" class="product-carousel-arrow product-carousel-prev" aria-label="@Localizer["Previous"]"><i class="bi bi-chevron-left"></i></button>
+                    <div class="product-carousel-track">
+                        @foreach (var product in bestSellers)
+                        {
+                            <div class="product-carousel-item">
+                                <partial name="_ProductCard" model="product" />
+                            </div>
+                        }
+                    </div>
+                    <button type="button" class="product-carousel-arrow product-carousel-next" aria-label="@Localizer["Next"]"><i class="bi bi-chevron-right"></i></button>
+                </div>
+            </div>
+        </div>
+    }
+}
+
+<div class="container mb-5">
+    <div class="row">
+        <div class="col-12 col-md-3 mb-4">
+            <h5>@Localizer["Categories"]</h5>
+            <ul class="list-unstyled">
+                <li class="mb-2">
+                    <a class="@(Model.SelectedCategoryId == null ? "fw-bold" : "")" asp-action="Index">@Localizer["All Products"]</a>
+                </li>
+                @foreach (var category in Model.Categories)
+                {
+                    var isCategoryActive = Model.SelectedCategoryId == category.Id;
+                    <li class="mb-2">
+                        <a class="@(isCategoryActive ? "fw-bold" : "")" asp-action="Index" asp-route-categoryId="@category.Id">@category.LocalizedName()</a>
+                        @if (isCategoryActive && category.Subcategories.Count > 0)
+                        {
+                            <ul class="list-unstyled ms-3 mt-1">
+                                @foreach (var subcategory in category.Subcategories)
+                                {
+                                    <li class="mb-1">
+                                        <a class="@(Model.SelectedSubcategoryId == subcategory.Id ? "fw-bold" : "")" asp-action="Index" asp-route-categoryId="@category.Id" asp-route-subcategoryId="@subcategory.Id">@subcategory.LocalizedName()</a>
+                                    </li>
+                                }
+                            </ul>
+                        }
+                    </li>
+                }
+            </ul>
+
+            <h5 class="mt-4">@Localizer["Filter by Price"]</h5>
+            <form asp-action="Index" method="get" class="price-filter-form">
+                <input type="hidden" name="categoryId" value="@Model.SelectedCategoryId" />
+                <input type="hidden" name="subcategoryId" value="@Model.SelectedSubcategoryId" />
+                <input type="hidden" name="search" value="@Model.SearchTerm" />
+                <input type="hidden" name="sort" value="@Model.SortBy" />
+                <div class="price-filter-inputs">
+                    <div class="price-filter-field">
+                        <label for="minPriceInput">@Localizer["Min"]</label>
+                        <input type="number" id="minPriceInput" name="minPrice" min="0" step="1" value="@Model.MinPrice" placeholder="0" />
+                    </div>
+                    <span class="price-filter-sep">&ndash;</span>
+                    <div class="price-filter-field">
+                        <label for="maxPriceInput">@Localizer["Max"]</label>
+                        <input type="number" id="maxPriceInput" name="maxPrice" min="0" step="1" value="@Model.MaxPrice" placeholder="@Localizer["Any"]" />
+                    </div>
+                </div>
+                <button type="submit" class="btn-wlm price-filter-btn">@Localizer["Apply"]</button>
+                @if (Model.MinPrice.HasValue || Model.MaxPrice.HasValue)
+                {
+                    <a class="price-filter-clear" asp-action="Index" asp-route-categoryId="@Model.SelectedCategoryId" asp-route-subcategoryId="@Model.SelectedSubcategoryId" asp-route-search="@Model.SearchTerm" asp-route-sort="@Model.SortBy">@Localizer["Clear"]</a>
+                }
+            </form>
+        </div>
+        <div class="col-12 col-md-9">
+            @if (currentCategory != null)
+            {
+                <!-- Category page details — Step 3: clear CTA per category -->
+                <div class="category-cta-banner">
+                    <span><i class="bi bi-file-earmark-text"></i> @Localizer["Buying {0} in bulk?", currentCategory.LocalizedName()]</span>
+                    <a asp-controller="QuoteRequests" asp-action="Create">@Localizer["Request a Quote"] <i class="bi bi-arrow-right"></i></a>
+                </div>
+            }
+
+            <div class="sort-bar">
+                <span class="sort-bar-count">@Localizer["{0} product(s)", Model.TotalCount]</span>
+                <form asp-action="Index" method="get" id="sortForm">
+                    <input type="hidden" name="categoryId" value="@Model.SelectedCategoryId" />
+                    <input type="hidden" name="subcategoryId" value="@Model.SelectedSubcategoryId" />
+                    <input type="hidden" name="search" value="@Model.SearchTerm" />
+                    <input type="hidden" name="minPrice" value="@Model.MinPrice" />
+                    <input type="hidden" name="maxPrice" value="@Model.MaxPrice" />
+                    <label for="sortSelect">@Localizer["Sort by"]</label>
+                    <select name="sort" id="sortSelect" onchange="document.getElementById('sortForm').submit()">
+                        <option value="" selected="@(string.IsNullOrEmpty(Model.SortBy))">@Localizer["Name (A-Z)"]</option>
+                        <option value="price_asc" selected="@(Model.SortBy == "price_asc")">@Localizer["Price: Low to High"]</option>
+                        <option value="price_desc" selected="@(Model.SortBy == "price_desc")">@Localizer["Price: High to Low"]</option>
+                        <option value="newest" selected="@(Model.SortBy == "newest")">@Localizer["Newest"]</option>
+                        <option value="rating" selected="@(Model.SortBy == "rating")">@Localizer["Top Rated"]</option>
+                    </select>
+                </form>
+            </div>
+
+            @if (Model.Products.Count == 0)
+            {
+                <p>@Localizer["No products found. Try a different category or search term."]</p>
+            }
+            else
+            {
+                <div class="product-grid">
+                    @foreach (var product in Model.Products)
+                    {
+                        <partial name="_ProductCard" model="product" />
+                    }
+                </div>
+
+                @if (Model.TotalPages > 1)
+                {
+                    <nav>
+                        <ul class="pagination">
+                            @for (int i = 1; i <= Model.TotalPages; i++)
+                            {
+                                <li class="page-item @(i == Model.Page ? "active" : "")">
+                                    <a class="page-link" asp-action="Index" asp-route-categoryId="@Model.SelectedCategoryId" asp-route-subcategoryId="@Model.SelectedSubcategoryId" asp-route-search="@Model.SearchTerm" asp-route-minPrice="@Model.MinPrice" asp-route-maxPrice="@Model.MaxPrice" asp-route-sort="@Model.SortBy" asp-route-page="@i">@i</a>
+                                </li>
+                            }
+                        </ul>
+                    </nav>
+                }
+            }
+        </div>
+    </div>
+</div>

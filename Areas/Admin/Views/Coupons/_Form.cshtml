@@ -1,0 +1,54 @@
+@using WorldLinkMaster.Web.Models
+@model Coupon
+
+<div asp-validation-summary="ModelOnly" class="text-danger"></div>
+@if (Model.Id != 0)
+{
+    <input type="hidden" asp-for="Id" />
+}
+
+<div class="row">
+    <div class="col-12 col-sm-6 mb-3">
+        <label asp-for="Code" class="form-label">@Localizer["Code"]</label>
+        <input asp-for="Code" class="form-control" placeholder="e.g. SUMMER20" style="text-transform:uppercase;" />
+        <span asp-validation-for="Code" class="text-danger"></span>
+    </div>
+    <div class="col-6 col-sm-3 mb-3">
+        <label asp-for="DiscountPercent" class="form-label">@Localizer["Discount %"]</label>
+        <input asp-for="DiscountPercent" class="form-control" />
+        <span asp-validation-for="DiscountPercent" class="text-danger"></span>
+    </div>
+    <div class="col-6 col-sm-3 mb-3 d-flex align-items-end">
+        <div class="form-check">
+            <input asp-for="IsActive" class="form-check-input" />
+            <label asp-for="IsActive" class="form-check-label">@Localizer["Active"]</label>
+        </div>
+    </div>
+</div>
+
+<div class="mb-3">
+    <label asp-for="Description" class="form-label">@Localizer["Description"]</label>
+    <input asp-for="Description" class="form-control" placeholder="Shown to customers, e.g. Summer sale — 20% off everything" />
+    <span asp-validation-for="Description" class="text-danger"></span>
+</div>
+
+<div class="row">
+    <div class="col-12 col-sm-4 mb-3">
+        <label asp-for="StartsAt" class="form-label">@Localizer["Starts At"]</label>
+        <input asp-for="StartsAt" class="form-control" />
+        <span asp-validation-for="StartsAt" class="text-danger"></span>
+    </div>
+    <div class="col-12 col-sm-4 mb-3">
+        <label asp-for="ExpiresAt" class="form-label">@Localizer["Expires At"]</label>
+        <input asp-for="ExpiresAt" class="form-control" />
+        <span asp-validation-for="ExpiresAt" class="text-danger"></span>
+    </div>
+    <div class="col-12 col-sm-4 mb-3">
+        <label asp-for="MaxRedemptions" class="form-label">@Localizer["Max Redemptions"]</label>
+        <input asp-for="MaxRedemptions" class="form-control" placeholder="Blank = unlimited" />
+        <span asp-validation-for="MaxRedemptions" class="text-danger"></span>
+    </div>
+</div>
+
+<button type="submit" class="btn btn-primary">@Localizer["Save"]</button>
+<a asp-action="Index" class="btn btn-outline-secondary">@Localizer["Cancel"]</a>
