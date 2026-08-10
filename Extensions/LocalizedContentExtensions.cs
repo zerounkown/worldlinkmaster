@@ -1,5 +1,6 @@
 using System.Globalization;
 using WorldLinkMaster.Web.Models;
+using WorldLinkMaster.Web.Models.ViewModels;
 
 namespace WorldLinkMaster.Web.Extensions;
 
@@ -20,6 +21,9 @@ public static class LocalizedContentExtensions
     public static string? LocalizedDescription(this Product product) =>
         IsArabic && !string.IsNullOrWhiteSpace(product.DescriptionAr) ? product.DescriptionAr : product.Description;
 
+    public static string? LocalizedOverview(this Product product) =>
+        IsArabic && !string.IsNullOrWhiteSpace(product.OverviewAr) ? product.OverviewAr : product.Overview;
+
     public static string LocalizedName(this Category category) =>
         IsArabic && !string.IsNullOrWhiteSpace(category.NameAr) ? category.NameAr! : category.Name;
 
@@ -28,4 +32,19 @@ public static class LocalizedContentExtensions
 
     public static string LocalizedName(this Subcategory subcategory) =>
         IsArabic && !string.IsNullOrWhiteSpace(subcategory.NameAr) ? subcategory.NameAr! : subcategory.Name;
+
+    public static string LocalizedName(this Brand brand) =>
+        IsArabic && !string.IsNullOrWhiteSpace(brand.NameAr) ? brand.NameAr! : brand.Name;
+
+    public static string LocalizedName(this Feature feature) =>
+        IsArabic && !string.IsNullOrWhiteSpace(feature.NameAr) ? feature.NameAr! : feature.Name;
+
+    public static string LocalizedName(this FacetCount facet) =>
+        IsArabic && !string.IsNullOrWhiteSpace(facet.NameAr) ? facet.NameAr! : facet.Name;
+
+    public static string LocalizedTitle(this HomeBanner banner) =>
+        IsArabic && !string.IsNullOrWhiteSpace(banner.TitleAr) ? banner.TitleAr! : banner.TitleEn;
+
+    public static string? LocalizedSubtitle(this HomeBanner banner) =>
+        IsArabic && !string.IsNullOrWhiteSpace(banner.SubtitleAr) ? banner.SubtitleAr : banner.SubtitleEn;
 }

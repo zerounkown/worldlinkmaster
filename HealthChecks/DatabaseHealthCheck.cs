@@ -4,7 +4,7 @@ using WorldLinkMaster.Web.Data;
 
 namespace WorldLinkMaster.Web.HealthChecks;
 
-/// <summary>Readiness check: can we open a connection to SQL Server?</summary>
+/// <summary>Readiness check: can we open a connection to the database?</summary>
 public class DatabaseHealthCheck : IHealthCheck
 {
     private readonly ApplicationDbContext _context;

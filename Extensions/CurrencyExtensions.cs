@@ -21,11 +21,17 @@ public static class CurrencyExtensions
     {
         if (CurrencyContext.Current == "USD")
         {
-            var usd = amountInAed / AedToUsdRate;
-            return "$" + usd.ToString("N2", CultureInfo.InvariantCulture);
+            return "$" + amountInAed.ToDisplayCurrencyValue().ToString("N2", CultureInfo.InvariantCulture);
         }
 
         return amountInAed.ToAed();
+    }
+
+    // Bare numeric conversion (no currency symbol/formatting) — for inputs like a price-range
+    // slider's min/max bounds, which need a plain number rather than a display string.
+    public static decimal ToDisplayCurrencyValue(this decimal amountInAed)
+    {
+        return CurrencyContext.Current == "USD" ? amountInAed / AedToUsdRate : amountInAed;
     }
 
     // Reverse of ToDisplayCurrency — used when a shopper types a price filter value in

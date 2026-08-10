@@ -1,26 +1,101 @@
 @using WorldLinkMaster.Web.Models
 @using WorldLinkMaster.Web.Extensions
+@using WorldLinkMaster.Web.Services
+@using System.Text.Json
+@inject IFavoriteService FavoriteService
 @model Product
 @{
     var activeEvent = ViewBag.ActiveEvent as PromoEvent;
     var salePrice = activeEvent != null ? Model.Price * (1 - activeEvent.DiscountPercent / 100m) : (decimal?)null;
-    var hasColors = Model.Colors.Count > 0;
-    var hasSizes = Model.Sizes.Count > 0;
-    var hasVariants = hasColors || hasSizes;
+    var hasVariants = Model.Variants.Count > 0;
+    var isFavorite = User.Identity?.IsAuthenticated == true && await FavoriteService.IsFavoriteAsync(Model.Id);
+    var cardImageUrl = string.IsNullOrEmpty(Model.ImageUrl) ? ImagePlaceholder.DataUri : Model.ImageUrl;
+
+    string quickAddJson = "null";
+    if (hasVariants)
+    {
+        var colors = Model.Variants
+            .Where(v => v.Color != null)
+            .GroupBy(v => v.ColorId)
+            .Select(g => new
+            {
+                name = g.First().Color!.Name,
+                hex = g.First().Color!.HexCode,
+                image = g.First().ProductColor?.SwatchImageUrl
+            })
+            .ToList();
+
+        var sizes = Model.Variants
+            .Where(v => v.Size != null)
+            .GroupBy(v => v.SizeId)
+            .Select(g => new { label = g.First().Size!.Label })
+            .ToList();
+
+        var variants = Model.Variants.Select(v =>
+        {
+            var basePriceForVariant = v.Price ?? Model.Price;
+            var finalPrice = activeEvent != null
+                ? basePriceForVariant * (1 - activeEvent.DiscountPercent / 100m)
+                : basePriceForVariant;
+
+            return new
+            {
+                color = v.Color?.Name,
+                size = v.Size?.Label,
+                // Raw per-unit values (view's own display currency, unformatted) so the modal
+                // can compute a quantity total client-side instead of parsing formatted text —
+                // same pattern as the PDP's data-unit-price/data-currency-symbol total line.
+                price = finalPrice.ToDisplayCurrencyValue(),
+                listPrice = activeEvent != null ? basePriceForVariant.ToDisplayCurrencyValue() : (decimal?)null,
+                priceFormatted = finalPrice.ToDisplayCurrency(),
+                listPriceFormatted = activeEvent != null ? basePriceForVariant.ToDisplayCurrency() : null,
+                stock = v.StockQuantity,
+                active = v.Active
+            };
+        }).ToList();
+
+        var quickAddData = new
+        {
+            id = Model.Id,
+            name = Model.LocalizedName(),
+            currencySymbol = CurrencyContext.Current == "USD" ? "$" : "AED ",
+            colors,
+            sizes,
+            variants
+        };
+
+        quickAddJson = JsonSerializer.Serialize(quickAddData, new JsonSerializerOptions
+        {
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+        });
+    }
 }
 
 <div class="product-card">
     <div class="product-card-media">
         @if (activeEvent != null)
         {
-            <span class="sale-badge">@activeEvent.DiscountPercent.ToString("0.##")% @Localizer["OFF (badge)"]</span>
+            <span class="sale-badge">@activeEvent.DiscountPercent.ToString("0.##")% @Localizer["OFF"]</span>
         }
         else if (Model.IsFeatured)
         {
             <span class="featured-badge">@Localizer["Featured"]</span>
         }
+        @if (User.Identity?.IsAuthenticated == true)
+        {
+            <button type="button" class="favorite-toggle js-favorite-toggle @(isFavorite ? "active" : "")" data-product-id="@Model.Id"
+                    aria-label="@Localizer["Add to Favorites"]" aria-pressed="@(isFavorite ? "true" : "false")">
+                <i class="bi @(isFavorite ? "bi-heart-fill" : "bi-heart")"></i>
+            </button>
+        }
+        else
+        {
+            <a class="favorite-toggle" asp-area="Identity" asp-page="/Account/Login" aria-label="@Localizer["Add to Favorites"]">
+                <i class="bi bi-heart"></i>
+            </a>
+        }
         <a class="product-card-tilt" asp-area="" asp-controller="Products" asp-action="Details" asp-route-slug="@Model.Slug">
-            <img src="@Model.ImageUrl" alt="@Model.LocalizedName()" class="card-product-image" data-default-image="@Model.ImageUrl" />
+            <img src="@cardImageUrl" alt="@Model.LocalizedName()" class="card-product-image" data-default-image="@cardImageUrl" />
         </a>
     </div>
     <div class="product-card-body">
@@ -38,41 +113,20 @@
             }
         </div>
 
-        @if (hasVariants)
-        {
-            <select class="product-card-variant" aria-label="@Localizer["Choose options"]">
-                @if (hasColors && hasSizes)
-                {
-                    foreach (var color in Model.Colors)
-                    {
-                        foreach (var size in Model.Sizes)
-                        {
-                            <option value="@(color.Name)|@(size.Label)">@color.Name / @size.Label</option>
-                        }
-                    }
-                }
-                else if (hasColors)
-                {
-                    foreach (var color in Model.Colors)
-                    {
-                        <option value="@(color.Name)|">@color.Name</option>
-                    }
-                }
-                else
-                {
-                    foreach (var size in Model.Sizes)
-                    {
-                        <option value="|@(size.Label)">@size.Label</option>
-                    }
-                }
-            </select>
-        }
-
         @if (Model.StockQuantity > 0)
         {
-            <button type="button" class="product-card-add-btn js-inline-add" data-product-id="@Model.Id" data-product-name="@Model.Name">
-                @Localizer["Add to Cart"]
-            </button>
+            @if (hasVariants)
+            {
+                <button type="button" class="product-card-add-btn js-quick-add" data-product='@Html.Raw(quickAddJson)'>
+                    @Localizer["Add to Cart"]
+                </button>
+            }
+            else
+            {
+                <button type="button" class="product-card-add-btn js-inline-add" data-product-id="@Model.Id" data-product-name="@Model.Name">
+                    @Localizer["Add to Cart"]
+                </button>
+            }
         }
         else
         {

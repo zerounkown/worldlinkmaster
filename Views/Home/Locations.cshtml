@@ -1,5 +1,10 @@
+@inject Microsoft.Extensions.Configuration.IConfiguration Configuration
 @{
     ViewData["Title"] = Localizer["Our Locations"];
+    var abuDhabiWhatsAppNumber = Configuration["WhatsAppBranches:AbuDhabiNumber"];
+    var abuDhabiWhatsAppDisplay = Configuration["WhatsAppBranches:AbuDhabiDisplay"];
+    var alAinWhatsAppNumber = Configuration["WhatsAppBranches:AlAinNumber"];
+    var alAinWhatsAppDisplay = Configuration["WhatsAppBranches:AlAinDisplay"];
 }
 
 <div class="page-banner">
@@ -13,15 +18,27 @@
     <div class="locations-grid">
         <div class="location-card">
             <span class="location-pickup-badge"><i class="bi bi-box-seam"></i> @Localizer["Pickup Available"]</span>
-            <h4><i class="bi bi-geo-alt"></i> @Localizer["Abu Dhabi Branch"]</h4>
-            <p>@Localizer["Call ahead to arrange in-store pickup, or have your order delivered."]</p>
-            <a class="btn-wlm" href="tel:+18005550199"><i class="bi bi-telephone"></i> @Localizer["Call to Arrange Pickup"]</a>
+            <h4><i class="bi bi-geo-alt"></i> @Localizer["Abu Dhabi Showroom"]</h4>
+            <p>Al Muroor Street, Al Muntazah Area, next to Abu Dhabi Cooperative Society &mdash; Shop No. 2, EW002</p>
+            <div class="location-contact-actions">
+                <a class="btn-wlm-outline" href="tel:+97125647071"><i class="bi bi-telephone"></i> +971 2 564 7071</a>
+                @if (!string.IsNullOrWhiteSpace(abuDhabiWhatsAppNumber))
+                {
+                    <a class="btn-wlm whatsapp-btn" href="https://wa.me/@abuDhabiWhatsAppNumber" target="_blank" rel="noopener noreferrer"><i class="bi bi-whatsapp"></i> @abuDhabiWhatsAppDisplay</a>
+                }
+            </div>
         </div>
         <div class="location-card">
             <span class="location-pickup-badge"><i class="bi bi-box-seam"></i> @Localizer["Pickup Available"]</span>
-            <h4><i class="bi bi-geo-alt"></i> @Localizer["Al Ain Branch"]</h4>
-            <p>@Localizer["Call ahead to arrange in-store pickup, or have your order delivered."]</p>
-            <a class="btn-wlm" href="tel:+18005550199"><i class="bi bi-telephone"></i> @Localizer["Call to Arrange Pickup"]</a>
+            <h4><i class="bi bi-geo-alt"></i> @Localizer["Al Ain Showroom"]</h4>
+            <p>Hessa Bint Mohamed Street, Al Jahili Area &mdash; Al Qalaa District, Al Massa Hotel, next to Arab Sweets</p>
+            <div class="location-contact-actions">
+                <a class="btn-wlm-outline" href="tel:+97137547777"><i class="bi bi-telephone"></i> +971 3 754 7777</a>
+                @if (!string.IsNullOrWhiteSpace(alAinWhatsAppNumber))
+                {
+                    <a class="btn-wlm whatsapp-btn" href="https://wa.me/@alAinWhatsAppNumber" target="_blank" rel="noopener noreferrer"><i class="bi bi-whatsapp"></i> @alAinWhatsAppDisplay</a>
+                }
+            </div>
         </div>
     </div>
 </div>

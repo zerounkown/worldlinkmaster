@@ -3,6 +3,17 @@
 @model List<Category>
 @{
     ViewData["Title"] = Localizer["Collections"];
+
+    // Short plain-language tag shown under each category tile label, e.g. "TACTICAL APPAREL (clothing)".
+    // Always shown in English regardless of site language, to match the reference design.
+    var collectionsTagBySlug = new Dictionary<string, string>
+    {
+        ["tactical-apparel"] = "clothing",
+        ["bags-and-packs"] = "bags",
+        ["footwear"] = "shoes",
+        ["gear-and-accessories"] = "gear",
+        ["outdoor-equipment"] = "outdoor"
+    };
 }
 
 <div class="page-banner">
@@ -17,8 +28,19 @@
         @foreach (var category in Model)
         {
             <a class="collections-tile" asp-controller="Products" asp-action="Index" asp-route-categoryId="@category.Id">
-                <img src="@category.ImageUrl" alt="@category.LocalizedName()" />
-                <span class="collections-tile-label">@category.LocalizedName()</span>
+                <div class="collections-tile-img">
+                    <img src="@category.ImageUrl" alt="@category.LocalizedName()" />
+                </div>
+                <div class="collections-tile-footer">
+                    <div class="collections-tile-name-group">
+                        <span class="collections-tile-name">@category.LocalizedName()</span>
+                        @if (collectionsTagBySlug.TryGetValue(category.Slug, out var collectionsTag))
+                        {
+                            <span class="collections-tile-tag">(@collectionsTag)</span>
+                        }
+                    </div>
+                    <span class="collections-tile-cta">@Localizer["Shop Now"] <i class="bi bi-arrow-right"></i></span>
+                </div>
             </a>
         }
     </div>

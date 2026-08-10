@@ -53,12 +53,16 @@
         <aside class="admin-sidebar">
             <a asp-area="Admin" asp-controller="Home" asp-action="Index"><i class="bi bi-speedometer2"></i> @Localizer["Dashboard"]</a>
             <a asp-area="Admin" asp-controller="Products" asp-action="Index"><i class="bi bi-box-seam"></i> @Localizer["Products"]</a>
+            <a asp-area="Admin" asp-controller="Products" asp-action="BulkUpdate"><i class="bi bi-file-earmark-excel"></i> @Localizer["Bulk Update (Excel)"]</a>
+            <a asp-area="Admin" asp-controller="MasterData" asp-action="Index"><i class="bi bi-diagram-3"></i> @Localizer["Master Data Import"]</a>
+            <a asp-area="Admin" asp-controller="ProductImport" asp-action="Index"><i class="bi bi-box-arrow-in-down"></i> @Localizer["Product Import"]</a>
             <a asp-area="Admin" asp-controller="Categories" asp-action="Index"><i class="bi bi-tags"></i> @Localizer["Categories"]</a>
             <a asp-area="Admin" asp-controller="Subcategories" asp-action="Index"><i class="bi bi-tag"></i> @Localizer["Subcategories"]</a>
             <a asp-area="Admin" asp-controller="Orders" asp-action="Index"><i class="bi bi-receipt"></i> @Localizer["Orders"]</a>
             <a asp-area="Admin" asp-controller="Customers" asp-action="Index"><i class="bi bi-people"></i> @Localizer["Customers"]</a>
             <a asp-area="Admin" asp-controller="Merchants" asp-action="Index"><i class="bi bi-shop"></i> @Localizer["Merchants"]</a>
             <a asp-area="Admin" asp-controller="QuoteRequests" asp-action="Index"><i class="bi bi-file-earmark-text"></i> @Localizer["Quote Requests"]</a>
+            <a asp-area="Admin" asp-controller="HomeBanners" asp-action="Index"><i class="bi bi-images"></i> @Localizer["Home Banners"]</a>
             <a asp-area="Admin" asp-controller="PromoEvents" asp-action="Index"><i class="bi bi-stars"></i> @Localizer["Sale Events"]</a>
             <a asp-area="Admin" asp-controller="Coupons" asp-action="Index"><i class="bi bi-ticket-perforated"></i> @Localizer["Coupons"]</a>
             <a asp-area="Support" asp-controller="Conversations" asp-action="Index"><i class="bi bi-headset"></i> @Localizer["Support Chat"]</a>

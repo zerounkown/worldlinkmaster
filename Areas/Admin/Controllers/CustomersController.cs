@@ -167,7 +167,7 @@ public class CustomersController : AdminBaseController
         await SyncRoleAsync(user, "Customer", model.IsCustomer);
         await SyncRoleAsync(user, "Support", model.IsSupport);
 
-        TempData["AdminMessage"] = _localizer["Customer '{0}' updated.", user.Email].Value;
+        TempData["AdminMessage"] = _localizer["Customer '{0}' updated.", user.Email ?? string.Empty].Value;
         return RedirectToAction(nameof(Index));
     }
 
@@ -216,7 +216,7 @@ public class CustomersController : AdminBaseController
 
         if (blockers.Count > 0)
         {
-            TempData["AdminMessage"] = _localizer["Can't delete '{0}' — this customer still has {1}. Lock the account instead (Edit > Lock account) if you need to disable it.", user.Email, string.Join(", ", blockers)].Value;
+            TempData["AdminMessage"] = _localizer["Can't delete '{0}' — this customer still has {1}. Lock the account instead (Edit > Lock account) if you need to disable it.", user.Email ?? string.Empty, string.Join(", ", blockers)].Value;
             return RedirectToAction(nameof(Index));
         }
 
@@ -229,11 +229,11 @@ public class CustomersController : AdminBaseController
         var result = await _userManager.DeleteAsync(user);
         if (!result.Succeeded)
         {
-            TempData["AdminMessage"] = _localizer["Could not delete '{0}': {1}", user.Email, string.Join(" ", result.Errors.Select(e => e.Description))].Value;
+            TempData["AdminMessage"] = _localizer["Could not delete '{0}': {1}", user.Email ?? string.Empty, string.Join(" ", result.Errors.Select(e => e.Description))].Value;
             return RedirectToAction(nameof(Index));
         }
 
-        TempData["AdminMessage"] = _localizer["Customer '{0}' deleted.", user.Email].Value;
+        TempData["AdminMessage"] = _localizer["Customer '{0}' deleted.", user.Email ?? string.Empty].Value;
         return RedirectToAction(nameof(Index));
     }
 

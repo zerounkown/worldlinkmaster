@@ -1,8 +1,13 @@
 @using WorldLinkMaster.Web.Models.ViewModels
+@using WorldLinkMaster.Web.Services
+@inject IFavoriteService FavoriteService
 @model CartViewModel
 @{
     ViewData["Title"] = Localizer["Your Cart"];
+    var currencySymbol = CurrencyContext.Current == "USD" ? "$" : "AED ";
 }
+
+@Html.AntiForgeryToken()
 
 <div class="page-banner">
     <div class="container"><h1>@Localizer["Your Cart"]</h1></div>
@@ -19,6 +24,29 @@
     }
     else
     {
+        <div class="free-shipping-bar mb-4" id="freeShippingBar"
+             data-threshold="@CartViewModel.FreeShippingThreshold.ToString(System.Globalization.CultureInfo.InvariantCulture)"
+             data-currency-symbol="@currencySymbol">
+            <div class="free-shipping-bar-track">
+                <div class="free-shipping-bar-fill" id="freeShippingBarFill" style="width: @(Math.Min(100, Model.Subtotal / CartViewModel.FreeShippingThreshold * 100).ToString("0.##", System.Globalization.CultureInfo.InvariantCulture))%;"></div>
+            </div>
+            <div class="free-shipping-bar-label">
+                <span><i class="bi bi-truck"></i> @Localizer["Free Shipping"] <span class="text-muted">(@currencySymbol@CartViewModel.FreeShippingThreshold.ToString("0.##"))</span></span>
+                <span id="freeShippingBarStatus" class="@(Model.QualifiesForFreeShipping ? "free-shipping-qualified" : "")"
+                      data-qualified-text="@Localizer["You are eligible for free shipping!"]"
+                      data-away-text="@Localizer["{0} away from free shipping"]">
+                    @if (Model.QualifiesForFreeShipping)
+                    {
+                        <text><i class="bi bi-check-circle-fill"></i> @Localizer["You are eligible for free shipping!"]</text>
+                    }
+                    else
+                    {
+                        <text>@Localizer["{0} away from free shipping", currencySymbol + Model.AmountAwayFromFreeShipping.ToString("0.##")]</text>
+                    }
+                </span>
+            </div>
+        </div>
+
         <div class="row">
             <div class="col-12 col-md-8">
                 <div class="table-responsive">
@@ -30,12 +58,20 @@
                             <th>@Localizer["Quantity"]</th>
                             <th>@Localizer["Total"]</th>
                             <th></th>
+                            <th></th>
                         </tr>
                     </thead>
                     <tbody>
-                        @foreach (var item in Model.Items)
+                        @for (int i = 0; i < Model.Items.Count; i++)
                         {
-                            <tr>
+                            var item = Model.Items[i];
+                            var lineKey = $"{item.ProductId}|{item.Color}|{item.Size}";
+                            var unitPriceValue = item.UnitPrice.ToDisplayCurrencyValue();
+                            var stockInfo = Model.StockInfoByLineKey.TryGetValue(lineKey, out var si) ? si : null;
+                            var stock = stockInfo?.StockQuantity ?? 0;
+                            var isFavorite = User.Identity?.IsAuthenticated == true && await FavoriteService.IsFavoriteAsync(item.ProductId);
+                            <tr class="cart-line-row" data-line-key="@lineKey" data-product-id="@item.ProductId" data-color="@item.Color" data-size="@item.Size"
+                                data-unit-price="@unitPriceValue.ToString(System.Globalization.CultureInfo.InvariantCulture)" data-stock="@stock">
                                 <td class="d-flex align-items-center gap-3">
                                     <img src="@item.ImageUrl" alt="@item.Name" style="width:60px;height:60px;object-fit:cover;border-radius:4px;" />
                                     <span>
@@ -49,19 +85,49 @@
                                                 @if (!string.IsNullOrEmpty(item.Size)) { <text>@Localizer["Size"]: @item.Size</text> }
                                             </small>
                                         }
+                                        @if (!string.IsNullOrEmpty(stockInfo?.Sku))
+                                        {
+                                            <br /><small class="text-muted cart-line-sku">@Localizer["SKU"]: @stockInfo.Sku</small>
+                                        }
+                                        <br />
+                                        @if (stock > 5)
+                                        {
+                                            <small class="cart-stock-badge cart-stock-in"><span class="cart-stock-dot"></span>@Localizer["In Stock"]</small>
+                                        }
+                                        else if (stock >= 1)
+                                        {
+                                            <small class="cart-stock-badge cart-stock-low"><span class="cart-stock-dot"></span>@Localizer["Low Stock ({0} left)", stock]</small>
+                                        }
+                                        else
+                                        {
+                                            <small class="cart-stock-badge cart-stock-out"><span class="cart-stock-dot"></span>@Localizer["Out of Stock"]</small>
+                                        }
                                     </span>
                                 </td>
                                 <td>@item.UnitPrice.ToDisplayCurrency()</td>
                                 <td>
-                                    <form asp-controller="Cart" asp-action="UpdateQuantity" method="post" class="d-flex gap-2">
-                                        <input type="hidden" name="productId" value="@item.ProductId" />
-                                        <input type="hidden" name="color" value="@item.Color" />
-                                        <input type="hidden" name="size" value="@item.Size" />
-                                        <input type="number" name="quantity" value="@item.Quantity" min="1" class="form-control" style="width: 70px;" />
-                                        <button type="submit" class="btn btn-sm btn-outline-primary">@Localizer["Update"]</button>
-                                    </form>
+                                    <div class="qty-stepper cart-qty-stepper">
+                                        <button type="button" class="qty-btn cart-qty-minus" aria-label="@Localizer["Decrease quantity"]">&minus;</button>
+                                        <span class="cart-qty-value">@item.Quantity</span>
+                                        <button type="button" class="qty-btn cart-qty-plus" aria-label="@Localizer["Increase quantity"]">&plus;</button>
+                                    </div>
                                 </td>
-                                <td>@item.LineTotal.ToDisplayCurrency()</td>
+                                <td class="cart-line-total" data-currency-symbol="@currencySymbol">@item.LineTotal.ToDisplayCurrency()</td>
+                                <td>
+                                    @if (User.Identity?.IsAuthenticated == true)
+                                    {
+                                        <button type="button" class="favorite-toggle js-favorite-toggle @(isFavorite ? "active" : "")" data-product-id="@item.ProductId"
+                                                aria-label="@Localizer["Add to Favorites"]" aria-pressed="@(isFavorite ? "true" : "false")">
+                                            <i class="bi @(isFavorite ? "bi-heart-fill" : "bi-heart")"></i>
+                                        </button>
+                                    }
+                                    else
+                                    {
+                                        <a class="favorite-toggle" asp-area="Identity" asp-page="/Account/Login" aria-label="@Localizer["Add to Favorites"]">
+                                            <i class="bi bi-heart"></i>
+                                        </a>
+                                    }
+                                </td>
                                 <td>
                                     <form asp-controller="Cart" asp-action="Remove" method="post">
                                         <input type="hidden" name="productId" value="@item.ProductId" />
@@ -75,19 +141,104 @@
                     </tbody>
                 </table>
                 </div>
+
+                <div class="d-flex justify-content-between align-items-center mt-3">
+                    <a asp-controller="Products" asp-action="Index"><i class="bi bi-arrow-left"></i> @Localizer["Continue Shopping"]</a>
+                    <form asp-controller="Cart" asp-action="ClearCart" method="post">
+                        <button type="submit" class="btn btn-sm btn-outline-danger">@Localizer["Clear Cart"]</button>
+                    </form>
+                </div>
             </div>
             <div class="col-12 col-md-4">
-                <div class="summary-box">
+                <div class="summary-box" id="cartSummaryBox">
                     <h4>@Localizer["Order Summary"]</h4>
                     <div class="d-flex justify-content-between mb-2">
                         <span>@Localizer["Subtotal"]</span>
-                        <span>@Model.Subtotal.ToDisplayCurrency()</span>
+                        <span id="cartSubtotal" data-currency-symbol="@currencySymbol">@Model.Subtotal.ToDisplayCurrency()</span>
                     </div>
-                    <p class="text-muted small">@Localizer["Shipping and taxes calculated at checkout."]</p>
-                    <a class="btn-wlm w-100 text-center d-block" asp-controller="Checkout" asp-action="Index">@Localizer["Proceed to Checkout"]</a>
-                    <a class="d-block text-center mt-3" asp-controller="Products" asp-action="Index">@Localizer["Continue Shopping"]</a>
+
+                    <div id="cartCouponDiscountLine" class="d-flex justify-content-between align-items-center mb-2 coupon-discount-line" style="@(Model.AppliedCouponCode != null ? "" : "display:none;")">
+                        <span><i class="bi bi-ticket-perforated"></i> @Localizer["Coupon"] <strong>@Model.AppliedCouponCode</strong></span>
+                        <span>
+                            &minus;<span id="cartCouponDiscountAmount" data-currency-symbol="@currencySymbol">@Model.CouponDiscountAmount.ToDisplayCurrency()</span>
+                            <form asp-controller="Cart" asp-action="RemoveCoupon" method="post" class="d-inline">
+                                <button type="submit" class="btn btn-link btn-sm p-0 ms-1 text-danger" title="@Localizer["Remove coupon"]">&times;</button>
+                            </form>
+                        </span>
+                    </div>
+
+                    <div class="d-flex justify-content-between mb-1">
+                        <span>@Localizer["Shipping"]</span>
+                        <span id="cartShippingCost" class="@(Model.ShippingCost == 0 ? "text-success fw-bold" : "")" data-currency-symbol="@currencySymbol" data-free-label="@Localizer["Free"]">
+                            @(Model.ShippingCost == 0 ? Localizer["Free"].Value : Model.ShippingCost.ToDisplayCurrency())
+                        </span>
+                    </div>
+                    <p class="text-muted small mb-2">@Localizer["Standard Delivery (2–3 Working Days)"]</p>
+
+                    <hr />
+                    <div class="d-flex justify-content-between fw-bold mb-1">
+                        <span>@Localizer["Total (Incl. VAT)"]</span>
+                        <span id="cartTotal" data-currency-symbol="@currencySymbol">@Model.Total.ToDisplayCurrency()</span>
+                    </div>
+                    <p class="text-success small mb-3" id="cartYouSaved" style="@(Model.CouponDiscountAmount > 0 ? "" : "display:none;")">
+                        <i class="bi bi-tag-fill"></i> @Localizer["You saved"] <span id="cartYouSavedAmount" data-currency-symbol="@currencySymbol">@Model.CouponDiscountAmount.ToDisplayCurrency()</span>
+                    </p>
+
+                    @if (Model.AppliedCouponCode == null)
+                    {
+                        <form asp-controller="Cart" asp-action="ApplyCoupon" method="post" class="mb-3">
+                            <label class="form-label small mb-1">@Localizer["Have a coupon code?"]</label>
+                            <div class="d-flex gap-2">
+                                <input type="text" name="couponCode" class="form-control" placeholder="e.g. WELCOME-AB12CD" />
+                                <button type="submit" class="btn btn-outline-primary">@Localizer["Apply"]</button>
+                            </div>
+                            @if (User.Identity?.IsAuthenticated != true)
+                            {
+                                <p class="text-muted small mt-1 mb-0">@Localizer["Log in to apply a coupon."]</p>
+                            }
+                        </form>
+                    }
+
+                    <a class="btn-wlm-black w-100 text-center d-block mt-2" asp-controller="Checkout" asp-action="Index">@Localizer["PROCEED TO CHECKOUT"]</a>
+
+                    <div class="cart-or-divider"><span>@Localizer["OR"]</span></div>
+
+                    <button type="button" class="btn-tabby-disabled w-100" disabled title="@Localizer["Coming soon"]">
+                        @Localizer["Check out with"] <strong>tabby</strong>
+                        <span class="cart-coming-soon-badge">@Localizer["Coming soon"]</span>
+                    </button>
+
+                    <div class="footer-payments cart-payments mt-4">
+                        <span class="footer-payments-label">@Localizer["We Accept"]</span>
+                        <div class="footer-payments-icons">
+                            <img src="~/images/payments/visa.png" alt="Visa" />
+                            <img src="~/images/payments/mastercard.png" alt="Mastercard" />
+                            <img src="~/images/payments/apple-pay.jpg" alt="Apple Pay" />
+                            <img src="~/images/payments/tabby.png" alt="Tabby" />
+                            <img src="~/images/payments/tamara.png" alt="Tamara" />
+                        </div>
+                    </div>
+
+                    <div class="cart-trust-row mt-3">
+                        <div class="cart-trust-item">
+                            <i class="bi bi-shield-check"></i>
+                            <span>@Localizer["Secure Payments"]</span>
+                        </div>
+                        <div class="cart-trust-item">
+                            <i class="bi bi-arrow-repeat"></i>
+                            <span>@Localizer["Easy Returns"]</span>
+                        </div>
+                        <div class="cart-trust-item">
+                            <i class="bi bi-headset"></i>
+                            <span>@Localizer["24/7 Support"]</span>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
     }
 </div>
+
+@section Scripts {
+    <script src="~/js/cart-page.js"></script>
+}

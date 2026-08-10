@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.IO;
 using ClosedXML.Excel;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -188,8 +189,9 @@ public class ProductsController : AdminBaseController
     }
 
     private static readonly string[] ExcelHeaders = { "Sku", "Name", "Category", "Price (AED)", "Wholesale Price (AED)", "Stock Quantity", "Image URL" };
+    private static readonly string[] VariantExcelHeaders = { "Product Sku (Parent)", "Variant Sku", "Color", "Size", "Price (AED)", "Wholesale Price (AED)", "Stock Quantity", "Image URL" };
 
-    /// <summary>Downloads the full catalog as an .xlsx — the same file layout <see cref="BulkUpdate(IFormFile?)"/> expects back.</summary>
+    /// <summary>Downloads the full catalog as an .xlsx (Products + Variants sheets) — the same file layout <see cref="BulkUpdate(IFormFile?)"/> expects back.</summary>
     public async Task<IActionResult> ExportExcel()
     {
         var products = await _context.Products
@@ -226,6 +228,43 @@ public class ProductsController : AdminBaseController
         sheet.Columns(1, ExcelHeaders.Length).AdjustToContents();
         sheet.Column(2).Width = Math.Min(sheet.Column(2).Width, 45);
 
+        var variants = await _context.ProductVariants
+            .Include(v => v.Product)
+            .Include(v => v.Color)
+            .Include(v => v.Size)
+            .OrderBy(v => v.Product!.Sku).ThenBy(v => v.Sku)
+            .ToListAsync();
+
+        var variantSheet = workbook.Worksheets.Add("Variants");
+        for (var i = 0; i < VariantExcelHeaders.Length; i++)
+        {
+            variantSheet.Cell(1, i + 1).Value = VariantExcelHeaders[i];
+        }
+        variantSheet.Row(1).Style.Font.Bold = true;
+        variantSheet.SheetView.FreezeRows(1);
+
+        var vRow = 2;
+        foreach (var variant in variants)
+        {
+            variantSheet.Cell(vRow, 1).Value = variant.Product?.Sku;
+            variantSheet.Cell(vRow, 2).Value = variant.Sku;
+            variantSheet.Cell(vRow, 3).Value = variant.Color?.Name;
+            variantSheet.Cell(vRow, 4).Value = variant.Size?.Label;
+            if (variant.Price.HasValue)
+            {
+                variantSheet.Cell(vRow, 5).Value = variant.Price.Value;
+            }
+            if (variant.WholesalePrice.HasValue)
+            {
+                variantSheet.Cell(vRow, 6).Value = variant.WholesalePrice.Value;
+            }
+            variantSheet.Cell(vRow, 7).Value = variant.StockQuantity;
+            variantSheet.Cell(vRow, 8).Value = variant.ImageUrl;
+            vRow++;
+        }
+
+        variantSheet.Columns(1, VariantExcelHeaders.Length).AdjustToContents();
+
         using var stream = new MemoryStream();
         workbook.SaveAs(stream);
 
@@ -233,6 +272,38 @@ public class ProductsController : AdminBaseController
             stream.ToArray(),
             "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             $"wlm-products-{DateTime.UtcNow:yyyyMMdd}.xlsx");
+    }
+
+    // Maps each column header (row 1) to its column number, so rows are read by header name
+    // instead of fixed position — a re-ordered or partially-renamed sheet still imports correctly.
+    private static Dictionary<string, int> MapHeaders(IXLWorksheet sheet)
+    {
+        var map = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        var headerRow = sheet.Row(1);
+        foreach (var cell in headerRow.CellsUsed())
+        {
+            var header = cell.GetString().Trim();
+            if (!string.IsNullOrEmpty(header))
+            {
+                map[header] = cell.Address.ColumnNumber;
+            }
+        }
+
+        return map;
+    }
+
+    // Returns the column number for the first alias that matches a header in the sheet.
+    private static int? FindColumn(Dictionary<string, int> headerMap, params string[] aliases)
+    {
+        foreach (var alias in aliases)
+        {
+            if (headerMap.TryGetValue(alias, out var col))
+            {
+                return col;
+            }
+        }
+
+        return null;
     }
 
     public IActionResult BulkUpdate()
@@ -257,11 +328,51 @@ public class ProductsController : AdminBaseController
             return View(new BulkImportResult());
         }
 
-        var result = new BulkImportResult();
+        var extension = Path.GetExtension(file.FileName).ToLowerInvariant();
+        if (extension != ".xlsx")
+        {
+            ModelState.AddModelError(string.Empty, _localizer["Please upload a valid .xlsx file."]);
+            return View(new BulkImportResult());
+        }
 
         using var stream = file.OpenReadStream();
-        using var workbook = new XLWorkbook(stream);
+        XLWorkbook workbook;
+        try
+        {
+            workbook = new XLWorkbook(stream);
+        }
+        catch (Exception)
+        {
+            ModelState.AddModelError(string.Empty, _localizer["This file couldn't be read as a valid Excel file. It may be corrupted or not a real .xlsx file."]);
+            return View(new BulkImportResult());
+        }
+        using var _ = workbook; // parsed successfully — dispose it when this action returns
+
+        if (!workbook.Worksheets.Contains("Products") && workbook.Worksheets.Count == 0)
+        {
+            ModelState.AddModelError(string.Empty, _localizer["The Excel file has no sheets to read."]);
+            return View(new BulkImportResult());
+        }
+
         var sheet = workbook.Worksheets.First();
+
+        var headers = MapHeaders(sheet);
+        var skuCol = FindColumn(headers, "Sku", "SKU", "Product Sku", "رمز المنتج");
+        var nameCol = FindColumn(headers, "Name", "Product Name", "الاسم", "اسم المنتج");
+        var categoryCol = FindColumn(headers, "Category", "الفئة", "القسم");
+        var priceCol = FindColumn(headers, "Price (AED)", "Price", "السعر");
+        var wholesaleCol = FindColumn(headers, "Wholesale Price (AED)", "Wholesale Price", "سعر الجملة");
+        var stockCol = FindColumn(headers, "Stock Quantity", "Stock", "Qty", "الكمية", "كمية المخزون");
+        var imageCol = FindColumn(headers, "Image URL", "Image", "رابط الصورة");
+
+        if (skuCol == null || nameCol == null || categoryCol == null || priceCol == null || stockCol == null)
+        {
+            ModelState.AddModelError(string.Empty,
+                _localizer["Couldn't find required columns (Sku, Name, Category, Price, Stock Quantity). Check the column headers in row 1."]);
+            return View(new BulkImportResult());
+        }
+
+        var result = new BulkImportResult();
 
         var products = await _context.Products.ToListAsync();
         var productsBySku = products
@@ -278,22 +389,22 @@ public class ProductsController : AdminBaseController
         foreach (var row in sheet.RowsUsed().Skip(1))
         {
             var rowNum = row.RowNumber();
-            var sku = row.Cell(1).GetString().Trim();
+            var sku = row.Cell(skuCol.Value).GetString().Trim();
             if (string.IsNullOrWhiteSpace(sku))
             {
                 continue;
             }
 
-            if (!TryReadDecimal(row.Cell(4), out var price) || price < 0)
+            if (!TryReadDecimal(row.Cell(priceCol.Value), out var price) || price < 0)
             {
                 result.Errors.Add($"Row {rowNum} (SKU {sku}): invalid Price value.");
                 continue;
             }
 
             decimal? wholesale = null;
-            if (!row.Cell(5).IsEmpty())
+            if (wholesaleCol != null && !row.Cell(wholesaleCol.Value).IsEmpty())
             {
-                if (!TryReadDecimal(row.Cell(5), out var w) || w < 0)
+                if (!TryReadDecimal(row.Cell(wholesaleCol.Value), out var w) || w < 0)
                 {
                     result.Errors.Add($"Row {rowNum} (SKU {sku}): invalid Wholesale Price value.");
                     continue;
@@ -301,7 +412,7 @@ public class ProductsController : AdminBaseController
                 wholesale = w;
             }
 
-            if (!TryReadInt(row.Cell(6), out var stock) || stock < 0)
+            if (!TryReadInt(row.Cell(stockCol.Value), out var stock) || stock < 0)
             {
                 result.Errors.Add($"Row {rowNum} (SKU {sku}): invalid Stock Quantity value.");
                 continue;
@@ -317,14 +428,14 @@ public class ProductsController : AdminBaseController
             }
 
             // Unrecognized SKU — create a new product from this row instead of skipping it.
-            var name = row.Cell(2).GetString().Trim();
+            var name = row.Cell(nameCol.Value).GetString().Trim();
             if (string.IsNullOrWhiteSpace(name))
             {
                 result.Errors.Add($"Row {rowNum} (SKU {sku}): new SKU with no Name — can't create a product without one.");
                 continue;
             }
 
-            var categoryName = row.Cell(3).GetString().Trim();
+            var categoryName = row.Cell(categoryCol.Value).GetString().Trim();
             if (string.IsNullOrWhiteSpace(categoryName) || !categoriesByName.TryGetValue(categoryName, out var category))
             {
                 result.Errors.Add($"Row {rowNum} (SKU {sku}): new SKU with an unrecognized Category '{categoryName}' — check spelling against Admin → Categories.");
@@ -345,7 +456,7 @@ public class ProductsController : AdminBaseController
                 dedupeSuffix++;
             }
 
-            var imageUrl = row.Cell(7).IsEmpty() ? null : row.Cell(7).GetString().Trim();
+            var imageUrl = imageCol == null || row.Cell(imageCol.Value).IsEmpty() ? null : row.Cell(imageCol.Value).GetString().Trim();
 
             var newProduct = new Product
             {
@@ -376,7 +487,176 @@ public class ProductsController : AdminBaseController
             await _context.SaveChangesAsync();
         }
 
+        // Optional second sheet: per color/size combo pricing and stock. Absent entirely on
+        // older exports (or a Products-only re-upload) — that's fine, nothing to do then.
+        if (workbook.Worksheets.Contains("Variants"))
+        {
+            await ImportVariantsSheet(workbook.Worksheet("Variants"), productsBySku, result);
+        }
+
         return View(result);
+    }
+
+    // Known launch-catalog color names mapped to their real swatch hex — used when a bulk
+    // upload introduces a brand-new color name so it isn't stuck with a meaningless gray
+    // swatch. Anything not on this list still gets created, just with a neutral placeholder.
+    private static readonly Dictionary<string, string> KnownColorHex = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["Black"] = "#1c1c1c",
+        ["Coyote Tan"] = "#b08d57",
+        ["Ranger Green"] = "#4b5320",
+        ["Charcoal"] = "#36454f",
+        ["Brown"] = "#5b3a29",
+        ["Silver"] = "#c0c0c0",
+        ["Navy"] = "#1b263b",
+        ["Khaki"] = "#c3b091",
+        ["Slate Gray"] = "#6c757d",
+        ["Olive Drab"] = "#5c5f2e",
+        ["Arctic White"] = "#eef1ee"
+    };
+
+    /// <summary>
+    /// Matches rows to variants by Variant Sku (column B). An existing Variant Sku gets its
+    /// Price, Wholesale Price, and Stock Quantity updated. A new Variant Sku is created and
+    /// attached to the product named in Product Sku (Parent) (column A) — which must already
+    /// exist, including any product just created earlier in the same upload. Color/Size names
+    /// that don't exist yet are created on the fly.
+    /// </summary>
+    private async Task ImportVariantsSheet(IXLWorksheet sheet, Dictionary<string, Product> productsBySku, BulkImportResult result)
+    {
+        var headers = MapHeaders(sheet);
+        var parentSkuCol = FindColumn(headers, "Product Sku (Parent)", "Parent Sku", "SKU الأساسي");
+        var variantSkuCol = FindColumn(headers, "Variant Sku", "SKU المتغير");
+        var colorCol = FindColumn(headers, "Color", "اللون");
+        var sizeCol = FindColumn(headers, "Size", "المقاس");
+        var priceCol = FindColumn(headers, "Price (AED)", "Price", "السعر");
+        var wholesaleCol = FindColumn(headers, "Wholesale Price (AED)", "Wholesale Price", "سعر الجملة");
+        var stockCol = FindColumn(headers, "Stock Quantity", "Stock", "الكمية");
+        var imageCol = FindColumn(headers, "Image URL", "Image");
+
+        if (parentSkuCol == null || variantSkuCol == null || stockCol == null)
+        {
+            result.Errors.Add("Variants sheet: couldn't find required columns (Product Sku (Parent), Variant Sku, Stock Quantity).");
+            return;
+        }
+
+        var existingVariants = (await _context.ProductVariants.ToListAsync())
+            .GroupBy(v => v.Sku.Trim(), StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(g => g.Key, g => g.First(), StringComparer.OrdinalIgnoreCase);
+        var colorsByName = (await _context.Colors.ToListAsync())
+            .ToDictionary(c => c.Name.Trim(), c => c, StringComparer.OrdinalIgnoreCase);
+        var sizesByLabel = (await _context.Sizes.ToListAsync())
+            .ToDictionary(s => s.Label.Trim(), s => s, StringComparer.OrdinalIgnoreCase);
+        var newVariants = new List<ProductVariant>();
+
+        foreach (var row in sheet.RowsUsed().Skip(1))
+        {
+            var rowNum = row.RowNumber();
+            var variantSku = row.Cell(variantSkuCol.Value).GetString().Trim();
+            if (string.IsNullOrWhiteSpace(variantSku))
+            {
+                continue;
+            }
+
+            if (!TryReadInt(row.Cell(stockCol.Value), out var stock) || stock < 0)
+            {
+                result.Errors.Add($"Variants row {rowNum} (SKU {variantSku}): invalid Stock Quantity value.");
+                continue;
+            }
+
+            decimal? price = null;
+            if (priceCol != null && !row.Cell(priceCol.Value).IsEmpty())
+            {
+                if (!TryReadDecimal(row.Cell(priceCol.Value), out var p) || p < 0)
+                {
+                    result.Errors.Add($"Variants row {rowNum} (SKU {variantSku}): invalid Price value.");
+                    continue;
+                }
+                price = Math.Round(p, 2);
+            }
+
+            decimal? wholesale = null;
+            if (wholesaleCol != null && !row.Cell(wholesaleCol.Value).IsEmpty())
+            {
+                if (!TryReadDecimal(row.Cell(wholesaleCol.Value), out var w) || w < 0)
+                {
+                    result.Errors.Add($"Variants row {rowNum} (SKU {variantSku}): invalid Wholesale Price value.");
+                    continue;
+                }
+                wholesale = Math.Round(w, 2);
+            }
+
+            var imageUrl = imageCol == null || row.Cell(imageCol.Value).IsEmpty() ? null : row.Cell(imageCol.Value).GetString().Trim();
+
+            if (existingVariants.TryGetValue(variantSku, out var existingVariant))
+            {
+                existingVariant.Price = price;
+                existingVariant.WholesalePrice = wholesale;
+                existingVariant.StockQuantity = stock;
+                if (!string.IsNullOrWhiteSpace(imageUrl))
+                {
+                    existingVariant.ImageUrl = imageUrl;
+                }
+                result.VariantsUpdatedCount++;
+                continue;
+            }
+
+            var parentSku = row.Cell(parentSkuCol.Value).GetString().Trim();
+            if (string.IsNullOrWhiteSpace(parentSku) || !productsBySku.TryGetValue(parentSku, out var parentProduct))
+            {
+                result.Errors.Add($"Variants row {rowNum} (SKU {variantSku}): Product Sku (Parent) '{parentSku}' doesn't match any product.");
+                continue;
+            }
+
+            Color? color = null;
+            var colorName = colorCol == null ? string.Empty : row.Cell(colorCol.Value).GetString().Trim();
+            if (!string.IsNullOrWhiteSpace(colorName))
+            {
+                if (!colorsByName.TryGetValue(colorName, out color))
+                {
+                    color = new Color { Name = colorName, HexCode = KnownColorHex.GetValueOrDefault(colorName, "#808080") };
+                    colorsByName[colorName] = color;
+                    _context.Colors.Add(color);
+                }
+            }
+
+            Size? size = null;
+            var sizeLabel = sizeCol == null ? string.Empty : row.Cell(sizeCol.Value).GetString().Trim();
+            if (!string.IsNullOrWhiteSpace(sizeLabel))
+            {
+                if (!sizesByLabel.TryGetValue(sizeLabel, out size))
+                {
+                    size = new Size { Label = sizeLabel, SortOrder = sizesByLabel.Count };
+                    sizesByLabel[sizeLabel] = size;
+                    _context.Sizes.Add(size);
+                }
+            }
+
+            var newVariant = new ProductVariant
+            {
+                Product = parentProduct,
+                Color = color,
+                Size = size,
+                Sku = variantSku,
+                Price = price,
+                WholesalePrice = wholesale,
+                StockQuantity = stock,
+                ImageUrl = string.IsNullOrWhiteSpace(imageUrl) ? null : imageUrl
+            };
+            newVariants.Add(newVariant);
+            existingVariants[variantSku] = newVariant; // guards against a duplicate SKU appearing twice in the same sheet
+            result.VariantsCreatedCount++;
+        }
+
+        if (newVariants.Count > 0)
+        {
+            _context.ProductVariants.AddRange(newVariants);
+        }
+
+        if (result.VariantsUpdatedCount > 0 || result.VariantsCreatedCount > 0)
+        {
+            await _context.SaveChangesAsync();
+        }
     }
 
     private static string Slugify(string name)

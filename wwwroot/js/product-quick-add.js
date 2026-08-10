@@ -1,6 +1,3 @@
-// Quick-add-to-cart modal, triggered from product cards anywhere on the site (grid, home
-// page, "You may also like"). Products with no color/size variants skip the modal entirely
-// and add straight to cart.
 (function () {
     "use strict";
 
@@ -16,13 +13,23 @@
     var colorLabelEl = document.getElementById("quickAddColorLabel");
     var sizeSection = document.getElementById("quickAddSizeSection");
     var sizeOptionsEl = document.getElementById("quickAddSizeOptions");
+    var priceDisplayEl = document.getElementById("quickAddPriceDisplay");
     var errorEl = document.getElementById("quickAddError");
     var submitBtn = document.getElementById("quickAddSubmitBtn");
     var tokenInput = document.querySelector('input[name="__RequestVerificationToken"]');
 
+    var qtyValueEl = document.getElementById("quickAddQtyValue");
+    var qtyMinusBtn = document.getElementById("quickAddQtyMinus");
+    var qtyPlusBtn = document.getElementById("quickAddQtyPlus");
+
+    var selectPromptText = document.getElementById("quickAddSelectPromptText").textContent;
+    var unavailableText = document.getElementById("quickAddUnavailableText").textContent;
+    var outOfStockText = document.getElementById("quickAddOutOfStockText").textContent;
+
     var currentProduct = null;
     var selectedColor = null;
     var selectedSize = null;
+    var selectedQty = 1;
 
     function escapeHtml(text) {
         var div = document.createElement("div");
@@ -60,6 +67,91 @@
         });
     }
 
+    function findVariant(colorName, sizeLabel) {
+        if (!currentProduct.variants) {
+            return null;
+        }
+        var hasColors = currentProduct.colors && currentProduct.colors.length > 0;
+        var hasSizes = currentProduct.sizes && currentProduct.sizes.length > 0;
+
+        return currentProduct.variants.find(function (v) {
+            var colorMatch = !hasColors || v.color === colorName;
+            var sizeMatch = !hasSizes || v.size === sizeLabel;
+            return colorMatch && sizeMatch;
+        }) || null;
+    }
+
+    function formatTotal(unitPrice, qty) {
+        // unitPrice comes pre-formatted from the server (e.g. "AED 30.48"), so we pull the
+        // numeric part out, multiply, and reuse the same currency prefix/suffix.
+        var match = unitPrice.match(/^([^\d]*)([\d.,]+)([^\d]*)$/);
+        if (!match) {
+            return unitPrice;
+        }
+        var prefix = match[1];
+        var numeric = parseFloat(match[2].replace(/,/g, ""));
+        var suffix = match[3];
+        var total = (numeric * qty).toFixed(2);
+        return prefix + total + suffix;
+    }
+
+    function clampQtyToStock(variant) {
+        if (!variant) {
+            return;
+        }
+        if (selectedQty > variant.stock) {
+            selectedQty = variant.stock > 0 ? variant.stock : 1;
+        }
+        if (selectedQty < 1) {
+            selectedQty = 1;
+        }
+        qtyValueEl.textContent = selectedQty;
+    }
+
+    function updatePriceAndAvailability() {
+        var hasColors = currentProduct.colors && currentProduct.colors.length > 0;
+        var hasSizes = currentProduct.sizes && currentProduct.sizes.length > 0;
+
+        if ((hasColors && !selectedColor) || (hasSizes && !selectedSize)) {
+            priceDisplayEl.innerHTML = "";
+            errorEl.textContent = selectPromptText;
+            errorEl.classList.add("visible");
+            submitBtn.disabled = true;
+            return;
+        }
+
+        var variant = findVariant(selectedColor, selectedSize);
+
+        if (!variant || variant.active === false) {
+            priceDisplayEl.innerHTML = "";
+            errorEl.textContent = unavailableText;
+            errorEl.classList.add("visible");
+            submitBtn.disabled = true;
+            return;
+        }
+
+        if (variant.stock <= 0) {
+            priceDisplayEl.innerHTML = "";
+            errorEl.textContent = outOfStockText;
+            errorEl.classList.add("visible");
+            submitBtn.disabled = true;
+            return;
+        }
+
+        clampQtyToStock(variant);
+
+        errorEl.classList.remove("visible");
+        submitBtn.disabled = false;
+
+        if (variant.listPriceFormatted) {
+            priceDisplayEl.innerHTML =
+                '<span class="price-was">' + escapeHtml(formatTotal(variant.listPriceFormatted, selectedQty)) + '</span> ' +
+                '<span class="price price-sale">' + escapeHtml(formatTotal(variant.priceFormatted, selectedQty)) + '</span>';
+        } else {
+            priceDisplayEl.innerHTML = '<span class="price">' + escapeHtml(formatTotal(variant.priceFormatted, selectedQty)) + '</span>';
+        }
+    }
+
     function renderColorOptions() {
         colorOptionsEl.innerHTML = "";
         if (!currentProduct.colors || currentProduct.colors.length === 0) {
@@ -81,13 +173,14 @@
             }
 
             var label = document.createElement("label");
-            label.className = "color-swatch" + (index === 0 ? "" : "");
+            label.className = "color-swatch";
             label.style.cssText = style;
             label.title = color.name;
             label.innerHTML = '<input type="radio" name="quickAddColor" value="' + escapeHtml(color.name) + '" ' + (index === 0 ? "checked" : "") + ' />';
             label.addEventListener("click", function () {
                 selectedColor = color.name;
                 colorLabelEl.textContent = color.name;
+                updatePriceAndAvailability();
             });
             colorOptionsEl.appendChild(label);
         });
@@ -104,23 +197,24 @@
         sizeSection.style.display = "";
         currentProduct.sizes.forEach(function (size, index) {
             if (index === 0) {
-                selectedSize = size;
+                selectedSize = size.label;
             }
 
             var label = document.createElement("label");
             label.className = "size-pill";
-            label.innerHTML = '<input type="radio" name="quickAddSize" value="' + escapeHtml(size) + '" ' + (index === 0 ? "checked" : "") + ' /><span>' + escapeHtml(size) + '</span>';
+            label.innerHTML = '<input type="radio" name="quickAddSize" value="' + escapeHtml(size.label) + '" ' + (index === 0 ? "checked" : "") + ' /><span>' + escapeHtml(size.label) + '</span>';
             label.addEventListener("click", function () {
-                selectedSize = size;
+                selectedSize = size.label;
+                updatePriceAndAvailability();
             });
             sizeOptionsEl.appendChild(label);
         });
     }
 
-    function addToCart(productId, color, size, onDone) {
+    function addToCart(productId, color, size, qty, onDone) {
         var body = new URLSearchParams();
         body.set("productId", productId);
-        body.set("quantity", "1");
+        body.set("quantity", String(qty));
         if (color) body.set("color", color);
         if (size) body.set("size", size);
         if (tokenInput) body.set("__RequestVerificationToken", tokenInput.value);
@@ -148,6 +242,26 @@
             });
     }
 
+    qtyMinusBtn.addEventListener("click", function () {
+        if (selectedQty > 1) {
+            selectedQty--;
+            qtyValueEl.textContent = selectedQty;
+            updatePriceAndAvailability();
+        }
+    });
+
+    qtyPlusBtn.addEventListener("click", function () {
+        var variant = findVariant(selectedColor, selectedSize);
+        if (!variant) {
+            return;
+        }
+        if (selectedQty < variant.stock) {
+            selectedQty++;
+            qtyValueEl.textContent = selectedQty;
+            updatePriceAndAvailability();
+        }
+    });
+
     document.addEventListener("click", function (e) {
         var trigger = e.target.closest(".js-quick-add");
         if (!trigger) {
@@ -158,46 +272,42 @@
         currentProduct = JSON.parse(trigger.getAttribute("data-product"));
         selectedColor = null;
         selectedSize = null;
+        selectedQty = 1;
+        qtyValueEl.textContent = 1;
         errorEl.classList.remove("visible");
+        priceDisplayEl.innerHTML = "";
 
         var hasColors = currentProduct.colors && currentProduct.colors.length > 0;
         var hasSizes = currentProduct.sizes && currentProduct.sizes.length > 0;
 
         if (!hasColors && !hasSizes) {
-            // Nothing to choose — add it straight away, no modal needed.
             trigger.disabled = true;
-            addToCart(currentProduct.id, null, null, function () { trigger.disabled = false; });
+            addToCart(currentProduct.id, null, null, 1, function () { trigger.disabled = false; });
             return;
         }
 
         productNameEl.textContent = currentProduct.name;
         renderColorOptions();
         renderSizeOptions();
+        updatePriceAndAvailability();
         bsModal.show();
     });
 
     submitBtn.addEventListener("click", function () {
-        var hasColors = currentProduct.colors && currentProduct.colors.length > 0;
-        var hasSizes = currentProduct.sizes && currentProduct.sizes.length > 0;
-
-        if ((hasColors && !selectedColor) || (hasSizes && !selectedSize)) {
-            errorEl.classList.add("visible");
+        var variant = findVariant(selectedColor, selectedSize);
+        if (!variant || variant.stock <= 0) {
             return;
         }
-        errorEl.classList.remove("visible");
 
         submitBtn.disabled = true;
         submitBtn.textContent = "Adding…";
-        addToCart(currentProduct.id, selectedColor, selectedSize, function () {
+        addToCart(currentProduct.id, selectedColor, selectedSize, selectedQty, function () {
             submitBtn.disabled = false;
             submitBtn.textContent = "Add To Basket";
             bsModal.hide();
         });
     });
 
-    // Product card "Add To Cart" button — reads the card's own variant <select> (if the
-    // product has colors/sizes) rather than opening the modal, matching the on-card
-    // dropdown pattern used across the shop grid.
     document.addEventListener("click", function (e) {
         var trigger = e.target.closest(".js-inline-add");
         if (!trigger) {
@@ -205,21 +315,10 @@
         }
 
         var productId = trigger.getAttribute("data-product-id");
-        var card = trigger.closest(".product-card");
-        var variantSelect = card ? card.querySelector(".product-card-variant") : null;
-        var color = null;
-        var size = null;
-
-        if (variantSelect && variantSelect.value) {
-            var parts = variantSelect.value.split("|");
-            color = parts[0] || null;
-            size = parts[1] || null;
-        }
-
         var originalText = trigger.textContent;
         trigger.disabled = true;
         trigger.textContent = "Adding…";
-        addToCart(productId, color, size, function () {
+        addToCart(productId, null, null, 1, function () {
             trigger.disabled = false;
             trigger.textContent = originalText;
         });

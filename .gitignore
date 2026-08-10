@@ -6,6 +6,7 @@ obj/
 
 # Local development configuration & secrets — keep out of source control
 appsettings.Development.json
+appsettings.Production.json
 appsettings.*.Local.json
 secrets.json
 .env

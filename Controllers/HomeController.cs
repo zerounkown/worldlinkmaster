@@ -38,7 +38,45 @@ public class HomeController : Controller
             .Take(16)
             .ToListAsync();
         ViewBag.ScrollProducts = scrollProducts;
+        ViewBag.HomeBanners = await _context.HomeBanners
+            .Where(b => b.Active)
+            .OrderBy(b => b.DisplayOrder)
+            .ToListAsync();
         ViewBag.Categories = await _context.Categories.OrderBy(c => c.Name).ToListAsync();
+        // Only show brands with a real logo in the "Shop by Brand" row — mixing those in
+        // with plain text-wordmark placeholder tiles looked inconsistent.
+        ViewBag.Brands = await _context.Brands.Where(b => b.LogoUrl != null)
+            .OrderByDescending(b => b.Name == "WLM")
+            .ThenBy(b => b.Name)
+            .ToListAsync();
+        ViewBag.ActiveEvent = await _promoService.GetTopActiveEventAsync();
+
+        ViewBag.FeaturedProducts = await _context.Products
+            .Include(p => p.Variants).ThenInclude(v => v.Color)
+            .Include(p => p.Variants).ThenInclude(v => v.Size)
+            .Include(p => p.Variants).ThenInclude(v => v.ProductColor)
+            .Where(p => p.IsFeatured)
+            .OrderByDescending(p => p.Rating)
+            .Take(2)
+            .ToListAsync();
+
+        // "Best sellers" — approximated by review volume/rating since there's no sales-count field yet.
+        ViewBag.BestSellers = await _context.Products
+            .Include(p => p.Variants).ThenInclude(v => v.Color)
+            .Include(p => p.Variants).ThenInclude(v => v.Size)
+            .Include(p => p.Variants).ThenInclude(v => v.ProductColor)
+            .OrderByDescending(p => p.ReviewCount)
+            .ThenByDescending(p => p.Rating)
+            .Take(2)
+            .ToListAsync();
+
+        ViewBag.NewArrivals = await _context.Products
+            .Include(p => p.Variants).ThenInclude(v => v.Color)
+            .Include(p => p.Variants).ThenInclude(v => v.Size)
+            .Include(p => p.Variants).ThenInclude(v => v.ProductColor)
+            .OrderByDescending(p => p.CreatedAt)
+            .Take(2)
+            .ToListAsync();
 
         return View();
     }

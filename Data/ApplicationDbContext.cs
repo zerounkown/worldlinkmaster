@@ -13,12 +13,15 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
 
     public DbSet<Category> Categories => Set<Category>();
     public DbSet<Subcategory> Subcategories => Set<Subcategory>();
+    public DbSet<Feature> Features => Set<Feature>();
+    public DbSet<Favorite> Favorites => Set<Favorite>();
     public DbSet<Product> Products => Set<Product>();
+    public DbSet<Brand> Brands => Set<Brand>();
     public DbSet<Order> Orders => Set<Order>();
     public DbSet<OrderItem> OrderItems => Set<OrderItem>();
     public DbSet<ProductImage> ProductImages => Set<ProductImage>();
-    public DbSet<ProductColor> ProductColors => Set<ProductColor>();
-    public DbSet<ProductSize> ProductSizes => Set<ProductSize>();
+    public DbSet<Color> Colors => Set<Color>();
+    public DbSet<Size> Sizes => Set<Size>();
     public DbSet<Merchant> Merchants => Set<Merchant>();
     public DbSet<MerchantPayout> MerchantPayouts => Set<MerchantPayout>();
     public DbSet<WholesaleAccount> WholesaleAccounts => Set<WholesaleAccount>();
@@ -31,6 +34,25 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
     public DbSet<ChatMessage> ChatMessages => Set<ChatMessage>();
     public DbSet<QuoteRequest> QuoteRequests => Set<QuoteRequest>();
     public DbSet<Lead> Leads => Set<Lead>();
+    public DbSet<ProductVariant> ProductVariants => Set<ProductVariant>();
+    public DbSet<SizeGroup> SizeGroups => Set<SizeGroup>();
+    public DbSet<AttributeDefinition> AttributeDefinitions => Set<AttributeDefinition>();
+    public DbSet<ProductAttributeValue> ProductAttributeValues => Set<ProductAttributeValue>();
+    public DbSet<ProductColor> ProductColors => Set<ProductColor>();
+    public DbSet<ProductMedia> ProductMedia => Set<ProductMedia>();
+    public DbSet<HomeBanner> HomeBanners => Set<HomeBanner>();
+    public DbSet<CompareItem> CompareItems => Set<CompareItem>();
+    public DbSet<ProductReview> ProductReviews => Set<ProductReview>();
+
+    // Postgres' default "timestamp" column type has no timezone and rejects DateTime
+    // values with Kind=Utc (which DateTime.UtcNow — used throughout this codebase — always
+    // has). Mapping every DateTime to "timestamptz" avoids that mismatch at the source.
+    protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)
+    {
+        base.ConfigureConventions(configurationBuilder);
+        configurationBuilder.Properties<DateTime>().HaveColumnType("timestamptz");
+        configurationBuilder.Properties<DateTime?>().HaveColumnType("timestamptz");
+    }
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -91,16 +113,54 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
             .HasForeignKey(pi => pi.ProductId)
             .OnDelete(DeleteBehavior.Cascade);
 
-        builder.Entity<ProductColor>()
-            .HasOne(pc => pc.Product)
-            .WithMany(p => p.Colors)
-            .HasForeignKey(pc => pc.ProductId)
+        builder.Entity<ProductVariant>()
+            .HasIndex(v => v.Sku)
+            .IsUnique();
+
+        builder.Entity<ProductVariant>()
+            .HasOne(v => v.Product)
+            .WithMany(p => p.Variants)
+            .HasForeignKey(v => v.ProductId)
             .OnDelete(DeleteBehavior.Cascade);
 
-        builder.Entity<ProductSize>()
-            .HasOne(ps => ps.Product)
-            .WithMany(p => p.Sizes)
-            .HasForeignKey(ps => ps.ProductId)
+        builder.Entity<ProductVariant>()
+            .HasOne(v => v.Color)
+            .WithMany()
+            .HasForeignKey(v => v.ColorId)
+            .IsRequired(false)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.Entity<ProductVariant>()
+            .HasOne(v => v.Size)
+            .WithMany()
+            .HasForeignKey(v => v.SizeId)
+            .IsRequired(false)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        // Prevents the same product from having two variant rows for the same color+size combo.
+        builder.Entity<ProductVariant>()
+            .HasIndex(v => new { v.ProductId, v.ColorId, v.SizeId })
+            .IsUnique();
+
+        builder.Entity<Product>()
+            .HasMany(p => p.Features)
+            .WithMany(f => f.Products)
+            .UsingEntity(j => j.ToTable("ProductFeatures"));
+
+        builder.Entity<Favorite>()
+            .HasIndex(f => new { f.UserId, f.ProductId })
+            .IsUnique();
+
+        builder.Entity<Favorite>()
+            .HasOne(f => f.User)
+            .WithMany()
+            .HasForeignKey(f => f.UserId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        builder.Entity<Favorite>()
+            .HasOne(f => f.Product)
+            .WithMany()
+            .HasForeignKey(f => f.ProductId)
             .OnDelete(DeleteBehavior.Cascade);
 
         builder.Entity<Merchant>()
@@ -218,5 +278,96 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
             .HasForeignKey(q => q.UserId)
             .IsRequired(false)
             .OnDelete(DeleteBehavior.SetNull);
+
+        // --- Master Data / Product Import schema (WLM_01_Developer_Specification.xlsx) ---
+
+        builder.Entity<Brand>().HasIndex(b => b.Code).IsUnique();
+        builder.Entity<Category>().HasIndex(c => c.Code).IsUnique();
+        builder.Entity<Subcategory>().HasIndex(s => s.Code).IsUnique();
+        builder.Entity<Color>().HasIndex(c => c.Code).IsUnique();
+        builder.Entity<Size>().HasIndex(s => s.Code).IsUnique();
+        builder.Entity<SizeGroup>().HasIndex(g => g.Code).IsUnique();
+        builder.Entity<AttributeDefinition>().HasIndex(a => a.Code).IsUnique();
+        builder.Entity<ProductColor>().HasIndex(pc => pc.Code).IsUnique();
+        builder.Entity<ProductVariant>().HasIndex(v => v.Barcode).IsUnique();
+
+        builder.Entity<Size>()
+            .HasOne(s => s.SizeGroup)
+            .WithMany(g => g.Sizes)
+            .HasForeignKey(s => s.SizeGroupId)
+            .IsRequired(false)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.Entity<Product>()
+            .HasOne(p => p.SizeGroup)
+            .WithMany()
+            .HasForeignKey(p => p.SizeGroupId)
+            .IsRequired(false)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.Entity<ProductColor>()
+            .HasOne(pc => pc.Product)
+            .WithMany(p => p.ProductColors)
+            .HasForeignKey(pc => pc.ProductId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        builder.Entity<ProductColor>()
+            .HasOne(pc => pc.Color)
+            .WithMany()
+            .HasForeignKey(pc => pc.ColorId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        // A product can't offer the same shared Color twice as two different ProductColors.
+        builder.Entity<ProductColor>()
+            .HasIndex(pc => new { pc.ProductId, pc.ColorId })
+            .IsUnique();
+
+        builder.Entity<ProductVariant>()
+            .HasOne(v => v.ProductColor)
+            .WithMany(pc => pc.Variants)
+            .HasForeignKey(v => v.ProductColorId)
+            .IsRequired(false)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.Entity<ProductMedia>()
+            .HasOne(m => m.Product)
+            .WithMany(p => p.Media)
+            .HasForeignKey(m => m.ProductId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        builder.Entity<ProductMedia>()
+            .HasOne(m => m.ProductColor)
+            .WithMany(pc => pc.Media)
+            .HasForeignKey(m => m.ProductColorId)
+            .IsRequired(false)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        builder.Entity<ProductAttributeValue>()
+            .HasOne(v => v.Product)
+            .WithMany(p => p.AttributeValues)
+            .HasForeignKey(v => v.ProductId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        builder.Entity<ProductAttributeValue>()
+            .HasOne(v => v.AttributeDefinition)
+            .WithMany()
+            .HasForeignKey(v => v.AttributeDefinitionId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.Entity<ProductReview>()
+            .HasIndex(r => new { r.ProductId, r.UserId })
+            .IsUnique();
+
+        builder.Entity<ProductReview>()
+            .HasOne(r => r.Product)
+            .WithMany()
+            .HasForeignKey(r => r.ProductId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        builder.Entity<ProductReview>()
+            .HasOne(r => r.User)
+            .WithMany()
+            .HasForeignKey(r => r.UserId)
+            .OnDelete(DeleteBehavior.Cascade);
     }
 }

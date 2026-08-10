@@ -1,0 +1,38 @@
+name: Unit & Integration Tests (reusable)
+
+on:
+  workflow_call:
+
+jobs:
+  unit-integration-tests:
+    name: Unit & Integration Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+
+      - name: Restore
+        run: dotnet restore Tests/WorldLinkMaster.Tests.csproj
+
+      - name: Build
+        run: dotnet build Tests/WorldLinkMaster.Tests.csproj --no-restore
+
+      # SQLite-backed (see Tests/IntegrationTests/CustomWebApplicationFactory.cs) — no external
+      # database or secrets needed, which is exactly why this suite runs on every push/PR.
+      - name: Test
+        run: >
+          dotnet test Tests/WorldLinkMaster.Tests.csproj --no-build
+          --logger "trx;LogFileName=unit-tests.trx"
+          --results-directory ./test-results
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: unit-test-results
+          path: ./test-results

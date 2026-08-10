@@ -23,7 +23,7 @@ var builder = WebApplication.CreateBuilder(args);
 // ---------------------------------------------------------------------------
 // Database — connection string comes from configuration/environment
 // (ConnectionStrings__DefaultConnection). Connection resiliency is enabled so
-// transient SQL failures (common with cloud SQL) are retried automatically.
+// transient failures (common with cloud Postgres) are retried automatically.
 // ---------------------------------------------------------------------------
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
 if (string.IsNullOrWhiteSpace(connectionString))
@@ -33,13 +33,13 @@ if (string.IsNullOrWhiteSpace(connectionString))
 }
 
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
-    options.UseSqlServer(connectionString, sql =>
+    options.UseNpgsql(connectionString, npgsql =>
     {
-        sql.EnableRetryOnFailure(
+        npgsql.EnableRetryOnFailure(
             maxRetryCount: 5,
             maxRetryDelay: TimeSpan.FromSeconds(10),
-            errorNumbersToAdd: null);
-        sql.CommandTimeout(60);
+            errorCodesToAdd: null);
+        npgsql.CommandTimeout(60);
     }));
 builder.Services.AddDatabaseDeveloperPageExceptionFilter();
 
@@ -164,6 +164,12 @@ else
 }
 
 builder.Services.AddHttpContextAccessor();
+
+// JSON AJAX endpoints (e.g. the checkout wizard) can't carry the antiforgery token as a form
+// field since the request body is JSON, not form-encoded — so validation also accepts it via
+// this header, which the client sets manually on those fetch() calls.
+builder.Services.AddAntiforgery(options => options.HeaderName = "X-CSRF-TOKEN");
+
 builder.Services.AddSession(options =>
 {
     options.IdleTimeout = TimeSpan.FromHours(2);
@@ -178,6 +184,9 @@ builder.Services.AddSession(options =>
 // Application services.
 // ---------------------------------------------------------------------------
 builder.Services.AddScoped<ICartService, SessionCartService>();
+builder.Services.AddScoped<IFavoriteService, FavoriteService>();
+builder.Services.AddScoped<ICompareService, CompareService>();
+builder.Services.AddScoped<IProductReviewService, ProductReviewService>();
 builder.Services.AddScoped<IStripeConnectService, StripeConnectService>();
 builder.Services.AddScoped<IPromoService, PromoService>();
 builder.Services.AddScoped<ICouponService, WorldLinkMaster.Web.Services.CouponService>();
@@ -328,3 +337,7 @@ using (var scope = app.Services.CreateScope())
 }
 
 app.Run();
+
+// Exposes the top-level-statement-generated Program class publicly so WebApplicationFactory<Program>
+// can reference it from the test project (top-level statements otherwise generate it as internal).
+public partial class Program { }

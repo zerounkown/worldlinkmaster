@@ -6,7 +6,7 @@
 }
 
 <h1>@Localizer["Delete Product"]</h1>
-<p>@Localizer["Are you sure you want to delete {0} ({1})?", Model.Name, Model.Category?.Name]</p>
+<p>@Localizer["Are you sure you want to delete {0} ({1})?", Model.Name, Model.Category?.Name ?? string.Empty]</p>
 
 @if (orderCount > 0)
 {

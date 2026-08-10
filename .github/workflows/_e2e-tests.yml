@@ -1,0 +1,83 @@
+name: E2E Tests (reusable)
+
+on:
+  workflow_call:
+
+jobs:
+  e2e-tests:
+    name: E2E Tests (Playwright)
+    runs-on: ubuntu-latest
+
+    # A fresh, disposable Postgres for every run — not the shared Supabase instance used for local
+    # E2E runs (see Tests.E2E/Infrastructure/E2EWebAppFactory.cs). E2E_POSTGRES_CONNECTION below
+    # points the app at this container instead of the default Supabase connection string.
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      E2E_POSTGRES_CONNECTION: "Host=localhost;Port=5432;Username=postgres;Password=postgres;Database=postgres;SSL Mode=Disable;Trust Server Certificate=true"
+      # Overrides whatever is (or isn't) baked into appsettings.Development.json — ASP.NET Core's
+      # config precedence puts environment variables above appsettings.*.json.
+      Stripe__PublishableKey: ${{ secrets.STRIPE_TEST_PUBLISHABLE_KEY }}
+      Stripe__SecretKey: ${{ secrets.STRIPE_TEST_SECRET_KEY }}
+      Stripe__WebhookSecret: ${{ secrets.STRIPE_TEST_WEBHOOK_SECRET }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+
+      - name: Restore
+        run: dotnet restore Tests.E2E/WorldLinkMaster.E2E.csproj
+
+      # Also builds WorldLinkMaster.Web into its own bin/Debug/net8.0/ as a side effect (via the
+      # ProjectReference) — E2EWebAppFactory launches that build as a real child process.
+      - name: Build
+        run: dotnet build Tests.E2E/WorldLinkMaster.E2E.csproj --no-restore
+
+      - name: Cache Playwright browsers
+        id: playwright-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('Tests.E2E/WorldLinkMaster.E2E.csproj') }}
+
+      - name: Install Playwright browsers
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: pwsh Tests.E2E/bin/Debug/net8.0/playwright.ps1 install --with-deps chromium
+
+      # On a cache hit the browser binary itself is already on disk, but the runner image can
+      # still be missing OS-level shared libraries Chromium needs — this is fast/idempotent even
+      # when everything is already present, per Playwright's own documented CI caching pattern.
+      - name: Install Playwright OS dependencies
+        if: steps.playwright-cache.outputs.cache-hit == 'true'
+        run: pwsh Tests.E2E/bin/Debug/net8.0/playwright.ps1 install-deps chromium
+
+      - name: Run E2E tests
+        run: >
+          dotnet test Tests.E2E/WorldLinkMaster.E2E.csproj --no-build
+          --logger "trx;LogFileName=e2e-tests.trx"
+          --results-directory ./test-results
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-test-results
+          path: ./test-results

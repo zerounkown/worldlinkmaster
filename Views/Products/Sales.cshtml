@@ -8,7 +8,10 @@
     var totalPages = ViewBag.TotalPages is int tp ? tp : 1;
 }
 
-<div class="page-banner page-banner-sale">
+@{
+    var saleBannerHasImage = !string.IsNullOrWhiteSpace(activeEvent?.ImageUrl);
+}
+<div class="page-banner page-banner-sale @(saleBannerHasImage ? "page-banner-sale-photo" : "")" style="@(saleBannerHasImage ? $"background-image: linear-gradient(90deg, rgba(5,5,5,0.72) 0%, rgba(5,5,5,0.35) 60%, rgba(5,5,5,0.15) 100%), url('{activeEvent!.ImageUrl}');" : "")">
     <div class="container">
         <h1>@Localizer["Sales"]</h1>
         @if (activeEvent != null)

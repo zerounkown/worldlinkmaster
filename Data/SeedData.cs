@@ -12,14 +12,223 @@ public static class SeedData
         var context = services.GetRequiredService<ApplicationDbContext>();
         await context.Database.MigrateAsync();
 
+        // Shared across every seeding method below so the same color/size name (e.g. "Black")
+        // resolves to one Color/Size lookup row instead of a duplicate per product.
+        var colorCache = new Dictionary<string, Color>(StringComparer.OrdinalIgnoreCase);
+        var sizeCache = new Dictionary<string, Size>(StringComparer.OrdinalIgnoreCase);
+
         var adminUser = await SeedRolesAndAdminAsync(services);
         var defaultMerchant = await SeedDefaultMerchantAsync(context, adminUser);
-        await SeedCatalogAsync(context, defaultMerchant.Id);
-        await SeedBulkExpansionAsync(context, defaultMerchant.Id);
+        await SeedCatalogAsync(context, defaultMerchant.Id, colorCache, sizeCache);
+        await SeedBulkExpansionAsync(context, defaultMerchant.Id, colorCache, sizeCache);
         await SeedSubcategoriesAsync(context);
-        await SeedSubcategoryPlaceholderProductsAsync(context, defaultMerchant.Id);
+        await SeedSubcategoryPlaceholderProductsAsync(context, defaultMerchant.Id, colorCache, sizeCache);
+        await SeedMissingVariantsAsync(context, colorCache, sizeCache);
+        await SeedFeaturesAsync(context);
         await SeedPromoEventsAsync(context);
         await SeedPromoCouponsAsync(context);
+    }
+
+    private static Color GetOrCreateColor(Dictionary<string, Color> cache, string name, string hex)
+    {
+        if (!cache.TryGetValue(name, out var color))
+        {
+            color = new Color { Name = name, HexCode = hex };
+            cache[name] = color;
+        }
+
+        return color;
+    }
+
+    private static Size GetOrCreateSize(Dictionary<string, Size> cache, string label, int sortOrder)
+    {
+        if (!cache.TryGetValue(label, out var size))
+        {
+            size = new Size { Label = label, SortOrder = sortOrder };
+            cache[label] = size;
+        }
+
+        return size;
+    }
+
+    // Builds one ProductVariant per color×size combination (or per color/size alone if only
+    // one dimension applies), each with its own SKU. The product's total stock is split evenly
+    // across variants rather than each variant getting the full amount.
+    private static void BuildVariants(
+        Product product,
+        Dictionary<string, Color> colorCache,
+        Dictionary<string, Size> sizeCache,
+        IReadOnlyList<(string Name, string Hex)> colors,
+        IReadOnlyList<string>? sizes,
+        Func<int, string?>? colorImageSelector = null)
+    {
+        var colorEntities = new List<(Color Entity, string? Image)>();
+        for (var i = 0; i < colors.Count; i++)
+        {
+            var entity = GetOrCreateColor(colorCache, colors[i].Name, colors[i].Hex);
+            var image = colorImageSelector?.Invoke(i) ?? product.ImageUrl;
+            colorEntities.Add((entity, image));
+        }
+
+        var sizeEntities = sizes?.Select((label, i) => GetOrCreateSize(sizeCache, label, i)).ToList();
+
+        var combos = new List<(Color? Color, string? ColorImage, Size? Size)>();
+        if (colorEntities.Count > 0 && sizeEntities is { Count: > 0 })
+        {
+            foreach (var c in colorEntities)
+            {
+                foreach (var s in sizeEntities)
+                {
+                    combos.Add((c.Entity, c.Image, s));
+                }
+            }
+        }
+        else if (colorEntities.Count > 0)
+        {
+            foreach (var c in colorEntities)
+            {
+                combos.Add((c.Entity, c.Image, null));
+            }
+        }
+        else if (sizeEntities is { Count: > 0 })
+        {
+            foreach (var s in sizeEntities)
+            {
+                combos.Add((null, null, s));
+            }
+        }
+
+        if (combos.Count == 0)
+        {
+            return;
+        }
+
+        var stockPerVariant = Math.Max(1, product.StockQuantity / combos.Count);
+        for (var i = 0; i < combos.Count; i++)
+        {
+            var combo = combos[i];
+            product.Variants.Add(new ProductVariant
+            {
+                Color = combo.Color,
+                Size = combo.Size,
+                Sku = $"{product.Sku}-V{i + 1:00}",
+                StockQuantity = stockPerVariant,
+                ImageUrl = combo.ColorImage
+            });
+        }
+    }
+
+    // Backfill for products that predate the Color/Size/ProductVariant system (their
+    // ProductColor/ProductSize rows existed under the old schema but that data is gone once
+    // those tables are dropped). Reconstructs the SAME color/size profile each product would
+    // have gotten from its original seeding path — curated launch items get their curated
+    // colors+sizes, bulk-generated items get their category's color pool + size chart — rather
+    // than falling back to something generic and losing e.g. a boot's shoe sizes.
+    private static async Task SeedMissingVariantsAsync(ApplicationDbContext context, Dictionary<string, Color> colorCache, Dictionary<string, Size> sizeCache)
+    {
+        var productIdsWithVariants = await context.ProductVariants.Select(v => v.ProductId).Distinct().ToListAsync();
+        var productsNeedingVariants = await context.Products
+            .Include(p => p.Category)
+            .Where(p => !productIdsWithVariants.Contains(p.Id))
+            .ToListAsync();
+
+        if (productsNeedingVariants.Count == 0)
+        {
+            return;
+        }
+
+        var random = new Random(12345);
+        var genericColorPool = new[] { Black, CoyoteTan, RangerGreen, Charcoal, OliveDrab, Brown };
+
+        foreach (var product in productsNeedingVariants)
+        {
+            // Curated launch lineup — same colors (+ bonus range) and sizes ApplyVariants
+            // would have assigned, including the per-color gallery-photo swap.
+            if (Variants.TryGetValue(product.Slug, out var curated))
+            {
+                var allColors = curated.Colors.Concat(BonusColors).ToArray();
+                string? ColorImage(int i) => i == 0 || i - 1 >= curated.ExtraImages.Length
+                    ? product.ImageUrl
+                    : PexelsImage(curated.ExtraImages[i - 1], 800, 800);
+
+                BuildVariants(product, colorCache, sizeCache, allColors, curated.Sizes, ColorImage);
+                continue;
+            }
+
+            // Bulk-generated items — same color pool + size chart as their SKU prefix used
+            // at generation time (see the GenerateBulkProducts calls in SeedBulkExpansionAsync).
+            var bulkProfile = product.Sku switch
+            {
+                var sku when sku.StartsWith("WLM-BULK-JKT") => ((string Name, string Hex)[]?)JacketColorPool,
+                var sku when sku.StartsWith("WLM-BULK-HAT") => HatColorPool,
+                var sku when sku.StartsWith("WLM-BULK-SHO") => ShoeColorPool,
+                var sku when sku.StartsWith("WLM-BULK-BLT") => BeltColorPool,
+                var sku when sku.StartsWith("WLM-BULK-CMP") => ComponentColorPool,
+                _ => null
+            };
+            if (bulkProfile != null)
+            {
+                var bulkSizes = product.Sku switch
+                {
+                    var sku when sku.StartsWith("WLM-BULK-JKT") => ClothingSizes,
+                    var sku when sku.StartsWith("WLM-BULK-SHO") => ShoeSizes,
+                    var sku when sku.StartsWith("WLM-BULK-BLT") => GloveSizes,
+                    _ => null
+                };
+                var pick = bulkProfile.OrderBy(_ => random.Next()).Take(Math.Min(3, bulkProfile.Length)).ToList();
+                BuildVariants(product, colorCache, sizeCache, pick, bulkSizes);
+                continue;
+            }
+
+            // Subcategory placeholder items — the profile keyed by their category.
+            if (product.Sku.StartsWith("WLM-SUB-") && product.Category != null &&
+                SubcategoryProductProfile.TryGetValue(product.Category.Slug, out var subProfile))
+            {
+                var pick = subProfile.Colors.OrderBy(_ => random.Next()).Take(Math.Min(3, subProfile.Colors.Length)).ToList();
+                BuildVariants(product, colorCache, sizeCache, pick, subProfile.Sizes);
+                continue;
+            }
+
+            // Anything else (shouldn't normally happen) — a small generic color range.
+            var genericPick = genericColorPool.OrderBy(_ => random.Next()).Take(2 + random.Next(2)).ToList();
+            BuildVariants(product, colorCache, sizeCache, genericPick, null);
+        }
+
+        await context.SaveChangesAsync();
+    }
+
+    // Generic gear attributes used to power the "Features" filter facet — every product gets
+    // a random handful so the facet has realistic counts out of the box.
+    private static readonly string[] FeatureCatalog =
+    {
+        "Waterproof", "Breathable", "MOLLE Compatible", "Quick-Dry", "Reinforced Stitching",
+        "Adjustable Fit", "Multi-Pocket", "Lightweight", "Anti-Slip", "UV Protection",
+        "Heavy-Duty", "Reflective Trim", "Ripstop Fabric"
+    };
+
+    private static async Task SeedFeaturesAsync(ApplicationDbContext context)
+    {
+        if (await context.Features.AnyAsync())
+        {
+            return;
+        }
+
+        var features = FeatureCatalog.Select(name => new Feature { Name = name }).ToList();
+        context.Features.AddRange(features);
+        await context.SaveChangesAsync();
+
+        var random = new Random();
+        var products = await context.Products.ToListAsync();
+        foreach (var product in products)
+        {
+            var pick = features.OrderBy(_ => random.Next()).Take(3);
+            foreach (var feature in pick)
+            {
+                product.Features.Add(feature);
+            }
+        }
+
+        await context.SaveChangesAsync();
     }
 
     // Real-world subcategory taxonomy supplied by the store owner, matched onto the four
@@ -52,7 +261,8 @@ public static class SeedData
         },
         ["bags-and-packs"] = new[]
         {
-            "Bags & Packs", "Backpacks", "Trolley Bags", "Duffel Bags", "Shoulder Bags", "Waist Packs"
+            "Bags & Packs", "Backpacks", "Trolley Bags", "Duffel Bags", "Shoulder Bags", "Waist Packs",
+            "Laptop Bags", "Weapon Bags"
         }
     };
 
@@ -161,8 +371,8 @@ public static class SeedData
                 Description = "Celebrate the Union with our biggest discount of the year.",
                 IconEmoji = "\U0001F389",
                 DiscountPercent = 30,
-                StartDate = new DateTime(today.Year, 11, 29),
-                EndDate = new DateTime(today.Year, 12, 3)
+                StartDate = new DateTime(today.Year, 11, 29, 0, 0, 0, DateTimeKind.Utc),
+                EndDate = new DateTime(today.Year, 12, 3, 0, 0, 0, DateTimeKind.Utc)
             },
             new PromoEvent
             {
@@ -170,8 +380,8 @@ public static class SeedData
                 Description = "Weeks of citywide deals — stock up on field-ready gear.",
                 IconEmoji = "\U0001F6CD️",
                 DiscountPercent = 25,
-                StartDate = new DateTime(today.Year, 12, 10),
-                EndDate = new DateTime(today.Year + 1, 1, 31)
+                StartDate = new DateTime(today.Year, 12, 10, 0, 0, 0, DateTimeKind.Utc),
+                EndDate = new DateTime(today.Year + 1, 1, 31, 0, 0, 0, DateTimeKind.Utc)
             },
             new PromoEvent
             {
@@ -179,8 +389,8 @@ public static class SeedData
                 Description = "Ring in the new year with fresh gear at a fresh price.",
                 IconEmoji = "\U0001F386",
                 DiscountPercent = 20,
-                StartDate = new DateTime(today.Year, 12, 30),
-                EndDate = new DateTime(today.Year + 1, 1, 2)
+                StartDate = new DateTime(today.Year, 12, 30, 0, 0, 0, DateTimeKind.Utc),
+                EndDate = new DateTime(today.Year + 1, 1, 2, 0, 0, 0, DateTimeKind.Utc)
             },
             new PromoEvent
             {
@@ -188,8 +398,8 @@ public static class SeedData
                 Description = "Special pricing on essentials throughout the holy month.",
                 IconEmoji = "\U0001F319",
                 DiscountPercent = 15,
-                StartDate = new DateTime(today.Year + 1, 2, 17),
-                EndDate = new DateTime(today.Year + 1, 3, 19)
+                StartDate = new DateTime(today.Year + 1, 2, 17, 0, 0, 0, DateTimeKind.Utc),
+                EndDate = new DateTime(today.Year + 1, 3, 19, 0, 0, 0, DateTimeKind.Utc)
             },
             new PromoEvent
             {
@@ -197,8 +407,8 @@ public static class SeedData
                 Description = "Eid Mubarak! Celebrate with a storewide discount.",
                 IconEmoji = "\U0001F31F",
                 DiscountPercent = 20,
-                StartDate = new DateTime(today.Year + 1, 3, 20),
-                EndDate = new DateTime(today.Year + 1, 3, 24)
+                StartDate = new DateTime(today.Year + 1, 3, 20, 0, 0, 0, DateTimeKind.Utc),
+                EndDate = new DateTime(today.Year + 1, 3, 24, 0, 0, 0, DateTimeKind.Utc)
             }
         );
 
@@ -307,7 +517,7 @@ public static class SeedData
         return merchant;
     }
 
-    private static async Task SeedCatalogAsync(ApplicationDbContext context, int defaultMerchantId)
+    private static async Task SeedCatalogAsync(ApplicationDbContext context, int defaultMerchantId, Dictionary<string, Color> colorCache, Dictionary<string, Size> sizeCache)
     {
         if (await context.Categories.AnyAsync())
         {
@@ -321,7 +531,7 @@ public static class SeedData
                 Name = "Tactical Apparel",
                 Slug = "tactical-apparel",
                 Description = "Durable field-tested clothing built for movement and long days outdoors.",
-                ImageUrl = PexelsImage(1408986, 800, 500)
+                ImageUrl = PexelsImage(18838688, 800, 500)
             },
             new()
             {
@@ -359,7 +569,7 @@ public static class SeedData
         var products = new List<Product>
         {
             // Tactical Apparel
-            Product("Sentinel Combat Shirt", "sentinel-combat-shirt", categories[0], "Breathable ripstop combat shirt with reinforced elbows.", Aed(54.99m), "WLM-APP-001", 40, true, 1408986, 4.8m, 312),
+            Product("Sentinel Combat Shirt", "sentinel-combat-shirt", categories[0], "Breathable ripstop combat shirt with reinforced elbows.", Aed(54.99m), "WLM-APP-001", 40, true, 18838688, 4.8m, 312),
             Product("Ranger Field Pants", "ranger-field-pants", categories[0], "Stretch-panel field pants with reinforced knees and 8 pockets.", Aed(69.99m), "WLM-APP-002", 35, true, 16983209, 4.6m, 204),
             Product("Vanguard Softshell Jacket", "vanguard-softshell-jacket", categories[0], "Wind-resistant softshell jacket with adjustable hood.", Aed(89.99m), "WLM-APP-003", 25, false, 6368576, 4.8m, 176),
             Product("Trailblazer Base Layer", "trailblazer-base-layer", categories[0], "Moisture-wicking thermal base layer for cold weather ops.", Aed(34.99m), "WLM-APP-004", 50, false, 9522942, 4.5m, 98),
@@ -401,7 +611,7 @@ public static class SeedData
             }
         }
 
-        ApplyVariants(products);
+        ApplyVariants(products, colorCache, sizeCache);
 
         context.Products.AddRange(products);
         await context.SaveChangesAsync();
@@ -410,7 +620,7 @@ public static class SeedData
     // Large catalog expansion: jackets, hats, shoes, belts, and gear components,
     // generated from prefix/type combinations so the storefront has a full multi-page
     // catalog rather than just the curated 21-item launch lineup.
-    private static async Task SeedBulkExpansionAsync(ApplicationDbContext context, int defaultMerchantId)
+    private static async Task SeedBulkExpansionAsync(ApplicationDbContext context, int defaultMerchantId, Dictionary<string, Color> colorCache, Dictionary<string, Size> sizeCache)
     {
         const string bulkSkuMarker = "WLM-BULK-";
         if (await context.Products.AnyAsync(p => p.Sku.StartsWith(bulkSkuMarker)))
@@ -422,11 +632,11 @@ public static class SeedData
         var usedSlugs = new HashSet<string>(await context.Products.Select(p => p.Slug).ToListAsync());
         var products = new List<Product>();
 
-        products.AddRange(GenerateBulkProducts(JacketTypes, categories["tactical-apparel"], "WLM-BULK-JKT", JacketImages, JacketColorPool, ClothingSizes, 300m, 500m, 32, defaultMerchantId, usedSlugs));
-        products.AddRange(GenerateBulkProducts(HatTypes, categories["tactical-apparel"], "WLM-BULK-HAT", HatImages, HatColorPool, null, 60m, 140m, 32, defaultMerchantId, usedSlugs));
-        products.AddRange(GenerateBulkProducts(ShoeTypes, categories["footwear"], "WLM-BULK-SHO", ShoeImages, ShoeColorPool, ShoeSizes, 300m, 550m, 32, defaultMerchantId, usedSlugs));
-        products.AddRange(GenerateBulkProducts(BeltTypes, categories["gear-and-accessories"], "WLM-BULK-BLT", BeltImages, BeltColorPool, GloveSizes, 90m, 180m, 32, defaultMerchantId, usedSlugs));
-        products.AddRange(GenerateBulkProducts(ComponentTypes, categories["gear-and-accessories"], "WLM-BULK-CMP", ComponentImages, ComponentColorPool, null, 40m, 120m, 32, defaultMerchantId, usedSlugs));
+        products.AddRange(GenerateBulkProducts(JacketTypes, categories["tactical-apparel"], "WLM-BULK-JKT", JacketImages, JacketColorPool, ClothingSizes, 300m, 500m, 32, defaultMerchantId, usedSlugs, colorCache, sizeCache));
+        products.AddRange(GenerateBulkProducts(HatTypes, categories["tactical-apparel"], "WLM-BULK-HAT", HatImages, HatColorPool, null, 60m, 140m, 32, defaultMerchantId, usedSlugs, colorCache, sizeCache));
+        products.AddRange(GenerateBulkProducts(ShoeTypes, categories["footwear"], "WLM-BULK-SHO", ShoeImages, ShoeColorPool, ShoeSizes, 300m, 550m, 32, defaultMerchantId, usedSlugs, colorCache, sizeCache));
+        products.AddRange(GenerateBulkProducts(BeltTypes, categories["gear-and-accessories"], "WLM-BULK-BLT", BeltImages, BeltColorPool, GloveSizes, 90m, 180m, 32, defaultMerchantId, usedSlugs, colorCache, sizeCache));
+        products.AddRange(GenerateBulkProducts(ComponentTypes, categories["gear-and-accessories"], "WLM-BULK-CMP", ComponentImages, ComponentColorPool, null, 40m, 120m, 32, defaultMerchantId, usedSlugs, colorCache, sizeCache));
 
         context.Products.AddRange(products);
         await context.SaveChangesAsync();
@@ -449,7 +659,7 @@ public static class SeedData
     private static readonly string[] BeltTypes = { "Tactical Belt", "Gun Belt", "Duty Belt", "Web Belt", "EDC Belt" };
     private static readonly string[] ComponentTypes = { "MOLLE Pouch", "Mag Pouch", "Admin Pouch", "Utility Pouch", "Chest Rig", "Gear Mount", "Sling Strap" };
 
-    private static readonly int[] JacketImages = { 37678157, 32132582, 6368576, 18832219, 22064415, 19928303, 32039137, 1408986, 669291, 7468101, 30217011, 15814566, 33648165, 34409819, 25525596, 6786309, 7416037, 9522942 };
+    private static readonly int[] JacketImages = { 37678157, 32132582, 6368576, 18832219, 22064415, 19928303, 32039137, 669291, 7468101, 30217011, 15814566, 33648165, 34409819, 25525596, 6786309, 7416037, 9522942 };
     private static readonly int[] HatImages = { 8449785, 8443673, 8443671, 17216548, 16919435, 16047421, 17216544, 17179123, 30415388 };
     private static readonly int[] ShoeImages = { 13020558, 1047966, 32189248, 4275517, 17115801, 18236151, 4589107, 13882914, 9654860, 28991265, 7026406, 9654861, 4314202, 11280664, 6555893, 31954808, 29490907, 10781162, 35120029, 12983267, 11061924, 8729056, 5579004, 5876412, 31650335 };
     private static readonly int[] BeltImages = { 31959216, 31959214, 31959215, 31323080, 31959217, 31367058, 35222039, 1023937, 7679471, 6371786, 35322152, 33879839, 34443362, 37483619, 38053200, 34443363, 38053161, 38053187, 6654765, 35322161, 7679660 };
@@ -471,7 +681,9 @@ public static class SeedData
         decimal maxPriceAed,
         int count,
         int merchantId,
-        HashSet<string> usedSlugs)
+        HashSet<string> usedSlugs,
+        Dictionary<string, Color> colorCache,
+        Dictionary<string, Size> sizeCache)
     {
         var result = new List<Product>();
         var priceRange = maxPriceAed - minPriceAed;
@@ -514,25 +726,13 @@ public static class SeedData
             };
 
             var numColors = 2 + (index % 2);
+            var selectedColors = new List<(string Name, string Hex)>();
             for (int c = 0; c < numColors && c < colorPool.Length; c++)
             {
-                var color = colorPool[(index + c) % colorPool.Length];
-                product.Colors.Add(new ProductColor
-                {
-                    Name = color.Name,
-                    HexCode = color.Hex,
-                    ImageUrl = product.ImageUrl,
-                    SortOrder = c
-                });
+                selectedColors.Add(colorPool[(index + c) % colorPool.Length]);
             }
 
-            if (sizes != null)
-            {
-                for (int s = 0; s < sizes.Length; s++)
-                {
-                    product.Sizes.Add(new ProductSize { Label = sizes[s], SortOrder = s });
-                }
-            }
+            BuildVariants(product, colorCache, sizeCache, selectedColors, sizes);
 
             var altImage = imagePool[(index + 3) % imagePool.Length];
             if (altImage != image)
@@ -601,7 +801,7 @@ public static class SeedData
 
     // Gives every subcategory (Camouflage Tape, Trolley Bags, etc.) at least a few real,
     // purchasable products so browsing by subcategory never shows an empty page.
-    private static async Task SeedSubcategoryPlaceholderProductsAsync(ApplicationDbContext context, int defaultMerchantId)
+    private static async Task SeedSubcategoryPlaceholderProductsAsync(ApplicationDbContext context, int defaultMerchantId, Dictionary<string, Color> colorCache, Dictionary<string, Size> sizeCache)
     {
         const string skuMarker = "WLM-SUB-";
         if (await context.Products.AnyAsync(p => p.Sku.StartsWith(skuMarker)))
@@ -662,19 +862,13 @@ public static class SeedData
                 skuCounter++;
 
                 var numColors = Math.Min(3, profile.Colors.Length);
+                var selectedColors = new List<(string Name, string Hex)>();
                 for (int c = 0; c < numColors; c++)
                 {
-                    var color = profile.Colors[(i + c) % profile.Colors.Length];
-                    product.Colors.Add(new ProductColor { Name = color.Name, HexCode = color.Hex, ImageUrl = product.ImageUrl, SortOrder = c });
+                    selectedColors.Add(profile.Colors[(i + c) % profile.Colors.Length]);
                 }
 
-                if (profile.Sizes != null)
-                {
-                    for (int s = 0; s < profile.Sizes.Length; s++)
-                    {
-                        product.Sizes.Add(new ProductSize { Label = profile.Sizes[s], SortOrder = s });
-                    }
-                }
+                BuildVariants(product, colorCache, sizeCache, selectedColors, profile.Sizes);
 
                 products.Add(product);
             }
@@ -713,7 +907,7 @@ public static class SeedData
         ["frontier-camp-stove"] = (new[] { 8911191, 6324492 }, new[] { Black, Silver }, null)
     };
 
-    private static void ApplyVariants(List<Product> products)
+    private static void ApplyVariants(List<Product> products, Dictionary<string, Color> colorCache, Dictionary<string, Size> sizeCache)
     {
         foreach (var product in products)
         {
@@ -733,35 +927,15 @@ public static class SeedData
             }
 
             var allColors = variant.Colors.Concat(BonusColors).ToArray();
-            for (int i = 0; i < allColors.Length; i++)
-            {
-                // First color shows the product's main photo; each additional color
-                // reuses one of the gallery photos so picking a color swaps the image.
-                // Colors beyond the available gallery photos fall back to the main photo.
-                var colorImageUrl = i == 0 || i - 1 >= variant.ExtraImages.Length
-                    ? product.ImageUrl
-                    : PexelsImage(variant.ExtraImages[i - 1], 800, 800);
 
-                product.Colors.Add(new ProductColor
-                {
-                    Name = allColors[i].Name,
-                    HexCode = allColors[i].Hex,
-                    ImageUrl = colorImageUrl,
-                    SortOrder = i
-                });
-            }
+            // First color shows the product's main photo; each additional color reuses one
+            // of the gallery photos so picking a color swaps the image. Colors beyond the
+            // available gallery photos fall back to the main photo.
+            string? ColorImage(int i) => i == 0 || i - 1 >= variant.ExtraImages.Length
+                ? product.ImageUrl
+                : PexelsImage(variant.ExtraImages[i - 1], 800, 800);
 
-            if (variant.Sizes != null)
-            {
-                for (int i = 0; i < variant.Sizes.Length; i++)
-                {
-                    product.Sizes.Add(new ProductSize
-                    {
-                        Label = variant.Sizes[i],
-                        SortOrder = i
-                    });
-                }
-            }
+            BuildVariants(product, colorCache, sizeCache, allColors, variant.Sizes, ColorImage);
         }
     }
 

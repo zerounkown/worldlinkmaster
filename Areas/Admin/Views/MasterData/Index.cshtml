@@ -1,0 +1,52 @@
+@using WorldLinkMaster.Web.Models.ViewModels
+@model MasterDataImportResult
+@{
+    ViewData["Title"] = Localizer["Master Data Import"];
+}
+
+<h1>@Localizer["Master Data Import"]</h1>
+<p class="text-muted">@Localizer["Imports Brands, Categories, Colors, Size Groups, Sizes, and the Attribute Dictionary from a WLM_02_Master_Data.xlsx-style workbook. Run this before the Product Importer — products reference these codes."]</p>
+
+@if (Model.HasActivity)
+{
+    <div class="alert @(Model.Errors.Count > 0 ? "alert-warning" : "alert-success")">
+        <div class="row g-2">
+            <div class="col-6 col-md-4">@Localizer["Brands"]: <strong>@Model.BrandsCreated @Localizer["created"], @Model.BrandsUpdated @Localizer["updated"]</strong></div>
+            <div class="col-6 col-md-4">@Localizer["Categories"]: <strong>@Model.CategoriesCreated @Localizer["created"], @Model.CategoriesUpdated @Localizer["updated"]</strong></div>
+            <div class="col-6 col-md-4">@Localizer["Subcategories"]: <strong>@Model.SubcategoriesCreated @Localizer["created"], @Model.SubcategoriesUpdated @Localizer["updated"]</strong></div>
+            <div class="col-6 col-md-4">@Localizer["Colors"]: <strong>@Model.ColorsCreated @Localizer["created"], @Model.ColorsUpdated @Localizer["updated"]</strong></div>
+            <div class="col-6 col-md-4">@Localizer["Size Groups"]: <strong>@Model.SizeGroupsCreated @Localizer["created"], @Model.SizeGroupsUpdated @Localizer["updated"]</strong></div>
+            <div class="col-6 col-md-4">@Localizer["Sizes"]: <strong>@Model.SizesCreated @Localizer["created"], @Model.SizesUpdated @Localizer["updated"]</strong></div>
+            <div class="col-6 col-md-4">@Localizer["Attributes"]: <strong>@Model.AttributesCreated @Localizer["created"], @Model.AttributesUpdated @Localizer["updated"]</strong></div>
+        </div>
+
+        @if (Model.Errors.Count > 0)
+        {
+            <div class="mt-2">
+                <strong>@Localizer["{0} row(s) had a problem", Model.Errors.Count]</strong>:
+                <ul class="mb-0">
+                    @foreach (var error in Model.Errors)
+                    {
+                        <li>@error</li>
+                    }
+                </ul>
+            </div>
+        }
+    </div>
+}
+
+<div class="summary-box">
+    <h4>@Localizer["Upload a Master Data workbook"]</h4>
+    <p>
+        @Localizer["Expected sheets: Brands, Categories, Colors, Size Groups, Sizes, Attribute Dictionary — each with an Action column (ADD or UPDATE) and a Code column that rows are matched on."]
+    </p>
+    <p>
+        @Localizer["Categories with a blank Parent Category Code become top-level categories; rows with a Parent Category Code become subcategories under that parent (only 2 levels are supported, matching the rest of the site)."]
+    </p>
+    <form asp-action="Import" method="post" enctype="multipart/form-data" class="d-flex gap-2">
+        <input type="file" name="file" class="form-control" accept=".xlsx" required />
+        <button type="submit" class="btn btn-primary text-nowrap"><i class="bi bi-upload"></i> @Localizer["Upload"]</button>
+    </form>
+</div>
+
+<a class="mt-4 d-inline-block" asp-controller="ProductImport" asp-action="Index">@Localizer["Next: Product Import"] &rarr;</a>

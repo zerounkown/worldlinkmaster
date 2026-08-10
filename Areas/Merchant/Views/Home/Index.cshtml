@@ -5,7 +5,7 @@
     var payouts = ViewBag.RecentPayouts as List<MerchantPayout> ?? new List<MerchantPayout>();
 }
 
-<h1>@Localizer["Welcome, {0}", merchant?.BusinessName]</h1>
+<h1>@Localizer["Welcome, {0}", merchant?.BusinessName ?? string.Empty]</h1>
 
 @if (merchant != null && !merchant.StripeOnboardingComplete)
 {

@@ -108,3 +108,13 @@
     right: auto;
   }
 }
+
+/* .pdp-content-col: in RTL this column is mirrored to the left side, so its trailing
+   (outer, container-facing) edge is the LEFT side, not the right — the opposite of the LTR
+   fix in site.css. Restore the normal right-side gutter padding (24px, matching .g-5) and
+   drop the left-side one instead, so the purchase card's outer edge bleeds flush with the
+   container the same way the gallery column does on its own outer (right, in RTL) side. */
+.pdp-content-col {
+  padding-right: 24px;
+  padding-left: 0;
+}

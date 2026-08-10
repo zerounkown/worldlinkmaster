@@ -5,7 +5,7 @@
   --wlm-forest-dark: #0d0d0d;
   --wlm-forest: #1a1a1a;
   --wlm-forest-mid: #333333;
-  --wlm-sand: #f5c518;
+  --wlm-sand: #f0d264;
   --wlm-sand-light: #eaeaea;
   --wlm-cream: #ffffff;
   --wlm-ink: #111111;
@@ -14,6 +14,7 @@
   --wlm-danger: #b5482c;
   --font-heading: 'Oswald', sans-serif;
   --font-body: 'Inter', sans-serif;
+
 }
 
 * {
@@ -78,7 +79,7 @@ a:hover {
   justify-content: center;
   gap: 10px;
   background: var(--wlm-sand);
-  color: var(--wlm-forest-dark);
+  color: red;
   text-align: center;
   padding: 9px 16px;
   font-size: 0.85rem;
@@ -89,16 +90,16 @@ a:hover {
 }
 
 .sale-strip:hover {
-  color: var(--wlm-forest-dark);
+  color: red;
 }
 
 .sale-strip.welcome-strip {
   background: var(--wlm-sand);
-  color: var(--wlm-forest-dark);
+  color: red;
 }
 
 .sale-strip.welcome-strip strong {
-  color: var(--wlm-forest-dark);
+  color: red;
 }
 
 .sale-strip.welcome-strip .sale-strip-cta {
@@ -141,38 +142,6 @@ a:hover {
   display: flex;
   align-items: center;
   gap: 14px;
-}
-
-.lang-switch {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.lang-switch-btn {
-  background: none;
-  border: none;
-  padding: 0;
-  color: var(--wlm-sand-light);
-  opacity: 0.65;
-  font-size: 0.8rem;
-  cursor: pointer;
-  font-family: var(--font-body);
-}
-
-.lang-switch-btn:hover {
-  opacity: 0.9;
-}
-
-.lang-switch-btn.active {
-  opacity: 1;
-  font-weight: 700;
-  text-decoration: underline;
-}
-
-.lang-switch-sep {
-  opacity: 0.4;
-  font-size: 0.75rem;
 }
 
 /* Header */
@@ -666,7 +635,8 @@ a:hover {
   margin: 0;
 }
 
-.cart-link {
+.cart-link,
+.favorites-link {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -675,7 +645,8 @@ a:hover {
   white-space: nowrap;
 }
 
-.cart-label {
+.cart-label,
+.favorites-label {
   font-family: var(--font-heading);
   font-size: 0.9rem;
   font-weight: 600;
@@ -760,8 +731,135 @@ a:hover {
   flex-shrink: 0;
 }
 
-.cart-count {
+.cart-count,
+.favorites-count {
   font-weight: 700;
+}
+
+/* Heart toggle — overlaid on product-card images and next to Add to Cart on the detail page. */
+.favorite-toggle {
+  position: absolute;
+  top: 10px;
+  inset-inline-end: 10px;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.9);
+  border: none;
+  color: var(--wlm-ink);
+  font-size: 1rem;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  transition: transform 0.15s ease, color 0.15s ease;
+}
+
+.favorite-toggle:hover {
+  transform: scale(1.08);
+}
+
+.favorite-toggle.active,
+.favorite-toggle.active:hover {
+  color: #e0334f;
+}
+
+.favorite-toggle-detail {
+  position: static;
+  width: 46px;
+  height: 46px;
+  flex-shrink: 0;
+  background: white;
+  border: 1px solid var(--wlm-sand-light);
+  font-size: 1.2rem;
+}
+
+.empty-favorites {
+  text-align: center;
+  padding: 64px 16px;
+}
+
+.empty-favorites i {
+  font-size: 2.5rem;
+  color: var(--wlm-sand);
+  margin-bottom: 12px;
+  display: inline-block;
+}
+
+.empty-favorites .btn-wlm {
+  display: inline-block;
+  margin-top: 16px;
+}
+
+/* Compare page (Views/Compare/Index.cshtml) */
+.compare-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: white;
+}
+
+.compare-table th,
+.compare-table td {
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--wlm-sand-light);
+  text-align: center;
+  vertical-align: middle;
+  font-size: 0.9rem;
+}
+
+.compare-row-label {
+  text-align: start;
+  white-space: nowrap;
+  color: var(--wlm-forest-mid);
+  font-weight: 600;
+  background: var(--wlm-cream);
+}
+
+.compare-col {
+  position: relative;
+  min-width: 200px;
+}
+
+.compare-remove-form {
+  position: absolute;
+  top: 6px;
+  inset-inline-end: 6px;
+}
+
+.compare-remove-btn {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 1px solid var(--wlm-sand-light);
+  background: white;
+  color: var(--wlm-ink);
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.compare-remove-btn:hover {
+  background: var(--wlm-danger);
+  color: white;
+  border-color: var(--wlm-danger);
+}
+
+.compare-image {
+  width: 100%;
+  max-width: 140px;
+  aspect-ratio: 1 / 1;
+  object-fit: cover;
+  border-radius: 8px;
+  display: block;
+  margin: 0 auto 8px;
+}
+
+.compare-name {
+  display: block;
+  font-weight: 700;
+  color: var(--wlm-forest-dark);
 }
 
 /* Menu toggle button */
@@ -1057,12 +1155,82 @@ a:hover {
   }
 }
 
+/* Homepage top banner carousel (Views/Shared/HomeBanner, admin-managed under Home Banners).
+   Full-bleed, wide "hero strip" aspect ratio on desktop; a taller ratio on mobile so a wide
+   photo doesn't shrink down to a sliver on narrow screens. */
+.home-banner-carousel {
+  margin-bottom: 0;
+}
+
+.home-banner-image {
+  aspect-ratio: 21 / 9;
+  object-fit: cover;
+}
+
+.home-banner-slide-link {
+  display: block;
+  position: relative;
+  text-decoration: none;
+}
+
+.home-banner-caption {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 24px 6%;
+  background: linear-gradient(90deg, rgba(5, 5, 5, 0.65) 0%, rgba(5, 5, 5, 0.15) 55%, rgba(5, 5, 5, 0) 80%);
+}
+
+.home-banner-caption h2 {
+  color: white;
+  font-size: 2.2rem;
+  letter-spacing: 0.03em;
+  margin-bottom: 8px;
+  max-width: 600px;
+}
+
+.home-banner-caption p {
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 1.05rem;
+  max-width: 480px;
+  margin-bottom: 0;
+}
+
+.home-banner-carousel .carousel-control-prev,
+.home-banner-carousel .carousel-control-next {
+  width: 8%;
+}
+
+@media (max-width: 767.98px) {
+  .home-banner-image {
+    aspect-ratio: 4 / 3;
+  }
+
+  .home-banner-caption {
+    padding: 18px 6%;
+    background: linear-gradient(180deg, rgba(5, 5, 5, 0.15) 0%, rgba(5, 5, 5, 0.75) 100%);
+    justify-content: flex-end;
+  }
+
+  .home-banner-caption h2 {
+    font-size: 1.5rem;
+    max-width: 100%;
+  }
+
+  .home-banner-caption p {
+    font-size: 0.9rem;
+    max-width: 100%;
+  }
+}
+
 /* Hero */
 .hero {
-  background-image: linear-gradient(120deg, rgba(5, 5, 5, 0.92), rgba(10, 10, 10, 0.82) 55%, rgba(60, 60, 60, 0.7)),
-    url('https://images.pexels.com/photos/5252394/pexels-photo-5252394.jpeg?auto=compress&cs=tinysrgb&w=1920&h=1200&dpr=1');
+  background-image: linear-gradient(120deg, rgba(5, 5, 5, 0.78), rgba(10, 10, 10, 0.6) 55%, rgba(30, 20, 15, 0.45)),
+    url('/images/hero-soldier.jpg');
   background-size: cover;
-  background-position: center 30%;
+  background-position: center 15%;
   color: var(--wlm-cream);
   padding: 110px 0;
   margin-bottom: 40px;
@@ -1307,25 +1475,34 @@ a:hover {
 
 .collections-grid {
   display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 8px;
+  flex-wrap: nowrap;
+  gap: 16px;
   margin-bottom: 56px;
+  overflow-x: auto;
 }
 
 .collections-tile {
   position: relative;
-  display: block;
-  flex: 1 1 320px;
-  max-width: 420px;
-  aspect-ratio: 4 / 3;
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 0;
+  min-width: 190px;
   overflow: hidden;
   text-decoration: none;
-  transition: box-shadow 0.3s ease;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
 }
 
 .collections-tile:hover {
-  box-shadow: 0 14px 30px rgba(0, 0, 0, 0.35);
+  transform: translateY(-5px);
+  box-shadow: 0 14px 30px rgba(0, 0, 0, 0.22);
+}
+
+.collections-tile-img {
+  aspect-ratio: 4 / 3;
+  overflow: hidden;
 }
 
 .collections-tile img {
@@ -1339,35 +1516,365 @@ a:hover {
   transform: scale(1.08);
 }
 
-.collections-tile::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(180deg, rgba(0, 0, 0, 0.35) 0%, rgba(0, 0, 0, 0.4) 60%, rgba(0, 0, 0, 0.6) 100%);
-}
-
-.collections-tile-label {
-  position: absolute;
-  inset: 0;
-  z-index: 2;
+.collections-tile-footer {
   display: flex;
   align-items: center;
-  justify-content: center;
-  text-align: center;
-  color: white;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 14px 16px;
+}
+
+.collections-tile-name-group {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.collections-tile-name {
+  color: var(--wlm-ink);
   font-family: var(--font-heading);
   font-weight: 700;
   text-transform: uppercase;
-  font-size: 1.6rem;
-  letter-spacing: 0.03em;
-  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.7);
-  padding: 0 16px;
-  box-sizing: border-box;
-  transition: transform 0.3s ease;
+  font-size: 0.95rem;
+  letter-spacing: 0.02em;
 }
 
-.collections-tile:hover .collections-tile-label {
-  transform: scale(1.04);
+.collections-tile-tag {
+  font-weight: 500;
+  text-transform: none;
+  letter-spacing: normal;
+  font-size: 0.72rem;
+  color: var(--wlm-ink-soft, #8a8a8a);
+}
+
+.collections-tile-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--wlm-forest-mid);
+  font-size: 0.8rem;
+  font-weight: 600;
+  white-space: nowrap;
+  transition: color 0.2s ease, transform 0.2s ease;
+}
+
+.collections-tile:hover .collections-tile-cta {
+  color: var(--wlm-sand);
+  transform: translateX(3px);
+}
+
+[dir="rtl"] .collections-tile:hover .collections-tile-cta {
+  transform: translateX(-3px);
+}
+
+/* Subcategory tile row — per-category "shop by type" strip shown above the product
+   grid (currently only wired up for Bags & Packs). Same tile language as
+   .brand-tile (white card, contained image, label below) but with an active-state
+   border so the currently-selected subcategory stands out, matching the reference
+   the store owner supplied. */
+.subcat-tile-row {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 12px;
+  overflow-x: auto;
+  margin-bottom: 24px;
+  padding-bottom: 4px;
+}
+
+.subcat-tile {
+  flex: 0 0 130px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  text-decoration: none;
+  background: white;
+  border: 1px solid var(--wlm-sand-light);
+  border-radius: 8px;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.subcat-tile:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 10px 22px rgba(0, 0, 0, 0.12);
+  border-color: var(--wlm-sand);
+}
+
+.subcat-tile.active {
+  border: 2px solid var(--wlm-sand);
+}
+
+.subcat-tile-img {
+  aspect-ratio: 1 / 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  background: white;
+}
+
+.subcat-tile-img img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.subcat-tile-label {
+  padding: 8px 6px;
+  text-align: center;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--wlm-ink);
+  border-top: 1px solid var(--wlm-sand-light);
+}
+
+/* "Shop by Brand" carousel — reuses the .product-carousel arrow/track/scroll-snap
+   mechanics (site.js already wires up any ".product-carousel" generically), with
+   text-logotype tiles since we don't have real brand artwork to show instead. */
+/* Wraps everything on the homepage below the hero (which keeps its own dark background
+   image) — sections that need to stay dark (Own Brand banner, Wholesale banner) set
+   their own background-color and override this. Shop by Brand sits directly on this
+   gray backdrop; only its individual tiles are white. */
+.homepage-body {
+  background-color: #EDEDED;
+}
+
+.brand-carousel {
+  margin-bottom: 24px;
+}
+
+.brand-carousel .product-carousel-track {
+  scrollbar-width: none;
+}
+
+.brand-carousel .product-carousel-track::-webkit-scrollbar {
+  display: none;
+}
+
+.brand-carousel-item.brand-tile {
+  flex: 0 0 260px;
+  scroll-snap-align: start;
+}
+
+.brand-tile {
+  flex: 1 1 150px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 150px;
+  padding: 24px 28px;
+  background: white;
+  border: 1px solid var(--wlm-sand-light);
+  border-radius: 8px;
+  text-decoration: none;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.brand-tile:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 10px 22px rgba(0, 0, 0, 0.12);
+  border-color: var(--wlm-sand);
+}
+
+.brand-tile-mark {
+  flex-shrink: 0;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: var(--wlm-forest-dark);
+  color: var(--wlm-sand);
+  font-family: var(--font-heading);
+  font-weight: 700;
+  font-size: 0.9rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-inline-end: 10px;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.brand-tile:hover .brand-tile-mark {
+  background: var(--wlm-sand);
+  color: var(--wlm-forest-dark);
+}
+
+.brand-tile-name {
+  font-family: var(--font-heading);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-size: 0.95rem;
+  color: var(--wlm-forest-dark);
+  text-align: center;
+}
+
+.brand-tile-logo {
+  max-width: 100%;
+  max-height: 100px;
+  width: auto;
+  object-fit: contain;
+}
+
+.brand-sidebar-tile-logo {
+  max-width: 100%;
+  max-height: 44px;
+  width: auto;
+  object-fit: contain;
+}
+
+/* Featured / Best Selling / New Arrivals shown side by side in one row, each its own
+   labeled column with a divider between them — rather than three full-width stacked
+   sections. */
+.product-columns-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 32px;
+}
+
+.product-column {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.product-column + .product-column {
+  border-inline-start: 1px solid var(--wlm-sand-light);
+  padding-inline-start: 32px;
+}
+
+.product-grid-column {
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+}
+
+@media (max-width: 767.98px) {
+  .product-columns-row {
+    flex-direction: column;
+    gap: 40px;
+  }
+
+  .product-column + .product-column {
+    border-inline-start: none;
+    padding-inline-start: 0;
+    border-top: 1px solid var(--wlm-sand-light);
+    padding-top: 24px;
+  }
+}
+
+/* "Our Own Brand" banner — dark image banner with a decorative play button, mirrors
+   .spotlight-banner's overlay pattern but content is left-aligned and has no product data. */
+.own-brand-banner {
+  position: relative;
+  background: linear-gradient(120deg, var(--wlm-forest-dark) 0%, var(--wlm-forest-mid) 100%);
+  background-size: cover;
+  background-position: center;
+  margin-bottom: 56px;
+  overflow: hidden;
+}
+
+.own-brand-banner-inner {
+  position: relative;
+  min-height: 320px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  flex-wrap: wrap;
+  padding: 48px 0;
+}
+
+.own-brand-content {
+  max-width: 480px;
+  color: white;
+}
+
+.own-brand-eyebrow {
+  display: block;
+  font-family: var(--font-heading);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.8rem;
+  color: var(--wlm-sand);
+  margin-bottom: 8px;
+}
+
+.own-brand-content h2 {
+  color: white;
+  font-size: 2.6rem;
+  letter-spacing: 0.04em;
+  margin-bottom: 14px;
+}
+
+.own-brand-content p {
+  color: rgba(255, 255, 255, 0.85);
+  margin-bottom: 20px;
+}
+
+.own-brand-play {
+  flex-shrink: 0;
+  width: 84px;
+  height: 84px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.6);
+  background: rgba(255, 255, 255, 0.12);
+  color: white;
+  font-size: 1.8rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background-color 0.2s ease, transform 0.2s ease;
+}
+
+.own-brand-play:hover {
+  background: var(--wlm-sand);
+  color: var(--wlm-forest-dark);
+  transform: scale(1.06);
+}
+
+/* Government / bulk-supply banner with stat counters */
+.wholesale-banner {
+  background: var(--wlm-forest-dark);
+  margin-bottom: 56px;
+}
+
+.wholesale-banner-inner {
+  padding: 48px 0;
+}
+
+.wholesale-content {
+  max-width: 720px;
+}
+
+.wholesale-content h2 {
+  color: white;
+  font-size: 1.9rem;
+  margin-bottom: 14px;
+}
+
+.wholesale-content p {
+  color: rgba(255, 255, 255, 0.8);
+  margin-bottom: 20px;
+}
+
+.wholesale-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 20px;
+  margin-top: 32px;
+  max-width: 640px;
+}
+
+.wholesale-stat strong {
+  display: block;
+  font-family: var(--font-heading);
+  font-size: 1.7rem;
+  color: var(--wlm-sand);
+}
+
+.wholesale-stat span {
+  display: block;
+  font-size: 0.82rem;
+  color: rgba(255, 255, 255, 0.75);
 }
 
 /* Mission-loadout banner — three large unlabeled photo tiles, tactical-brand style */
@@ -1452,6 +1959,16 @@ a:hover {
 .loadout-tile:hover .loadout-tile-label {
   transform: translateY(-3px);
   color: var(--wlm-sand);
+}
+
+.loadout-tile-tag {
+  display: block;
+  margin-top: 2px;
+  font-weight: 500;
+  text-transform: none;
+  letter-spacing: normal;
+  font-size: 0.72rem;
+  color: rgba(255, 255, 255, 0.75);
 }
 
 /* Best-selling carousel — arrow-controlled horizontal scroller, tactical-brand style */
@@ -1655,60 +2172,300 @@ a:hover {
   letter-spacing: 0.04em;
 }
 
-/* Sidebar price-range filter */
-.price-filter-form {
-  margin-top: 10px;
+/* Sidebar "Shop by Brand" — logo-card tiles (same white-card wordmark treatment as the
+   homepage brand row), in a compact grid that scrolls internally past a handful of rows
+   so it doesn't push the price filter and product grid far down the page. */
+.brand-sidebar-all {
+  display: inline-block;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--wlm-forest-mid);
+  margin-bottom: 10px;
 }
 
-.price-filter-inputs {
+.brand-sidebar-all.active {
+  color: var(--wlm-forest-dark);
+  text-decoration: underline;
+}
+
+.brand-sidebar-grid {
   display: flex;
-  align-items: flex-end;
+  flex-direction: column;
+  gap: 10px;
+  max-height: 520px;
+  overflow-y: auto;
+  padding: 2px 4px 2px 2px;
+}
+
+.brand-sidebar-tile {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 76px;
+  padding: 14px 16px;
+  background: white;
+  border: 1px solid var(--wlm-sand-light);
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  text-decoration: none;
+  text-align: center;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+}
+
+.brand-sidebar-tile:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 22px rgba(0, 0, 0, 0.14);
+  border-color: var(--wlm-sand);
+}
+
+.brand-sidebar-tile.active {
+  border-color: var(--wlm-sand);
+  background: var(--wlm-sand-light);
+}
+
+.brand-sidebar-tile-name {
+  font-family: var(--font-heading);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-size: 1.15rem;
+  color: var(--wlm-forest-dark);
+  line-height: 1.25;
+}
+
+/* Sidebar "Filter Results" panel — one form, one collapsible accordion per facet
+   (category/subcategory, brand, color, price, size, features, availability, rating). */
+.filter-panel {
+  position: sticky;
+  top: 12px;
+}
+
+.filter-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.filter-panel-header h5 {
+  margin: 0;
+}
+
+.filter-clear-all {
+  font-size: 0.8rem;
+  color: var(--wlm-forest-mid);
+  text-decoration: underline;
+}
+
+.filter-accordion {
+  border-top: 1px solid var(--wlm-sand-light);
+  padding-top: 12px;
+  padding-bottom: 12px;
+}
+
+.filter-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: var(--wlm-ink);
+  list-style: none;
+}
+
+.filter-header::-webkit-details-marker {
+  display: none;
+}
+
+.filter-header i {
+  color: var(--wlm-forest-mid);
+  font-size: 0.85rem;
+  transition: transform 0.2s ease;
+}
+
+.filter-accordion:not([open]) .filter-header i {
+  transform: rotate(180deg);
+}
+
+.filter-body {
+  margin-top: 14px;
+}
+
+.filter-checkbox-row,
+.filter-radio-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.88rem;
+  color: var(--wlm-ink);
+  padding: 4px 0;
+  cursor: pointer;
+}
+
+.filter-checkbox-row input,
+.filter-radio-row input {
+  accent-color: var(--wlm-sand);
+  width: 15px;
+  height: 15px;
+  flex-shrink: 0;
+}
+
+.filter-checkbox-row span:first-of-type,
+.filter-radio-row .filter-stars {
+  flex: 1;
+}
+
+.filter-count {
+  color: var(--wlm-forest-mid);
+  font-size: 0.8rem;
+}
+
+.filter-extra {
+  display: none;
+}
+
+.filter-extra.filter-extra-visible {
+  display: flex;
+}
+
+.filter-show-more {
+  background: none;
+  border: none;
+  padding: 4px 0;
+  color: var(--wlm-forest-mid);
+  font-size: 0.82rem;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.filter-swatch-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.filter-swatch {
+  position: relative;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--swatch-color, #ccc);
+  border: 2px solid white;
+  box-shadow: 0 0 0 1px var(--wlm-sand-light);
+  cursor: pointer;
+  display: block;
+}
+
+.filter-swatch input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  margin: 0;
+  cursor: pointer;
+}
+
+.filter-swatch.active {
+  box-shadow: 0 0 0 2px var(--wlm-sand);
+}
+
+.filter-stars {
+  display: inline-flex;
+  gap: 1px;
+  color: var(--wlm-sand);
+  font-size: 0.85rem;
+}
+
+.filter-stars .bi-star {
+  color: var(--wlm-sand-light);
+}
+
+.price-range-slider {
+  position: relative;
+  height: 18px;
+  margin: 0 8px 16px;
+  /* Forced LTR: the slider's own left-to-right math (0% at the left handle) must stay
+     predictable regardless of the page's RTL direction — same reasoning as the numeric
+     form inputs noted in Program.cs. */
+  direction: ltr;
+}
+
+.price-range-track {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: var(--wlm-sand-light);
+  border-radius: 2px;
+  transform: translateY(-50%);
+}
+
+.price-range-fill {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: var(--wlm-sand);
+  border-radius: 2px;
+}
+
+.price-range-input {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 18px;
+  margin: 0;
+  background: transparent;
+  pointer-events: none;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.price-range-input::-webkit-slider-thumb {
+  pointer-events: auto;
+  -webkit-appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--wlm-sand);
+  border: 2px solid white;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
+  cursor: pointer;
+}
+
+.price-range-input::-moz-range-thumb {
+  pointer-events: auto;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--wlm-sand);
+  border: 2px solid white;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
+  cursor: pointer;
+}
+
+.price-range-input::-webkit-slider-runnable-track,
+.price-range-input::-moz-range-track {
+  background: transparent;
+}
+
+.price-range-values {
+  display: flex;
+  align-items: center;
   gap: 8px;
   margin-bottom: 12px;
 }
 
-.price-filter-field {
+.price-range-values input {
   flex: 1;
   min-width: 0;
-}
-
-.price-filter-field label {
-  display: block;
-  font-size: 0.75rem;
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-  color: var(--wlm-forest-mid);
-  margin-bottom: 4px;
-}
-
-.price-filter-field input {
-  width: 100%;
   padding: 8px 10px;
-  border: 1px solid var(--wlm-sand-light);
+  border: 1px solid var(--wlm-sand);
   border-radius: 4px;
   font-family: var(--font-body);
   font-size: 0.9rem;
-}
-
-.price-filter-sep {
-  padding-bottom: 10px;
-  color: var(--wlm-forest-mid);
-}
-
-.price-filter-btn.btn-wlm {
-  width: 100%;
-  padding: 9px 16px;
-  font-size: 0.8rem;
   text-align: center;
-}
-
-.price-filter-clear {
-  display: block;
-  text-align: center;
-  margin-top: 8px;
-  font-size: 0.82rem;
-  color: var(--wlm-forest-mid);
-  text-decoration: underline;
 }
 
 /* Product grid sort/count bar */
@@ -1765,19 +2522,15 @@ a:hover {
   transform: translateY(-3px);
 }
 
-.product-card img {
-  width: 100%;
-  aspect-ratio: 1 / 1;
-  object-fit: contain;
-  background-color: #f1efe9;
-  border-radius: 8px;
-  padding: 12px;
-}
-
 .product-card-body {
   padding: 12px 2px;
   display: flex;
   flex-direction: column;
+  /* .product-card is a CSS Grid item, stretched to the tallest card in its row — grow to
+     fill that stretched height so the price/variant/button block (pushed down via
+     margin-top: auto on .product-card-price-row below) lands at the same Y across every
+     card in the row, regardless of how many lines the title above it wraps to. */
+  flex: 1;
 }
 
 .product-card-body .category-tag {
@@ -1794,6 +2547,14 @@ a:hover {
   text-transform: uppercase;
   letter-spacing: 0.01em;
   margin: 10px 0 6px;
+  line-height: 1.25;
+  /* Reserve space for 2 lines (1rem × 1.25 × 2) regardless of actual wrap, and clamp any
+     title that would wrap to 3+ lines — keeps every card's title block the same height. */
+  min-height: 2.5em;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 .product-card-body h3 a {
@@ -1802,6 +2563,9 @@ a:hover {
 
 .product-card-price-row {
   margin-bottom: 10px;
+  /* Anchors the price/variant/button block to the bottom of .product-card-body (which now
+     fills the grid-stretched card height) — see .product-card-body's flex: 1 comment. */
+  margin-top: auto;
 }
 
 .product-card-body .price {
@@ -1868,6 +2632,11 @@ a:hover {
 }
 
 .card-product-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+  display: block;
   transition: opacity 0.1s ease, transform 0.3s ease;
 }
 
@@ -1930,6 +2699,709 @@ a:hover {
   letter-spacing: 0.04em;
   padding: 6px 14px;
   border-radius: 20px;
+}
+
+.pdp-price {
+  font-family: var(--font-heading);
+  font-weight: 800;
+  font-size: 2rem;
+  color: var(--wlm-ink);
+}
+
+.pdp-vat-note {
+  color: var(--wlm-forest-mid);
+  font-size: 0.85rem;
+}
+
+.pdp-savings {
+  color: var(--bs-success, #198754);
+  font-weight: 600;
+  font-size: 0.95rem;
+}
+
+.pdp-stock-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.95rem;
+  color: var(--wlm-ink);
+}
+
+.pdp-stock-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background-color: var(--bs-success, #198754);
+  flex-shrink: 0;
+}
+
+.pdp-total-line {
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--wlm-ink);
+}
+
+.pdp-total-line strong {
+  font-weight: 800;
+  font-size: 1.4rem;
+  color: var(--wlm-forest-dark);
+}
+
+.pdp-btn-cart,
+.pdp-btn-buynow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  width: 100%;
+  border-radius: 4px;
+  padding: 11px 4px;
+  font-family: var(--font-heading);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0;
+  font-size: 0.66rem;
+  white-space: nowrap;
+  cursor: pointer;
+  text-decoration: none;
+  border: none;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.pdp-btn-cart {
+  background-color: var(--wlm-forest-dark);
+  color: white;
+}
+
+.pdp-btn-cart:hover {
+  background-color: var(--wlm-forest-mid);
+}
+
+.pdp-btn-buynow {
+  background-color: var(--wlm-sand);
+  color: var(--wlm-forest-dark);
+}
+
+.pdp-btn-buynow:hover {
+  background-color: var(--wlm-sand-light);
+}
+
+/* Add to Cart / Buy Now side by side, equal width. */
+.pdp-btn-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.pdp-btn-row .pdp-btn-cart,
+.pdp-btn-row .pdp-btn-buynow {
+  flex: 1;
+  width: auto;
+  min-width: 0;
+}
+
+/* Full-width outlined Add to Wishlist button below the cart/buy row — the reference's
+   primary secondary-action button, promoted here from a small inline text link. */
+.pdp-btn-wishlist {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  border-radius: 4px;
+  padding: 10px 4px;
+  background: transparent;
+  border: 1px solid var(--wlm-forest-dark);
+  color: var(--wlm-forest-dark);
+  font-family: var(--font-heading);
+  font-weight: 700;
+  text-transform: uppercase;
+  font-size: 0.78rem;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  text-decoration: none;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.pdp-btn-wishlist:hover {
+  background-color: var(--wlm-cream);
+}
+
+.pdp-btn-wishlist.active {
+  background-color: var(--wlm-forest-dark);
+  color: white;
+}
+
+/* Compare / Wholesale quote — real functionality kept, but visually secondary to the
+   Cart/Buy Now/Wishlist trio above, matching how little room the reference gives non-primary
+   actions. */
+.pdp-secondary-links {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+}
+
+@media (max-width: 575.98px) {
+  .pdp-btn-row {
+    flex-direction: column;
+  }
+
+  /* Once .pdp-btn-row is column-stacked (see above), each button gets the full card width
+     instead of sharing a row, so the cramped font-size/padding tuned for narrow side-by-side
+     desktop layouts is no longer necessary — restore a more comfortable, legible touch size. */
+  .pdp-btn-cart,
+  .pdp-btn-buynow {
+    padding: 13px 4px;
+    font-size: 0.8rem;
+    letter-spacing: 0.02em;
+  }
+
+  /* Qty stepper moves above the (now column-stacked) buttons instead of squeezing beside
+     them, so the buttons keep the full card width for their larger touch-friendly text. */
+  .pdp-qty-cart-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .pdp-qty-stepper {
+    align-self: flex-start;
+  }
+}
+
+@media (max-width: 767.98px) {
+  .currency-switch-toggle {
+    padding: 8px 0;
+  }
+}
+
+/* Compact horizontal mini trust row inside the purchase card (Free Shipping / Easy Returns /
+   Secure Payment) — no fabricated delivery-estimate item, since there's no real ETA data. */
+.pdp-trust-mini-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+  gap: 10px 12px;
+  border-top: 1px solid var(--wlm-sand-light);
+  padding-top: 12px;
+}
+
+.pdp-trust-mini-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pdp-trust-mini-item i {
+  font-size: 1.2rem;
+  color: var(--wlm-forest-mid);
+  flex-shrink: 0;
+}
+
+.pdp-trust-mini-item strong {
+  display: block;
+  font-family: var(--font-heading);
+  font-size: 0.8rem;
+  color: var(--wlm-forest-dark);
+}
+
+.pdp-trust-mini-item span {
+  display: block;
+  font-size: 0.72rem;
+  color: var(--wlm-ink);
+  opacity: 0.7;
+}
+
+.pdp-brand-badge {
+  display: inline-block;
+  background: var(--wlm-sand);
+  color: var(--wlm-forest-dark);
+  font-family: var(--font-heading);
+  font-weight: 700;
+  font-size: 0.7rem;
+  letter-spacing: 0.05em;
+  padding: 3px 10px;
+  border-radius: 4px;
+  margin-inline-end: 8px;
+}
+
+.pdp-meta-line {
+  color: var(--wlm-ink);
+  opacity: 0.75;
+  font-size: 0.88rem;
+}
+
+.pdp-meta-sep {
+  margin: 0 6px;
+  color: var(--wlm-sand-light);
+}
+
+/* Icon feature row below the gallery (Durable Fabric / Multiple Pockets / ... style) — each
+   item is a circular icon badge with a bold label underneath, matching the reference's
+   below-image feature row. Flexbox, not grid: with a grid (even auto-fit), the last
+   incomplete row still reserves the same N column tracks as full rows, leaving visibly empty
+   trailing cells whenever the item count isn't a multiple of the column count. Flexbox items
+   keep their own natural width and simply wrap with nothing reserved beyond the last item. */
+.pdp-icon-feature-row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 16px 12px;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--wlm-sand-light);
+}
+
+/* flex: 0 (no grow) keeps each item at its natural ~90px width instead of stretching to fill
+   whatever's left on an incomplete last row — the same lesson as the feature-badge row
+   earlier: a leftover single item on its own row must NOT balloon to fill the full width. */
+.pdp-icon-feature-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  flex: 0 1 90px;
+  text-align: center;
+}
+
+.pdp-icon-feature-circle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: var(--wlm-cream);
+  color: var(--wlm-forest);
+  font-size: 1.2rem;
+}
+
+.pdp-icon-feature-label {
+  font-size: 0.76rem;
+  font-weight: 600;
+  color: var(--wlm-ink);
+}
+
+.pdp-rating-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.pdp-review-count {
+  font-size: 0.85rem;
+  color: var(--wlm-ink);
+  opacity: 0.75;
+}
+
+.pdp-rating-sep {
+  color: var(--wlm-sand-light);
+}
+
+.pdp-ask-question {
+  font-size: 0.85rem;
+  color: var(--wlm-forest-mid);
+  text-decoration: underline;
+}
+
+.pdp-ask-question:hover {
+  color: var(--wlm-forest-dark);
+}
+
+/* Qty stepper sits beside the Cart/Buy Now row (not stacked above it), matching the
+   reference's single "QTY ... ADD TO CART" line instead of two separate rows. */
+.pdp-qty-cart-row {
+  display: flex;
+  align-items: stretch;
+  gap: 10px;
+}
+
+.pdp-qty-cart-row .pdp-btn-row {
+  flex: 1;
+  margin-bottom: 0;
+}
+
+.pdp-qty-stepper {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--wlm-sand-light);
+  border-radius: 4px;
+  overflow: hidden;
+  width: fit-content;
+  flex-shrink: 0;
+}
+
+.pdp-qty-btn {
+  width: 38px;
+  height: 40px;
+  border: none;
+  background: var(--wlm-cream);
+  color: var(--wlm-forest-dark);
+  font-size: 1.1rem;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.pdp-qty-btn:hover {
+  background-color: var(--wlm-sand-light);
+}
+
+.pdp-qty-input {
+  width: 50px;
+  height: 40px;
+  border: none;
+  border-inline: 1px solid var(--wlm-sand-light);
+  text-align: center;
+  font-size: 0.95rem;
+  -moz-appearance: textfield;
+}
+
+.pdp-qty-input::-webkit-outer-spin-button,
+.pdp-qty-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.pdp-wishlist-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--wlm-forest-mid);
+  font-size: 0.85rem;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.pdp-wishlist-link:hover {
+  color: var(--wlm-forest-dark);
+}
+
+.pdp-wishlist-link.active i {
+  color: #c8342f;
+}
+
+@media (max-width: 575.98px) {
+  /* Bump up a few controls that measure comfortably above 44px on desktop pointer input
+     but come in under that on a touch screen (qty stepper, wishlist/compare links). */
+  .pdp-qty-btn {
+    width: 44px;
+    height: 44px;
+  }
+
+  .pdp-wishlist-link {
+    padding: 8px 0;
+  }
+}
+
+/* Horizontal 4-up trust strip below the purchase area — distinct from .pdp-trust-list
+   (the vertical list inside the purchase card itself). */
+.pdp-trust-strip {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 20px;
+  background: white;
+  border: 1px solid var(--wlm-sand-light);
+  border-radius: 8px;
+  padding: 20px;
+}
+
+.pdp-trust-strip-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.pdp-trust-strip-item i {
+  font-size: 1.5rem;
+  color: var(--wlm-forest);
+  flex-shrink: 0;
+}
+
+.pdp-trust-strip-item span {
+  display: block;
+  font-family: var(--font-heading);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--wlm-ink);
+  opacity: 0.65;
+}
+
+.pdp-trust-strip-item strong {
+  display: block;
+  font-family: var(--font-heading);
+  font-weight: 700;
+  font-size: 0.88rem;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  color: var(--wlm-forest-dark);
+}
+
+.pdp-view-all {
+  color: var(--wlm-forest-mid);
+  font-weight: 600;
+  font-size: 0.9rem;
+  text-decoration: none;
+}
+
+.pdp-view-all:hover {
+  color: var(--wlm-forest-dark);
+}
+
+.pdp-info-tabs {
+  background: white;
+  border: 1px solid var(--wlm-sand-light);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+/* Horizontal underline tab bar (Description / Specifications / Shipping & Returns / Reviews),
+   full width above the tab content — replaces the earlier vertical sidebar nav. */
+.pdp-tab-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  background: var(--wlm-cream);
+  border-bottom: 1px solid var(--wlm-sand-light);
+  padding: 0 8px;
+  overflow-x: auto;
+}
+
+.pdp-tab-link {
+  border: none;
+  background: none;
+  padding: 16px 18px;
+  font-family: var(--font-heading);
+  font-size: 0.88rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  color: var(--wlm-ink);
+  opacity: 0.65;
+  cursor: pointer;
+  white-space: nowrap;
+  border-bottom: 3px solid transparent;
+  transition: color 0.15s ease, border-color 0.15s ease, opacity 0.15s ease;
+}
+
+.pdp-tab-link:hover {
+  opacity: 1;
+}
+
+.pdp-tab-link.active {
+  opacity: 1;
+  color: var(--wlm-forest-dark);
+  border-bottom-color: var(--wlm-sand);
+}
+
+.pdp-tab-content {
+  padding: 24px;
+}
+
+/* Description tab: intro/materials text + checklist on one side, an optional per-color
+   lifestyle photo on the other (Media Role "Lifestyle"). */
+.pdp-description-layout {
+  display: flex;
+  gap: 28px;
+  align-items: flex-start;
+}
+
+.pdp-description-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.pdp-description-photo {
+  flex: 0 0 280px;
+}
+
+.pdp-description-photo img {
+  width: 100%;
+  aspect-ratio: 4 / 5;
+  object-fit: cover;
+  border-radius: 8px;
+  display: block;
+}
+
+/* Checkmarked feature bullets inside the Description tab (reuses the FEATURE-attribute
+   marketing bullets, same data as before, just relocated into the tab alongside the photo
+   to match the reference layout instead of living in its own section). */
+.pdp-checklist {
+  list-style: none;
+  margin: 14px 0 0;
+  padding: 0;
+  color: var(--wlm-ink);
+  font-size: 0.9rem;
+}
+
+.pdp-checklist li {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.pdp-checklist li i {
+  color: var(--wlm-forest);
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+@media (max-width: 767.98px) {
+  .pdp-description-layout {
+    flex-direction: column;
+  }
+
+  .pdp-description-photo {
+    flex: 0 0 auto;
+    width: 100%;
+    max-width: 320px;
+  }
+}
+
+.pdp-spec-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.pdp-spec-table th,
+.pdp-spec-table td {
+  text-align: start;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--wlm-sand-light);
+  font-size: 0.9rem;
+}
+
+.pdp-spec-table th {
+  width: 40%;
+  color: var(--wlm-forest-mid);
+  font-weight: 600;
+}
+
+/* Reviews tab — aggregate summary (average + count, recalculated from real ProductReviews
+   rows), a write/edit-in-place review form, and the list of submitted reviews below it. */
+.pdp-reviews-summary {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.pdp-reviews-summary-count {
+  font-family: var(--font-heading);
+  font-weight: 700;
+  color: var(--wlm-forest-dark);
+}
+
+.pdp-review-form-section {
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid var(--wlm-sand-light);
+}
+
+.pdp-review-form-heading {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--wlm-forest-dark);
+  margin: 0 0 12px;
+}
+
+.pdp-review-login-prompt {
+  color: var(--wlm-ink);
+  font-size: 0.9rem;
+}
+
+.pdp-review-login-prompt a {
+  color: var(--wlm-forest-mid);
+  font-weight: 600;
+  margin-inline-start: 4px;
+}
+
+.pdp-review-form {
+  max-width: 560px;
+}
+
+.pdp-star-input {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 12px;
+}
+
+.pdp-star-input-btn {
+  background: none;
+  border: none;
+  padding: 2px;
+  cursor: pointer;
+  font-size: 1.5rem;
+  line-height: 1;
+  color: var(--wlm-sand);
+}
+
+.pdp-star-input-btn .bi-star-fill {
+  color: #c79420;
+}
+
+.pdp-review-textarea {
+  width: 100%;
+  min-height: 100px;
+  padding: 10px 12px;
+  border: 1px solid var(--wlm-sand-light);
+  border-radius: 6px;
+  font-family: inherit;
+  font-size: 0.9rem;
+  resize: vertical;
+  margin-bottom: 12px;
+}
+
+.pdp-review-submit {
+  width: auto;
+  padding-inline: 28px;
+}
+
+.pdp-review-list {
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid var(--wlm-sand-light);
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.pdp-review-item-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 4px;
+}
+
+.star-rating-inline {
+  color: #c79420;
+  font-size: 0.85rem;
+}
+
+.pdp-review-author {
+  font-family: var(--font-heading);
+  font-weight: 700;
+  font-size: 0.88rem;
+  color: var(--wlm-forest-dark);
+}
+
+.pdp-review-date {
+  font-size: 0.78rem;
+  color: var(--wlm-ink);
+  opacity: 0.6;
+}
+
+.pdp-review-comment {
+  font-size: 0.9rem;
+  color: var(--wlm-ink);
+  margin: 0;
+  line-height: 1.6;
 }
 
 .loyalty-celebration {
@@ -2303,12 +3775,36 @@ a:hover {
   border-radius: 20px;
 }
 
+.location-contact-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.whatsapp-btn {
+  background-color: #25d366;
+  border-color: #25d366;
+  color: white;
+}
+
+.whatsapp-btn:hover {
+  background-color: #1ebe5b;
+  border-color: #1ebe5b;
+  color: white;
+}
+
 .product-card-media {
   position: relative;
+  width: 100%;
+  aspect-ratio: 4 / 5;
+  overflow: hidden;
+  border-radius: 8px;
 }
 
 .product-card-tilt {
   display: block;
+  width: 100%;
+  height: 100%;
   border-radius: 8px;
   transition: transform 0.2s ease, box-shadow 0.2s ease;
   transform-style: preserve-3d;
@@ -2432,6 +3928,41 @@ a:hover {
   color: rgba(232, 220, 200, 0.7);
 }
 
+.footer-payments {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 14px;
+  padding: 18px 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.footer-payments-label {
+  font-family: var(--font-heading);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-size: 0.78rem;
+  color: rgba(232, 220, 200, 0.7);
+  white-space: nowrap;
+}
+
+.footer-payments-icons {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.footer-payments-icons img {
+  height: 28px;
+  width: auto;
+  border-radius: 4px;
+  background: white;
+  padding: 3px 8px;
+  object-fit: contain;
+}
+
 /* Cart & checkout tables */
 .cart-table th {
   font-family: var(--font-heading);
@@ -2477,6 +4008,23 @@ a:hover {
   background-color: var(--wlm-forest-dark);
 }
 
+/* Optional PromoEvent.ImageUrl photo behind the sale banner — the gradient overlay is set
+   inline alongside the image (Views/Products/Sales.cshtml) so it composites in one
+   background-image value; this class just adds the sizing/height a photo needs to read. */
+.page-banner-sale-photo {
+  background-size: cover;
+  background-position: center;
+  min-height: 280px;
+  display: flex;
+  align-items: center;
+}
+
+@media (max-width: 575.98px) {
+  .page-banner-sale-photo {
+    min-height: 200px;
+  }
+}
+
 .page-banner-sale p {
   color: var(--wlm-sand);
   font-weight: 600;
@@ -2504,10 +4052,36 @@ a:hover {
   margin-bottom: 20px;
 }
 
+/* Matches the .sale-badge/.featured-badge pill typography used on product cards (uppercase,
+   bold, small, tight padding) rather than Bootstrap's default .badge look. */
+.badge-status {
+  display: inline-block;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  padding: 4px 10px;
+  border-radius: 3px;
+  color: white;
+}
+
 .badge-status-pending { background-color: var(--wlm-danger); }
 .badge-status-processing { background-color: var(--wlm-sand); color: var(--wlm-ink); }
 .badge-status-shipped { background-color: var(--wlm-blue); }
+.badge-status-outfordelivery { background-color: #b8860b; }
 .badge-status-delivered { background-color: var(--wlm-forest); }
+
+/* Customer order-tracking: FedEx tracking link box (stepper CSS lives further down, alongside
+   the checkout-stepper classes it's built on). */
+.order-tracking-box {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  background: var(--wlm-sand-light);
+  border-radius: 8px;
+  padding: 14px 20px;
+}
 
 .admin-shell {
   display: flex;
@@ -2539,6 +4113,56 @@ a:hover {
 }
 
 /* Product image zoom + gallery */
+/* Gallery layout: a narrow vertical thumbnail column beside the main image on desktop
+   (matches typical PDP references), falling back to a horizontal row below the image on
+   mobile where there isn't room for a side column. */
+.product-gallery-layout {
+  display: flex;
+  gap: 12px;
+}
+
+/* .pdp-content-col (the title/description/purchase-card column) is the last column of the
+   outer row, so it carries that row's own trailing gutter padding (24px, from .g-5) on its
+   outer edge. The purchase card, nested two levels deep inside a second row-and-columns
+   split (color/size | purchase card), only bleeds relative to ITS OWN parent row's gutter —
+   it has no way to also cancel out the outer column's separate 24px padding reservation on
+   top of that. Net effect: the purchase card's outer edge lands 24px short of where the
+   gallery's outer edge lands on the opposite side (which — as the outer row's FIRST column —
+   bleeds cleanly to the container edge with nothing reserved beyond it). Dropping this
+   column's own trailing padding removes that extra reservation so both sides match. LTR: the
+   trailing edge is the right side. */
+.pdp-content-col {
+  padding-right: 0;
+}
+
+/* At lg+, .pdp-top-row has no align-items override (defaults to stretch), so both columns'
+   outer boxes become equal height — as tall as .pdp-content-col, which is normally the taller
+   of the two. .pdp-gallery-col becomes a flex column so that extra height can be handed to
+   .product-gallery-layout (flex: 1 below) instead of sitting there as unused space, which is
+   what actually grows the product photo — .pdp-icon-feature-row keeps its own natural height
+   and simply gets pushed down to sit right under the now-taller image. This replaces the
+   earlier position:sticky approach: sticky kept a SHORT gallery pinned in view while the
+   taller column scrolled past it; here the gallery is no longer short, so there's nothing left
+   to pin against. Below lg the columns stack full-width in document order, so none of this
+   applies — the image keeps its own natural aspect-ratio there (see .product-zoom-image). */
+@media (min-width: 992px) {
+  .pdp-gallery-col {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .product-gallery-layout {
+    flex: 1;
+    min-height: 0;
+  }
+
+  .product-zoom-image {
+    height: 100%;
+    aspect-ratio: auto;
+    object-fit: contain;
+  }
+}
+
 .product-zoom-container {
   position: relative;
   overflow: hidden;
@@ -2549,6 +4173,8 @@ a:hover {
   transition: transform 0.15s ease, box-shadow 0.15s ease;
   transform-style: preserve-3d;
   will-change: transform;
+  flex: 1;
+  min-width: 0;
 }
 
 .product-zoom-container:hover {
@@ -2557,7 +4183,7 @@ a:hover {
 
 .product-zoom-image {
   width: 100%;
-  aspect-ratio: 1 / 1;
+  aspect-ratio: 5 / 6;
   object-fit: cover;
   display: block;
   transition: transform 0.15s ease;
@@ -2582,8 +4208,34 @@ a:hover {
 
 .product-thumbs {
   display: flex;
+  flex-direction: column;
+  flex: 0 0 70px;
   gap: 10px;
-  margin-top: 12px;
+  max-height: 520px;
+  overflow-y: auto;
+}
+
+@media (max-width: 991.98px) {
+  .product-gallery-layout {
+    flex-direction: column-reverse;
+  }
+
+  /* Horizontal scroll strip instead of wrapping to multiple rows — wrapping leaves a lopsided
+     trailing row (e.g. 4 thumbs then 1 alone) whenever the count isn't a clean multiple of
+     however many fit per row; a single scrollable row sidesteps that regardless of count. */
+  .product-thumbs {
+    flex-direction: row;
+    flex-wrap: nowrap;
+    flex: 0 0 auto;
+    max-height: none;
+    overflow-y: visible;
+    overflow-x: auto;
+  }
+
+  .product-thumb,
+  .product-thumb-item {
+    flex-shrink: 0;
+  }
 }
 
 .product-thumb {
@@ -2603,6 +4255,34 @@ a:hover {
 .product-thumb.active {
   border-color: var(--wlm-forest);
   opacity: 1;
+}
+
+.product-zoom-video {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  object-fit: contain;
+  display: block;
+  background: #000;
+}
+
+/* Video thumbs need a wrapper for the play-icon overlay — <img> itself can't render
+   ::after content since it's a replaced element. */
+.product-thumb-item {
+  position: relative;
+  display: inline-block;
+  line-height: 0;
+}
+
+.product-thumb-play {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: 1.4rem;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.7);
+  pointer-events: none;
 }
 
 .zoom-lightbox {
@@ -2756,6 +4436,335 @@ a:hover {
 
 .quick-add-error.visible {
   display: block;
+}
+
+/* Quick-add modal quantity stepper. */
+.qty-stepper { display: flex; align-items: center; gap: 12px; }
+.qty-btn { width: 32px; height: 32px; border: 1px solid #ccc; background: #fff; border-radius: 4px; cursor: pointer; font-size: 18px; line-height: 1; }
+.qty-btn:hover { background: #f5f5f5; }
+#quickAddQtyValue { min-width: 24px; text-align: center; font-weight: 600; }
+
+/* Checkout wizard: step indicator, per-step panels, Stripe Payment Element container, and the
+   OTP verification modal (reuses the .quick-add-modal header/subtitle look for consistency). */
+.checkout-stepper {
+  display: flex;
+  list-style: none;
+  padding: 0;
+  margin: 0 0 2rem;
+  gap: 0.5rem;
+}
+
+.checkout-step {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex: 1;
+  padding-bottom: 0.75rem;
+  border-bottom: 3px solid var(--wlm-sand-light);
+  color: var(--wlm-blue);
+  font-family: var(--font-heading);
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.checkout-step-num {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--wlm-sand-light);
+  color: var(--wlm-forest-dark);
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.checkout-step.active {
+  border-bottom-color: var(--wlm-sand);
+  color: var(--wlm-forest-dark);
+}
+
+.checkout-step.active .checkout-step-num {
+  background: var(--wlm-sand);
+}
+
+.checkout-step.completed {
+  color: var(--wlm-forest-mid);
+}
+
+.checkout-step.completed .checkout-step-num {
+  background: var(--wlm-forest-dark);
+  color: var(--wlm-cream);
+}
+
+.checkout-step-error {
+  display: none;
+  color: var(--wlm-danger);
+  font-size: 0.85rem;
+  margin-top: 0.5rem;
+}
+
+.checkout-step-error.visible {
+  display: block;
+}
+
+.stripe-element-box {
+  background: #fff;
+  border: 1px solid var(--wlm-sand-light);
+  border-radius: 6px;
+  padding: 1.25rem;
+}
+
+.review-recap-box {
+  background: var(--wlm-sand-light);
+  border-radius: 6px;
+  padding: 1rem 1.25rem;
+}
+
+.checkout-otp-modal .modal-header {
+  border-bottom: none;
+  padding-bottom: 0;
+  align-items: flex-start;
+}
+
+.checkout-otp-modal .modal-title {
+  font-family: var(--font-heading);
+  font-size: 1.3rem;
+  color: var(--wlm-forest-dark);
+}
+
+.checkout-otp-modal .modal-subtitle {
+  color: var(--wlm-ink);
+  opacity: 0.7;
+  font-size: 0.9rem;
+  margin-top: 2px;
+}
+
+.checkout-step.completed .checkout-step-num {
+  background: var(--wlm-forest-dark);
+  color: white;
+}
+
+/* Order-tracking stepper: reuses .checkout-stepper/.checkout-step/.checkout-step-num from the
+   checkout wizard, but arranges each step as a circle-over-label column connected by a
+   horizontal line (instead of the wizard's underline-per-step), since a shipment timeline reads
+   better that way. */
+.order-tracking-stepper .checkout-step {
+  border-bottom: none;
+  flex-direction: column;
+  text-align: center;
+  padding-bottom: 0;
+  position: relative;
+}
+
+.order-tracking-stepper .checkout-step::before {
+  content: "";
+  position: absolute;
+  top: 12px;
+  left: -50%;
+  width: 100%;
+  height: 3px;
+  background: var(--wlm-sand-light);
+  z-index: 0;
+}
+
+.order-tracking-stepper .checkout-step:first-child::before {
+  content: none;
+}
+
+.order-tracking-stepper .checkout-step.completed::before,
+.order-tracking-stepper .checkout-step.active::before {
+  background: var(--wlm-forest-dark);
+}
+
+.order-tracking-stepper .checkout-step-num {
+  position: relative;
+  z-index: 1;
+  margin: 0 auto 6px;
+}
+
+.order-tracking-step-date {
+  display: block;
+  font-size: 0.7rem;
+  color: var(--wlm-blue);
+  text-transform: none;
+  letter-spacing: normal;
+  margin-top: 2px;
+}
+
+.otp-code-input {
+  width: 100%;
+  font-size: 1.5rem;
+  letter-spacing: 0.5em;
+  text-align: center;
+  padding: 0.6rem;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+}
+
+/* Cart page: free-shipping progress bar, stock badges, qty stepper, and sidebar extras
+   (dark checkout button, Tabby placeholder, payment/trust rows reused from the footer/PDP). */
+.free-shipping-bar {
+  background: white;
+  border: 1px solid var(--wlm-sand-light);
+  border-radius: 8px;
+  padding: 16px 20px;
+}
+
+.free-shipping-bar-track {
+  height: 8px;
+  border-radius: 4px;
+  background: var(--wlm-sand-light);
+  overflow: hidden;
+  margin-bottom: 10px;
+}
+
+.free-shipping-bar-fill {
+  height: 100%;
+  background: var(--wlm-sand);
+  border-radius: 4px;
+  transition: width 0.3s ease;
+}
+
+.free-shipping-bar-label {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 0.85rem;
+}
+
+#freeShippingBarStatus.free-shipping-qualified {
+  color: #2e7d32;
+  font-weight: 600;
+}
+
+.cart-stock-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.cart-stock-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.cart-stock-in { color: #2e7d32; }
+.cart-stock-in .cart-stock-dot { background: #2e7d32; }
+.cart-stock-low { color: #b8860b; }
+.cart-stock-low .cart-stock-dot { background: #b8860b; }
+.cart-stock-out { color: #b5482c; }
+.cart-stock-out .cart-stock-dot { background: #b5482c; }
+
+.cart-qty-stepper { display: inline-flex; }
+
+.btn-wlm-black {
+  display: inline-block;
+  background-color: var(--wlm-forest-dark);
+  color: white;
+  font-family: var(--font-heading);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 12px 30px;
+  border-radius: 4px;
+  border: none;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.btn-wlm-black:hover {
+  background-color: var(--wlm-forest-mid);
+  color: white;
+}
+
+.cart-or-divider {
+  display: flex;
+  align-items: center;
+  text-align: center;
+  color: var(--wlm-blue);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin: 14px 0;
+}
+
+.cart-or-divider::before,
+.cart-or-divider::after {
+  content: "";
+  flex: 1;
+  border-bottom: 1px solid var(--wlm-sand-light);
+}
+
+.cart-or-divider span {
+  padding: 0 10px;
+}
+
+.btn-tabby-disabled {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  background: var(--wlm-sand-light);
+  color: var(--wlm-blue);
+  border: 1px solid var(--wlm-sand-light);
+  border-radius: 4px;
+  padding: 12px 20px;
+  font-weight: 600;
+  cursor: not-allowed;
+  position: relative;
+}
+
+.cart-coming-soon-badge {
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  background: white;
+  border-radius: 3px;
+  padding: 2px 6px;
+  margin-left: 6px;
+}
+
+.cart-payments.footer-payments {
+  border-top: 1px solid var(--wlm-sand-light);
+  padding: 14px 0 0;
+  justify-content: flex-start;
+}
+
+.cart-payments .footer-payments-label {
+  color: var(--wlm-blue);
+}
+
+.cart-trust-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  border-top: 1px solid var(--wlm-sand-light);
+  padding-top: 14px;
+}
+
+.cart-trust-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.72rem;
+  color: var(--wlm-blue);
+  text-align: center;
+  flex: 1;
+}
+
+.cart-trust-item i {
+  font-size: 1.1rem;
+  color: var(--wlm-forest-dark);
 }
 
 /* ---------- Mobile responsiveness ---------- */
@@ -3454,6 +5463,125 @@ a:hover {
   .chat-widget {
     left: 14px;
     bottom: 14px;
+  }
+}
+
+/* ==========================================================================
+   Site-wide WhatsApp contact widget (Views/Shared/_WhatsAppWidget.cshtml).
+   Sits directly above the support chat widget (same left offset, stacked
+   higher) so the two coexist without overlapping when both are visible.
+   ========================================================================== */
+.whatsapp-widget {
+  position: fixed;
+  left: 22px;
+  bottom: 92px;
+  z-index: 1030;
+}
+
+.whatsapp-widget-toggle {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  border: none;
+  background-color: #25d366;
+  color: white;
+  font-size: 1.6rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 6px 16px rgba(10, 10, 10, 0.35);
+  cursor: pointer;
+  transition: background-color 0.15s ease, transform 0.15s ease;
+}
+
+.whatsapp-widget-toggle:hover {
+  background-color: #1ebe5b;
+  transform: translateY(-2px);
+}
+
+.whatsapp-widget-panel {
+  position: absolute;
+  left: 0;
+  bottom: 70px;
+  width: 300px;
+  max-width: calc(100vw - 44px);
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 16px 40px rgba(10, 10, 10, 0.25);
+  overflow: hidden;
+}
+
+.whatsapp-widget-header {
+  background: #25d366;
+  color: #fff;
+  padding: 0.75rem 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-family: var(--font-heading);
+  font-weight: 600;
+}
+
+.whatsapp-widget-close {
+  background: transparent;
+  border: none;
+  color: #fff;
+  font-size: 1.4rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.whatsapp-widget-branches {
+  padding: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.whatsapp-widget-hint {
+  margin: 0 0 0.25rem;
+  font-size: 0.82rem;
+  color: var(--wlm-ink);
+  opacity: 0.7;
+}
+
+.whatsapp-branch-link {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.6rem 0.75rem;
+  border-radius: 8px;
+  border: 1px solid var(--wlm-sand-light);
+  color: var(--wlm-ink);
+  text-decoration: none;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.whatsapp-branch-link:hover {
+  background-color: var(--wlm-cream);
+  border-color: #25d366;
+  color: var(--wlm-ink);
+}
+
+.whatsapp-branch-name {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+  font-size: 0.88rem;
+}
+
+.whatsapp-branch-phone {
+  font-size: 0.8rem;
+  opacity: 0.75;
+  white-space: nowrap;
+}
+
+@media (max-width: 575.98px) {
+  .whatsapp-widget {
+    left: 14px;
+    bottom: 84px;
   }
 }
 

@@ -3,7 +3,82 @@
 @{
     ViewData["Title"] = Localizer["Welcome"];
     var scrollProducts = ViewBag.ScrollProducts as List<Product> ?? new List<Product>();
+    var homeBanners = ViewBag.HomeBanners as List<HomeBanner> ?? new List<HomeBanner>();
     var welcomeCategories = ViewBag.Categories as List<Category> ?? new List<Category>();
+    var welcomeBrands = ViewBag.Brands as List<Brand> ?? new List<Brand>();
+    var featuredProducts = ViewBag.FeaturedProducts as List<Product> ?? new List<Product>();
+    var bestSellers = ViewBag.BestSellers as List<Product> ?? new List<Product>();
+    var newArrivals = ViewBag.NewArrivals as List<Product> ?? new List<Product>();
+
+    // Short plain-language tag shown under each category tile label, e.g. "TACTICAL APPAREL (clothing)".
+    // Always shown in English regardless of site language, to match the reference design.
+    var collectionsTagBySlug = new Dictionary<string, string>
+    {
+        ["tactical-apparel"] = "clothing",
+        ["bags-and-packs"] = "bags",
+        ["footwear"] = "shoes",
+        ["gear-and-accessories"] = "gear",
+        ["outdoor-equipment"] = "outdoor"
+    };
+}
+
+@if (homeBanners.Count > 0)
+{
+    <div id="homeBannerCarousel" class="carousel slide home-banner-carousel" data-bs-ride="carousel" data-bs-touch="true">
+        @if (homeBanners.Count > 1)
+        {
+            <div class="carousel-indicators">
+                @for (int i = 0; i < homeBanners.Count; i++)
+                {
+                    <button type="button" data-bs-target="#homeBannerCarousel" data-bs-slide-to="@i" class="@(i == 0 ? "active" : "")" aria-current="@(i == 0 ? "true" : null)" aria-label="@Localizer["Slide {0}", i + 1]"></button>
+                }
+            </div>
+        }
+        <div class="carousel-inner">
+            @for (int i = 0; i < homeBanners.Count; i++)
+            {
+                var banner = homeBanners[i];
+                var subtitle = banner.LocalizedSubtitle();
+                <div class="carousel-item @(i == 0 ? "active" : "")">
+                    @if (!string.IsNullOrWhiteSpace(banner.LinkUrl))
+                    {
+                        <a href="@banner.LinkUrl" class="home-banner-slide-link">
+                            <img src="@banner.ImageUrl" class="d-block w-100 home-banner-image" alt="@banner.LocalizedTitle()" />
+                            <div class="home-banner-caption">
+                                <h2>@banner.LocalizedTitle()</h2>
+                                @if (!string.IsNullOrWhiteSpace(subtitle))
+                                {
+                                    <p>@subtitle</p>
+                                }
+                            </div>
+                        </a>
+                    }
+                    else
+                    {
+                        <img src="@banner.ImageUrl" class="d-block w-100 home-banner-image" alt="@banner.LocalizedTitle()" />
+                        <div class="home-banner-caption">
+                            <h2>@banner.LocalizedTitle()</h2>
+                            @if (!string.IsNullOrWhiteSpace(subtitle))
+                            {
+                                <p>@subtitle</p>
+                            }
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+        @if (homeBanners.Count > 1)
+        {
+            <button class="carousel-control-prev" type="button" data-bs-target="#homeBannerCarousel" data-bs-slide="prev">
+                <span class="carousel-control-prev-icon" aria-hidden="true"></span>
+                <span class="visually-hidden">@Localizer["Previous"]</span>
+            </button>
+            <button class="carousel-control-next" type="button" data-bs-target="#homeBannerCarousel" data-bs-slide="next">
+                <span class="carousel-control-next-icon" aria-hidden="true"></span>
+                <span class="visually-hidden">@Localizer["Next"]</span>
+            </button>
+        }
+    </div>
 }
 
 <section class="hero">
@@ -22,21 +97,199 @@
     </div>
 </section>
 
+<div class="homepage-body">
 @if (welcomeCategories.Count > 0)
 {
     <div class="container">
-        <h2 class="collections-title">@Localizer["Collections"]</h2>
+        <h2 class="collections-title">@Localizer["Shop by Category"]</h2>
         <div class="collections-grid">
             @foreach (var category in welcomeCategories)
             {
                 <a class="collections-tile" asp-controller="Products" asp-action="Index" asp-route-categoryId="@category.Id">
-                    <img src="@category.ImageUrl" alt="@category.LocalizedName()" />
-                    <span class="collections-tile-label">@category.LocalizedName()</span>
+                    <div class="collections-tile-img">
+                        <img src="@category.ImageUrl" alt="@category.LocalizedName()" />
+                    </div>
+                    <div class="collections-tile-footer">
+                        <div class="collections-tile-name-group">
+                            <span class="collections-tile-name">@category.LocalizedName()</span>
+                            @if (collectionsTagBySlug.TryGetValue(category.Slug, out var collectionsTag))
+                            {
+                                <span class="collections-tile-tag">(@collectionsTag)</span>
+                            }
+                        </div>
+                        <span class="collections-tile-cta">@Localizer["Shop Now"] <i class="bi bi-arrow-right"></i></span>
+                    </div>
                 </a>
             }
         </div>
     </div>
 }
+
+@if (welcomeBrands.Count > 0)
+{
+    <div class="container">
+        <h2 class="collections-title">@Localizer["Shop by Brand"]</h2>
+        <div class="product-carousel brand-carousel" aria-label="@Localizer["Shop by Brand"]">
+            <button type="button" class="product-carousel-arrow product-carousel-prev" aria-label="@Localizer["Previous"]"><i class="bi bi-chevron-left"></i></button>
+            <div class="product-carousel-track">
+                @foreach (var brand in welcomeBrands)
+                {
+                    <a class="brand-tile product-carousel-item brand-carousel-item" asp-controller="Products" asp-action="Index" asp-route-brandId="@brand.Id">
+                        @if (!string.IsNullOrWhiteSpace(brand.LogoUrl))
+                        {
+                            <img class="brand-tile-logo" src="@brand.LogoUrl" alt="@brand.LocalizedName()" />
+                        }
+                        else
+                        {
+                            <span class="brand-tile-mark">@brand.Name.Substring(0, 1)</span>
+                            <span class="brand-tile-name">@brand.LocalizedName()</span>
+                        }
+                    </a>
+                }
+            </div>
+            <button type="button" class="product-carousel-arrow product-carousel-next" aria-label="@Localizer["Next"]"><i class="bi bi-chevron-right"></i></button>
+        </div>
+    </div>
+}
+
+@if (featuredProducts.Count > 0 || bestSellers.Count > 0 || newArrivals.Count > 0)
+{
+    <div class="container mb-5">
+        <div class="product-columns-row">
+            @if (featuredProducts.Count > 0)
+            {
+                <div class="product-column">
+                    <div class="section-title">
+                        <h2>@Localizer["Featured Products"]</h2>
+                        <a asp-controller="Products" asp-action="Index">@Localizer["View All"] &rarr;</a>
+                    </div>
+                    <div class="product-grid product-grid-column">
+                        @foreach (var product in featuredProducts)
+                        {
+                            <partial name="_ProductCard" model="product" />
+                        }
+                    </div>
+                </div>
+            }
+
+            @if (bestSellers.Count > 0)
+            {
+                <div class="product-column">
+                    <div class="section-title">
+                        <h2>@Localizer["Best Selling"]</h2>
+                        <a asp-controller="Products" asp-action="Index">@Localizer["View All"] &rarr;</a>
+                    </div>
+                    <div class="product-grid product-grid-column">
+                        @foreach (var product in bestSellers)
+                        {
+                            <partial name="_ProductCard" model="product" />
+                        }
+                    </div>
+                </div>
+            }
+
+            @if (newArrivals.Count > 0)
+            {
+                <div class="product-column">
+                    <div class="section-title">
+                        <h2>@Localizer["New Arrivals"]</h2>
+                        <a asp-controller="Products" asp-action="NewArrivals">@Localizer["View All"] &rarr;</a>
+                    </div>
+                    <div class="product-grid product-grid-column">
+                        @foreach (var product in newArrivals)
+                        {
+                            <partial name="_ProductCard" model="product" />
+                        }
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+}
+
+<section class="own-brand-banner">
+    <div class="container own-brand-banner-inner">
+        <div class="own-brand-content">
+            <span class="own-brand-eyebrow">@Localizer["Our Own Brand"]</span>
+            <h2>WLM</h2>
+            <p>@Localizer["We take pride in presenting our own WLM brand — practical design, tough materials, and competitive pricing for professionals across every mission."]</p>
+            <a class="btn-wlm" asp-controller="Products" asp-action="Index">@Localizer["Discover WLM Products"]</a>
+        </div>
+        <button type="button" class="own-brand-play" aria-label="@Localizer["Play video"]">
+            <i class="bi bi-play-fill"></i>
+        </button>
+    </div>
+</section>
+
+<div class="container">
+    <h2 class="collections-title">@Localizer["Why Choose Us?"]</h2>
+    <div class="trust-strip trust-strip-5">
+        <div class="trust-item">
+            <i class="bi bi-truck"></i>
+            <div>
+                <strong>@Localizer["Fast Delivery"]</strong>
+                <span>@Localizer["Fast, safe delivery across the Emirates"]</span>
+            </div>
+        </div>
+        <div class="trust-item">
+            <i class="bi bi-patch-check"></i>
+            <div>
+                <strong>@Localizer["Authentic Products"]</strong>
+                <span>@Localizer["100% genuine products from authorized dealers"]</span>
+            </div>
+        </div>
+        <div class="trust-item">
+            <i class="bi bi-headset"></i>
+            <div>
+                <strong>@Localizer["Professional Support"]</strong>
+                <span>@Localizer["A team ready to help you before and after the sale"]</span>
+            </div>
+        </div>
+        <div class="trust-item">
+            <i class="bi bi-tags"></i>
+            <div>
+                <strong>@Localizer["Competitive Prices"]</strong>
+                <span>@Localizer["Best prices at the highest quality standards"]</span>
+            </div>
+        </div>
+        <div class="trust-item">
+            <i class="bi bi-award"></i>
+            <div>
+                <strong>@Localizer["Trusted Expertise"]</strong>
+                <span>@Localizer["Serving government and military entities for years"]</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<section class="wholesale-banner">
+    <div class="container wholesale-banner-inner">
+        <div class="wholesale-content">
+            <span class="own-brand-eyebrow">@Localizer["Bulk & Government Supply Orders"]</span>
+            <h2>@Localizer["We Equip Army, Police, Civil Defense, and Government Needs"]</h2>
+            <p>@Localizer["We fulfill bulk orders and equip government ministries and entities with the highest quality and professionalism."]</p>
+            <a class="btn-wlm" asp-controller="QuoteRequests" asp-action="Create">@Localizer["Request Price List"]</a>
+            <div class="wholesale-stats">
+                <div class="wholesale-stat">
+                    <strong>+15</strong>
+                    <span>@Localizer["Years of Experience"]</span>
+                </div>
+                <div class="wholesale-stat">
+                    <strong>+1000</strong>
+                    <span>@Localizer["Government Clients"]</span>
+                </div>
+                <div class="wholesale-stat">
+                    <strong>+500,000</strong>
+                    <span>@Localizer["Products Supplied"]</span>
+                </div>
+                <div class="wholesale-stat">
+                    <strong>2</strong>
+                    <span>@Localizer["Branches in the UAE"]</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
 
 <div class="container">
     <div class="section-title">
@@ -82,4 +335,5 @@
             <a class="btn-wlm-outline-dark ms-2" asp-controller="QuoteRequests" asp-action="Create">@Localizer["Request Price List"]</a>
         </div>
     </div>
+</div>
 </div>
