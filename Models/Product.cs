@@ -28,6 +28,15 @@ public class Product
     [StringLength(2000)]
     public string? DescriptionAr { get; set; }
 
+    // Longer-form "Overview" section shown separately from Description (own page section,
+    // own accent header) — a distinct field since it's genuinely different marketing copy,
+    // not a duplicate of the Description tab's intro/materials paragraphs.
+    [StringLength(4000)]
+    public string? Overview { get; set; }
+
+    [StringLength(4000)]
+    public string? OverviewAr { get; set; }
+
     [Column(TypeName = "decimal(10,2)")]
     public decimal Price { get; set; }
 
@@ -35,6 +44,11 @@ public class Product
     // product isn't part of the wholesale program and only sells at retail Price.
     [Column(TypeName = "decimal(10,2)")]
     public decimal? WholesalePrice { get; set; }
+
+    // VAT rate as a fraction (e.g. 0.05 for 5%) — set by the Product Importer; existing
+    // products created before it have this null and are treated as VAT-unaware, as before.
+    [Column(TypeName = "decimal(5,4)")]
+    public decimal? VatRate { get; set; }
 
     [Required, StringLength(40)]
     public string Sku { get; set; } = string.Empty;
@@ -62,7 +76,26 @@ public class Product
     public int MerchantId { get; set; }
     public Merchant? Merchant { get; set; }
 
+    public int? BrandId { get; set; }
+    public Brand? Brand { get; set; }
+
+    // Restricts which Sizes this product's Variants may use. Null for products created
+    // before the Product Importer existed — those aren't restricted to any group.
+    public int? SizeGroupId { get; set; }
+    public SizeGroup? SizeGroup { get; set; }
+
+    public bool IsPublished { get; set; } = true;
+
+    [StringLength(200)]
+    public string? SeoTitleEn { get; set; }
+
+    [StringLength(200)]
+    public string? SeoTitleAr { get; set; }
+
     public ICollection<ProductImage> Images { get; set; } = new List<ProductImage>();
-    public ICollection<ProductColor> Colors { get; set; } = new List<ProductColor>();
-    public ICollection<ProductSize> Sizes { get; set; } = new List<ProductSize>();
+    public ICollection<Feature> Features { get; set; } = new List<Feature>();
+    public ICollection<ProductVariant> Variants { get; set; } = new List<ProductVariant>();
+    public ICollection<ProductColor> ProductColors { get; set; } = new List<ProductColor>();
+    public ICollection<ProductMedia> Media { get; set; } = new List<ProductMedia>();
+    public ICollection<ProductAttributeValue> AttributeValues { get; set; } = new List<ProductAttributeValue>();
 }

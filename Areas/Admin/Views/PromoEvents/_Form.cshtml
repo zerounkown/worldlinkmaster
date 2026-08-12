@@ -17,6 +17,12 @@
     <label asp-for="Description" class="form-label">@Localizer["Description"]</label>
     <textarea asp-for="Description" class="form-control" rows="2" placeholder="A short, cheerful line about the sale"></textarea>
 </div>
+<div class="mb-3">
+    <label asp-for="ImageUrl" class="form-label">@Localizer["Banner Image URL (optional)"]</label>
+    <input asp-for="ImageUrl" class="form-control" placeholder="https://..." />
+    <span asp-validation-for="ImageUrl" class="text-danger"></span>
+    <div class="form-text">@Localizer["Shown behind the Sales page banner. Recommended: 1920×480px (4:1 wide), JPEG, under 400KB. Leave blank to keep the plain color banner."]</div>
+</div>
 <div class="row">
     <div class="col-12 col-sm-4 mb-3">
         <label asp-for="IconEmoji" class="form-label">@Localizer["Icon (emoji)"]</label>

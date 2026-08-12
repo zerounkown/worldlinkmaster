@@ -4,7 +4,6 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Localization;
-using Stripe.Checkout;
 using WorldLinkMaster.Web.Data;
 using WorldLinkMaster.Web.Models;
 using WorldLinkMaster.Web.Models.ViewModels;
@@ -22,6 +21,7 @@ public class CheckoutController : Controller
     private const string OtpExpirySessionKey = "CheckoutOtpExpiry";
     private const string OtpAttemptsSessionKey = "CheckoutOtpAttempts";
     private const string OtpEmailSessionKey = "CheckoutOtpEmail";
+    private const string OtpVerifiedSessionKey = "CheckoutOtpVerified";
     private const int OtpValidityMinutes = 10;
     private const int OtpMaxAttempts = 5;
 
@@ -78,6 +78,7 @@ public class CheckoutController : Controller
         await ApplyStoredCouponAsync(vm);
 
         ViewBag.StripeConfigured = !string.IsNullOrEmpty(_configuration["Stripe:SecretKey"]);
+        ViewBag.StripePublishableKey = _configuration["Stripe:PublishableKey"];
 
         return View(vm);
     }
@@ -132,117 +133,80 @@ public class CheckoutController : Controller
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> PlaceOrder(CheckoutViewModel model)
+    public async Task<IActionResult> SendOtpAjax([FromBody] CheckoutViewModel model)
     {
         var cart = _cartService.GetCart();
         if (cart.Count == 0)
-        {
-            return RedirectToAction("Index", "Cart");
-        }
+            return Json(new { success = false, message = _localizer["Your cart is empty."].Value });
 
         model.Items = cart;
         await ApplyStoredCouponAsync(model);
 
-        if (!ModelState.IsValid)
+        if (!TryValidateModel(model))
         {
-            return View("Index", model);
+            var errors = ModelState.Values.SelectMany(v => v.Errors).Select(e => e.ErrorMessage);
+            return Json(new { success = false, message = string.Join(" ", errors) });
         }
 
         if (string.IsNullOrEmpty(_configuration["Stripe:SecretKey"]))
-        {
-            ModelState.AddModelError(string.Empty, _localizer["Stripe isn't configured yet. Set the Stripe__SecretKey environment variable to enable checkout."]);
-            return View("Index", model);
-        }
+            return Json(new { success = false, message = _localizer["Stripe isn't configured yet."].Value });
 
-        // Stash the shipping form so it survives the redirect through OTP verification and out to Stripe.
         HttpContext.Session.SetString(PendingShippingSessionKey, JsonSerializer.Serialize(model));
 
         var user = await _userManager.GetUserAsync(User);
         var email = user?.Email ?? User.Identity?.Name;
         if (string.IsNullOrEmpty(email))
-        {
-            ModelState.AddModelError(string.Empty, _localizer["We couldn't find an email address on your account to send a verification code to."]);
-            return View("Index", model);
-        }
+            return Json(new { success = false, message = _localizer["We couldn't find an email address on your account."].Value });
 
-        _logger.LogInformation("Checkout started by user {UserId}; sending verification code.", _userManager.GetUserId(User));
         await SendOtpAsync(email);
-
-        return RedirectToAction(nameof(VerifyOtp));
-    }
-
-    public IActionResult VerifyOtp()
-    {
-        if (string.IsNullOrEmpty(HttpContext.Session.GetString(PendingShippingSessionKey)) ||
-            string.IsNullOrEmpty(HttpContext.Session.GetString(OtpCodeSessionKey)))
-        {
-            return RedirectToAction(nameof(Index));
-        }
-
-        SetOtpViewBag();
-        return View();
+        // SECURITY: the OTP is only ever revealed in the response in Development. In every other
+        // environment it is delivered exclusively by email.
+        return Json(new { success = true, email, devOtpCode = _environment.IsDevelopment() ? HttpContext.Session.GetString(OtpCodeSessionKey) : null });
     }
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> VerifyOtp(string code)
+    public IActionResult VerifyOtpAjax([FromBody] OtpVerifyRequest request)
     {
         var shippingJson = HttpContext.Session.GetString(PendingShippingSessionKey);
         var storedCode = HttpContext.Session.GetString(OtpCodeSessionKey);
         var storedExpiry = HttpContext.Session.GetString(OtpExpirySessionKey);
 
         if (string.IsNullOrEmpty(shippingJson) || string.IsNullOrEmpty(storedCode) || string.IsNullOrEmpty(storedExpiry))
-        {
-            TempData["CheckoutMessage"] = _localizer["Your checkout session expired. Please start again."].Value;
-            return RedirectToAction(nameof(Index));
-        }
+            return Json(new { success = false, message = _localizer["Your checkout session expired. Please start again."].Value, expired = true });
 
-        var model = JsonSerializer.Deserialize<CheckoutViewModel>(shippingJson)!;
         var attempts = int.TryParse(HttpContext.Session.GetString(OtpAttemptsSessionKey), out var a) ? a : 0;
-
         if (attempts >= OtpMaxAttempts)
-        {
-            ModelState.AddModelError(string.Empty, _localizer["Too many incorrect attempts. Request a new code."]);
-            SetOtpViewBag();
-            return View();
-        }
+            return Json(new { success = false, message = _localizer["Too many incorrect attempts. Request a new code."].Value });
 
         if (DateTime.UtcNow > DateTime.Parse(storedExpiry).ToUniversalTime())
-        {
-            ModelState.AddModelError(string.Empty, _localizer["That code has expired. Request a new one."]);
-            SetOtpViewBag();
-            return View();
-        }
+            return Json(new { success = false, message = _localizer["That code has expired. Request a new one."].Value });
 
-        if (string.IsNullOrWhiteSpace(code) || code.Trim() != storedCode)
+        if (string.IsNullOrWhiteSpace(request.Code) || request.Code.Trim() != storedCode)
         {
             HttpContext.Session.SetString(OtpAttemptsSessionKey, (attempts + 1).ToString());
-            ModelState.AddModelError(string.Empty, _localizer["That code isn't correct. Please try again."]);
-            SetOtpViewBag();
-            return View();
+            return Json(new { success = false, message = _localizer["That code isn't correct. Please try again."].Value });
         }
 
         HttpContext.Session.Remove(OtpCodeSessionKey);
         HttpContext.Session.Remove(OtpExpirySessionKey);
         HttpContext.Session.Remove(OtpAttemptsSessionKey);
         HttpContext.Session.Remove(OtpEmailSessionKey);
+        HttpContext.Session.SetString(OtpVerifiedSessionKey, "true");
 
-        return await CreateStripeCheckoutSessionAsync(model);
+        return Json(new { success = true });
     }
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> ResendOtp()
+    public async Task<IActionResult> ResendOtpAjax()
     {
         var email = HttpContext.Session.GetString(OtpEmailSessionKey);
         if (string.IsNullOrEmpty(email) || string.IsNullOrEmpty(HttpContext.Session.GetString(PendingShippingSessionKey)))
-        {
-            return RedirectToAction(nameof(Index));
-        }
+            return Json(new { success = false, message = _localizer["Your checkout session expired. Please start again."].Value });
 
         await SendOtpAsync(email);
-        TempData["CheckoutMessage"] = _localizer["We sent you a new code."].Value;
-        return RedirectToAction(nameof(VerifyOtp));
+        return Json(new { success = true, devOtpCode = _environment.IsDevelopment() ? HttpContext.Session.GetString(OtpCodeSessionKey) : null });
     }
 
     private async Task SendOtpAsync(string email)
@@ -256,143 +220,101 @@ public class CheckoutController : Controller
         await _emailService.SendOtpAsync(email, code);
     }
 
-    private void SetOtpViewBag()
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> CreatePaymentIntent()
     {
-        ViewBag.OtpEmail = HttpContext.Session.GetString(OtpEmailSessionKey);
-        ViewBag.EmailConfigured = _emailService.IsConfigured;
-        // SECURITY: the OTP is only ever revealed on-screen in Development. In every other
-        // environment it is delivered exclusively by email.
-        ViewBag.DevOtpCode = _environment.IsDevelopment() ? HttpContext.Session.GetString(OtpCodeSessionKey) : null;
-    }
+        if (HttpContext.Session.GetString(OtpVerifiedSessionKey) != "true")
+            return Json(new { success = false, message = _localizer["Please verify your email first."].Value });
 
-    private async Task<IActionResult> CreateStripeCheckoutSessionAsync(CheckoutViewModel model)
-    {
+        var shippingJson = HttpContext.Session.GetString(PendingShippingSessionKey);
+        if (string.IsNullOrEmpty(shippingJson))
+            return Json(new { success = false, message = _localizer["Your checkout session expired. Please start again."].Value });
+
+        var model = JsonSerializer.Deserialize<CheckoutViewModel>(shippingJson)!;
         var cart = _cartService.GetCart();
         if (cart.Count == 0)
-        {
-            return RedirectToAction("Index", "Cart");
-        }
+            return Json(new { success = false, message = _localizer["Your cart is empty."].Value });
 
         var userId = _userManager.GetUserId(User)!;
         var discountedCart = ApplyCouponToCart(cart, model.CouponDiscountPercent);
 
-        // Persist the order as unpaid BEFORE redirecting to Stripe. Payment is then confirmed
-        // server-side by the Stripe webhook, independent of the browser returning to /Success.
-        var order = await _fulfillment.CreatePendingOrderAsync(userId, model, discountedCart);
-
-        var lineItems = discountedCart.Select(item => new SessionLineItemOptions
+        Order order;
+        try
         {
-            Quantity = item.Quantity,
-            PriceData = new SessionLineItemPriceDataOptions
-            {
-                Currency = "aed",
-                UnitAmount = (long)Math.Round(item.UnitPrice * 100),
-                ProductData = new SessionLineItemPriceDataProductDataOptions
-                {
-                    Name = item.Name,
-                    Description = BuildVariantDescription(item),
-                    Images = string.IsNullOrEmpty(item.ImageUrl) ? null : new List<string> { item.ImageUrl }
-                }
-            }
-        }).ToList();
-
-        if (model.ShippingCost > 0)
+            order = await _fulfillment.CreatePendingOrderAsync(userId, model, discountedCart);
+        }
+        catch (Exception ex)
         {
-            lineItems.Add(new SessionLineItemOptions
-            {
-                Quantity = 1,
-                PriceData = new SessionLineItemPriceDataOptions
-                {
-                    Currency = "aed",
-                    UnitAmount = (long)Math.Round(model.ShippingCost * 100),
-                    ProductData = new SessionLineItemPriceDataProductDataOptions
-                    {
-                        Name = "Shipping"
-                    }
-                }
-            });
+            _logger.LogError(ex, "Failed to create pending order for user {UserId} during checkout.", userId);
+            return Json(new { success = false, message = _localizer["We couldn't start checkout. Please try again."].Value });
         }
 
-        var baseUrl = $"{Request.Scheme}://{Request.Host}";
-        var options = new SessionCreateOptions
+        var totalAmount = discountedCart.Sum(i => i.LineTotal) + model.ShippingCost;
+
+        // Resolved explicitly via the ApplicationUser record (not just User.Identity?.Name) so
+        // Stripe associates this PaymentIntent with the actual logged-in account's real email —
+        // Stripe Link otherwise autofills based on whatever email it last saw on this browser,
+        // which can belong to a completely different site user on a shared/reused device.
+        var currentUser = await _userManager.GetUserAsync(User);
+        var userEmail = currentUser?.Email ?? User.Identity?.Name;
+
+        var piOptions = new Stripe.PaymentIntentCreateOptions
         {
-            Mode = "payment",
+            Amount = (long)Math.Round(totalAmount * 100),
+            Currency = "aed",
+            // Card only — explicitly excludes Link (and any other automatic method), which was
+            // surfacing a different logged-in user's saved card via its own browser-level email
+            // recognition. PaymentMethodTypes and AutomaticPaymentMethods are mutually exclusive
+            // in the Stripe API, so AutomaticPaymentMethods is removed rather than left alongside.
             PaymentMethodTypes = new List<string> { "card" },
-            LineItems = lineItems,
-            SuccessUrl = $"{baseUrl}/Checkout/Success?session_id={{CHECKOUT_SESSION_ID}}",
-            CancelUrl = $"{baseUrl}/Checkout/Cancel",
-            CustomerEmail = User.Identity?.Name,
-            ClientReferenceId = order.Id.ToString(),
-            Metadata = new Dictionary<string, string>
-            {
-                ["OrderId"] = order.Id.ToString(),
-                ["UserId"] = userId
-            }
+            ReceiptEmail = userEmail,
+            Metadata = new Dictionary<string, string> { ["OrderId"] = order.Id.ToString(), ["UserId"] = userId }
         };
 
         try
         {
-            var service = new SessionService();
-            Session session = await service.CreateAsync(options);
-
-            order.StripeSessionId = session.Id;
+            var service = new Stripe.PaymentIntentService();
+            var intent = await service.CreateAsync(piOptions);
+            // Note: uses the dedicated StripePaymentIntentId column (not StripeSessionId) so the
+            // existing payment_intent.succeeded webhook — which looks orders up by that column —
+            // still works as the server-side fulfillment safety net under this PaymentIntent-only flow.
+            order.StripePaymentIntentId = intent.Id;
             await _context.SaveChangesAsync();
 
-            _logger.LogInformation("Stripe checkout session {SessionId} created for order {OrderId}.", session.Id, order.Id);
-            return Redirect(session.Url);
+            return Json(new { success = true, clientSecret = intent.ClientSecret, orderId = order.Id, publishableKey = _configuration["Stripe:PublishableKey"] });
         }
         catch (Stripe.StripeException ex)
         {
-            _logger.LogError(ex, "Stripe failed to start checkout for order {OrderId}.", order.Id);
-            TempData["CheckoutMessage"] = _localizer["Stripe couldn't start checkout: {0}", ex.StripeError?.Message ?? ex.Message].Value;
-            return RedirectToAction(nameof(Index));
+            _logger.LogError(ex, "Stripe failed to create PaymentIntent for order {OrderId}.", order.Id);
+            return Json(new { success = false, message = ex.StripeError?.Message ?? ex.Message });
         }
     }
 
-    public async Task<IActionResult> Success(string session_id)
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> ConfirmOrder([FromBody] ConfirmOrderRequest request)
     {
-        if (string.IsNullOrEmpty(session_id))
-        {
-            return RedirectToAction("Index", "Cart");
-        }
-
-        Session session;
+        var service = new Stripe.PaymentIntentService();
+        Stripe.PaymentIntent intent;
         try
         {
-            var sessionService = new SessionService();
-            session = await sessionService.GetAsync(session_id);
+            intent = await service.GetAsync(request.PaymentIntentId);
         }
         catch (Stripe.StripeException)
         {
-            TempData["CartMessage"] = _localizer["We couldn't verify that payment with Stripe. Please try checking out again."].Value;
-            return RedirectToAction("Index", "Cart");
+            return Json(new { success = false, message = _localizer["We couldn't verify that payment with Stripe."].Value });
         }
 
-        if (session.PaymentStatus != "paid")
-        {
-            TempData["CartMessage"] = _localizer["Your payment could not be confirmed. Please try again."].Value;
-            return RedirectToAction(nameof(Index));
-        }
+        if (intent.Status != "succeeded")
+            return Json(new { success = false, message = _localizer["Your payment could not be confirmed. Please try again."].Value });
 
         var userId = _userManager.GetUserId(User)!;
-        var order = await _context.Orders.FirstOrDefaultAsync(o => o.StripeSessionId == session_id && o.UserId == userId);
-
-        // Fallback to the session metadata if the session id wasn't persisted for some reason.
-        if (order == null && session.Metadata != null &&
-            session.Metadata.TryGetValue("OrderId", out var orderIdRaw) && int.TryParse(orderIdRaw, out var metadataOrderId))
-        {
-            order = await _context.Orders.FirstOrDefaultAsync(o => o.Id == metadataOrderId && o.UserId == userId);
-        }
-
+        var order = await _context.Orders.FirstOrDefaultAsync(o => o.StripePaymentIntentId == intent.Id && o.UserId == userId);
         if (order == null)
-        {
-            // Nothing to show for this user/session — send them back to the catalog.
-            return RedirectToAction("Index", "Products");
-        }
+            return Json(new { success = false, message = _localizer["We couldn't find that order."].Value });
 
-        // Idempotent: if the webhook already fulfilled this order, NewlyPaid is false and we
-        // simply show the confirmation. Otherwise this call performs fulfillment exactly once.
-        var result = await _fulfillment.FulfillPaidOrderAsync(order.Id, session.PaymentIntentId);
+        var result = await _fulfillment.FulfillPaidOrderAsync(order.Id, intent.Id);
         if (result.NewlyPaid && !string.IsNullOrEmpty(result.LoyaltyCouponCode))
         {
             TempData["NewLoyaltyCouponCode"] = result.LoyaltyCouponCode;
@@ -402,8 +324,9 @@ public class CheckoutController : Controller
         _cartService.ClearCart();
         HttpContext.Session.Remove(PendingShippingSessionKey);
         HttpContext.Session.Remove(AppliedCouponSessionKey);
+        HttpContext.Session.Remove(OtpVerifiedSessionKey);
 
-        return RedirectToAction(nameof(Confirmation), new { id = order.Id });
+        return Json(new { success = true, redirectUrl = Url.Action(nameof(Confirmation), new { id = order.Id }) });
     }
 
     public IActionResult Cancel()
@@ -448,16 +371,6 @@ public class CheckoutController : Controller
         }).ToList();
     }
 
-    private static string? BuildVariantDescription(CartItem item)
-    {
-        if (string.IsNullOrEmpty(item.Color) && string.IsNullOrEmpty(item.Size))
-        {
-            return null;
-        }
-
-        var parts = new List<string>();
-        if (!string.IsNullOrEmpty(item.Color)) parts.Add($"Color: {item.Color}");
-        if (!string.IsNullOrEmpty(item.Size)) parts.Add($"Size: {item.Size}");
-        return string.Join(" | ", parts);
-    }
+    public class OtpVerifyRequest { public string Code { get; set; } = string.Empty; }
+    public class ConfirmOrderRequest { public string PaymentIntentId { get; set; } = string.Empty; }
 }

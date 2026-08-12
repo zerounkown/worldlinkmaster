@@ -1,0 +1,20 @@
+@model decimal
+@{
+    var fullStars = (int)Math.Floor(Model);
+    var hasHalfStar = (Model - fullStars) >= 0.5m;
+    var emptyStars = 5 - fullStars - (hasHalfStar ? 1 : 0);
+}
+<span class="star-rating star-rating-inline">
+    @for (int i = 0; i < fullStars; i++)
+    {
+        <i class="bi bi-star-fill"></i>
+    }
+    @if (hasHalfStar)
+    {
+        <i class="bi bi-star-half"></i>
+    }
+    @for (int i = 0; i < emptyStars; i++)
+    {
+        <i class="bi bi-star"></i>
+    }
+</span>

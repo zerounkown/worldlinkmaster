@@ -1,0 +1,39 @@
+@inject Microsoft.Extensions.Configuration.IConfiguration Configuration
+@{
+    var abuDhabiNumber = Configuration["WhatsAppBranches:AbuDhabiNumber"];
+    var abuDhabiDisplay = Configuration["WhatsAppBranches:AbuDhabiDisplay"];
+    var alAinNumber = Configuration["WhatsAppBranches:AlAinNumber"];
+    var alAinDisplay = Configuration["WhatsAppBranches:AlAinDisplay"];
+    var hasAnyBranch = !string.IsNullOrWhiteSpace(abuDhabiNumber) || !string.IsNullOrWhiteSpace(alAinNumber);
+}
+@if (hasAnyBranch)
+{
+    <div id="whatsappWidget" class="whatsapp-widget">
+        <button type="button" id="whatsappWidgetToggle" class="whatsapp-widget-toggle" aria-label="@Localizer["Chat with us on WhatsApp"]">
+            <i class="bi bi-whatsapp"></i>
+        </button>
+        <div id="whatsappWidgetPanel" class="whatsapp-widget-panel" hidden>
+            <div class="whatsapp-widget-header">
+                <span><i class="bi bi-whatsapp"></i> @Localizer["Chat on WhatsApp"]</span>
+                <button type="button" id="whatsappWidgetClose" class="whatsapp-widget-close" aria-label="@Localizer["Close"]">&times;</button>
+            </div>
+            <div class="whatsapp-widget-branches">
+                <p class="whatsapp-widget-hint">@Localizer["Pick a branch to start chatting:"]</p>
+                @if (!string.IsNullOrWhiteSpace(abuDhabiNumber))
+                {
+                    <a class="whatsapp-branch-link" href="https://wa.me/@abuDhabiNumber" target="_blank" rel="noopener noreferrer">
+                        <span class="whatsapp-branch-name"><i class="bi bi-geo-alt-fill"></i> @Localizer["Abu Dhabi Showroom"]</span>
+                        <span class="whatsapp-branch-phone">@abuDhabiDisplay</span>
+                    </a>
+                }
+                @if (!string.IsNullOrWhiteSpace(alAinNumber))
+                {
+                    <a class="whatsapp-branch-link" href="https://wa.me/@alAinNumber" target="_blank" rel="noopener noreferrer">
+                        <span class="whatsapp-branch-name"><i class="bi bi-geo-alt-fill"></i> @Localizer["Al Ain Showroom"]</span>
+                        <span class="whatsapp-branch-phone">@alAinDisplay</span>
+                    </a>
+                }
+            </div>
+        </div>
+    </div>
+}

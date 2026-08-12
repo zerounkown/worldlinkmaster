@@ -7,6 +7,17 @@
     <UserSecretsId>aspnet-WorldLinkMaster.Web-c4457f82-d85b-4caa-906d-804ce0a4a095</UserSecretsId>
   </PropertyGroup>
 
+  <!-- The Tests/ and Tests.E2E/ projects live under this project's own directory, so their .cs
+       files would otherwise also match this project's default compile glob — exclude them explicitly. -->
+  <ItemGroup>
+    <Compile Remove="Tests\**\*.cs" />
+    <Content Remove="Tests\**" />
+    <None Remove="Tests\**" />
+    <Compile Remove="Tests.E2E\**\*.cs" />
+    <Content Remove="Tests.E2E\**" />
+    <None Remove="Tests.E2E\**" />
+  </ItemGroup>
+
   <ItemGroup>
     <PackageReference Include="ClosedXML" Version="0.104.1" />
     <PackageReference Include="MailKit" Version="4.17.0" />
@@ -15,11 +26,11 @@
     <PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="8.0.28" />
     <PackageReference Include="Microsoft.AspNetCore.Identity.UI" Version="8.*" />
     <PackageReference Include="Microsoft.AspNetCore.Mvc.Razor.RuntimeCompilation" Version="8.0.28" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="8.*" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Tools" Version="8.*">
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
+    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="8.*" />
     <PackageReference Include="Stripe.net" Version="52.1.0" />
     <PackageReference Include="Microsoft.Extensions.Caching.StackExchangeRedis" Version="8.0.11" />
     <PackageReference Include="Microsoft.AspNetCore.DataProtection.StackExchangeRedis" Version="8.0.11" />

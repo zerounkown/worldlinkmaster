@@ -1,14 +1,183 @@
+@using System.Text.Json
 @using WorldLinkMaster.Web.Models
+@using WorldLinkMaster.Web.Models.ViewModels
 @using WorldLinkMaster.Web.Extensions
+@using WorldLinkMaster.Web.Services
+@inject IFavoriteService FavoriteService
+@inject ICompareService CompareService
 @model Product
 @{
     ViewData["Title"] = Model.LocalizedName();
     var related = ViewBag.Related as List<Product> ?? new List<Product>();
+    var productReviews = ViewBag.Reviews as List<ProductReviewDisplay> ?? new List<ProductReviewDisplay>();
+    var myReview = ViewBag.MyReview as ProductReview;
+    var isArabicUi = System.Globalization.CultureInfo.CurrentUICulture.TwoLetterISOLanguageName == "ar";
+
+    // Products brought in through the Product Importer have real per-color Media (Media Rules
+    // M001-M009 in WLM_01_Developer_Specification.xlsx); everything else falls back to the
+    // original single flat gallery (Product.ImageUrl + ProductImages) exactly as before.
+    var hasProductColors = Model.ProductColors.Count > 0;
+
     var gallery = new List<string>();
     if (!string.IsNullOrEmpty(Model.ImageUrl)) { gallery.Add(Model.ImageUrl); }
     gallery.AddRange(Model.Images.Select(i => i.ImageUrl));
+    if (gallery.Count == 0) { gallery.Add(ImagePlaceholder.DataUri); }
+
     var activeEvent = ViewBag.ActiveEvent as PromoEvent;
     var salePrice = activeEvent != null ? Model.Price * (1 - activeEvent.DiscountPercent / 100m) : (decimal?)null;
+    var detailIsFavorite = User.Identity?.IsAuthenticated == true && await FavoriteService.IsFavoriteAsync(Model.Id);
+    var detailIsInCompare = User.Identity?.IsAuthenticated == true && await CompareService.IsInCompareAsync(Model.Id);
+
+    // Live quantity × price total (Views/Shared js below) — the unit price is already
+    // resolved to whatever currency the shopper is viewing the store in.
+    var effectiveUnitPrice = (salePrice ?? Model.Price).ToDisplayCurrencyValue();
+    var currencySymbol = CurrencyContext.Current == "USD" ? "$" : "AED ";
+
+    // Distinct colors/sizes offered across this product's variants, each paired with a
+    // representative variant image (falls back to the main product photo when none is set).
+    // Used for the swatches/cart form on legacy (non-imported) products.
+    var colorOptions = Model.Variants
+        .Where(v => v.ColorId.HasValue)
+        .GroupBy(v => v.ColorId!.Value)
+        .Select(g => (Color: g.First().Color!, ImageUrl: g.Select(v => v.ImageUrl).FirstOrDefault(url => url != null)))
+        .ToList();
+    var sizeOptions = Model.Variants
+        .Where(v => v.SizeId.HasValue)
+        .GroupBy(v => v.SizeId!.Value)
+        .Select(g => g.First().Size!)
+        .OrderBy(s => s.SortOrder)
+        .ToList();
+
+    // --- New per-color gallery (only meaningful when hasProductColors) ---
+    ProductColor? defaultProductColor = null;
+    Dictionary<int, List<Dictionary<string, string?>>> galleryByColorId = new();
+    List<Dictionary<string, string?>> initialGallery = new();
+
+    if (hasProductColors)
+    {
+        defaultProductColor = Model.ProductColors.FirstOrDefault(pc => pc.DefaultColor) ?? Model.ProductColors.First();
+
+        var sharedItems = Model.Media
+            .Where(m => m.ProductColorId == null && m.MediaScope == "Shared" && m.ShowInGallery)
+            .OrderBy(m => m.DisplayOrder)
+            .ToList();
+
+        // Maps a media URL back to the ProductColor it represents (its own main/first photo,
+        // or swatch image) — this lets a gallery thumbnail be traced back to a specific color
+        // swatch even when the thumbnail came from Shared media, so clicking a thumbnail can
+        // select the matching color button and keep the two controls in sync.
+        var colorIdByUrl = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        foreach (var pc in Model.ProductColors)
+        {
+            var ownMedia = Model.Media
+                .Where(m => m.ProductColorId == pc.Id && m.ShowInGallery)
+                .OrderByDescending(m => m.IsColorMain)
+                .ThenBy(m => m.DisplayOrder)
+                .FirstOrDefault();
+            var ownUrl = ownMedia?.MediaUrl ?? pc.SwatchImageUrl;
+            if (!string.IsNullOrEmpty(ownUrl) && !colorIdByUrl.ContainsKey(ownUrl))
+            {
+                colorIdByUrl[ownUrl] = pc.Id;
+            }
+        }
+
+        Dictionary<string, string?> ToGalleryItem(ProductMedia m) => new()
+        {
+            ["type"] = m.MediaType,
+            ["url"] = m.MediaUrl,
+            ["thumb"] = m.ThumbnailUrl ?? (m.MediaType == "Image" ? m.MediaUrl : null),
+            ["alt"] = isArabicUi ? (m.AltTextAr ?? m.AltTextEn) : (m.AltTextEn ?? m.AltTextAr),
+            ["colorId"] = colorIdByUrl.TryGetValue(m.MediaUrl, out var mediaColorId) ? mediaColorId.ToString() : null
+        };
+
+        foreach (var pc in Model.ProductColors)
+        {
+            var colorItems = Model.Media
+                .Where(m => m.ProductColorId == pc.Id && m.ShowInGallery)
+                .OrderBy(m => m.DisplayOrder);
+            var combined = sharedItems.Concat(colorItems).Select(ToGalleryItem).ToList();
+            if (combined.Count == 0 && !string.IsNullOrEmpty(pc.SwatchImageUrl))
+            {
+                combined.Add(new Dictionary<string, string?> { ["type"] = "Image", ["url"] = pc.SwatchImageUrl, ["thumb"] = pc.SwatchImageUrl, ["alt"] = pc.Color?.Name, ["colorId"] = pc.Id.ToString() });
+            }
+
+            // The item representing this color itself (not just a Shared photo that happens to
+            // be listed first) is what should be shown/highlighted by default when this color
+            // is selected — otherwise selecting e.g. Grey would show the first Shared photo
+            // (Black) as the main image instead of Grey's own picture.
+            var ownIndex = combined.FindIndex(item => item.GetValueOrDefault("colorId") == pc.Id.ToString());
+            if (ownIndex > 0)
+            {
+                combined[ownIndex]["active"] = "1";
+            }
+
+            galleryByColorId[pc.Id] = combined;
+        }
+
+        initialGallery = galleryByColorId.GetValueOrDefault(defaultProductColor.Id, new());
+        if (initialGallery.Count == 0)
+        {
+            initialGallery.Add(new Dictionary<string, string?> { ["type"] = "Image", ["url"] = ImagePlaceholder.DataUri, ["thumb"] = ImagePlaceholder.DataUri, ["alt"] = null });
+        }
+    }
+
+    var galleryDataJson = JsonSerializer.Serialize(galleryByColorId);
+
+    // --- Per-color size list (only meaningful when hasProductColors) — sizes must be scoped
+    // to the selected color's own variants, not the product's whole variant set, or colors that
+    // happen to share size labels (S/M/L, 30/32/34, ...) show every size from every color mixed
+    // together instead of just what that color actually offers.
+    List<Size> SizesForColor(int productColorId) => Model.Variants
+        .Where(v => v.ProductColorId == productColorId && v.SizeId.HasValue)
+        .GroupBy(v => v.SizeId!.Value)
+        .Select(g => g.First().Size!)
+        .OrderBy(s => s.SortOrder)
+        .ToList();
+
+    Dictionary<int, List<string>> sizesByColorId = new();
+    var initialSizeOptions = sizeOptions;
+    if (hasProductColors)
+    {
+        foreach (var pc in Model.ProductColors)
+        {
+            sizesByColorId[pc.Id] = SizesForColor(pc.Id).Select(s => s.Label).ToList();
+        }
+        initialSizeOptions = SizesForColor(defaultProductColor!.Id);
+    }
+
+    var sizeDataJson = JsonSerializer.Serialize(sizesByColorId);
+
+    // Description-tab feature bullets — rows in the Attributes sheet with Attribute Code
+    // "FEATURE" (kept out of the Specifications table below; those are real spec facts,
+    // these are marketing bullets, so they're excluded from one another's sections).
+    var featureBullets = Model.AttributeValues
+        .Where(a => a.AttributeDefinition?.Code == "FEATURE")
+        .OrderBy(a => a.DisplayOrder)
+        .Select(a => isArabicUi && !string.IsNullOrWhiteSpace(a.ValueAr) ? a.ValueAr! : a.ValueEn)
+        .ToList();
+    var specAttributeValues = Model.AttributeValues.Where(a => a.AttributeDefinition?.Code != "FEATURE").ToList();
+
+    // Description-tab lifestyle photo — a Media row with Role "Lifestyle", scoped to a color
+    // the same way gallery photos are. Each color falls back to the default color's lifestyle
+    // photo when it doesn't have its own; the whole slot is hidden if nothing exists at all.
+    Dictionary<int, string?> lifestyleByColorId = new();
+    string? initialLifestyleUrl = null;
+    if (hasProductColors)
+    {
+        var defaultLifestyleUrl = Model.Media.FirstOrDefault(m => m.ProductColorId == defaultProductColor!.Id && m.MediaRole == "Lifestyle")?.MediaUrl;
+        foreach (var pc in Model.ProductColors)
+        {
+            var ownUrl = Model.Media.FirstOrDefault(m => m.ProductColorId == pc.Id && m.MediaRole == "Lifestyle")?.MediaUrl;
+            lifestyleByColorId[pc.Id] = ownUrl ?? defaultLifestyleUrl;
+        }
+        initialLifestyleUrl = lifestyleByColorId.GetValueOrDefault(defaultProductColor!.Id);
+    }
+    else
+    {
+        initialLifestyleUrl = Model.Media.FirstOrDefault(m => m.ProductColorId == null && m.MediaRole == "Lifestyle")?.MediaUrl;
+    }
+    var hasAnyLifestylePhoto = lifestyleByColorId.Values.Any(v => !string.IsNullOrEmpty(v)) || !string.IsNullOrEmpty(initialLifestyleUrl);
+    var lifestyleDataJson = JsonSerializer.Serialize(lifestyleByColorId);
 }
 
 <div class="container mt-4 mb-5">
@@ -16,87 +185,195 @@
     {
         <div class="alert alert-success">@TempData["CartMessage"]</div>
     }
+    @if (TempData["ReviewMessage"] != null)
+    {
+        <div class="alert alert-success">@TempData["ReviewMessage"]</div>
+    }
     <nav class="mb-3">
         <a asp-controller="Products" asp-action="Index">@Localizer["All Products"]</a> /
-        <a asp-controller="Products" asp-action="Index" asp-route-categoryId="@Model.CategoryId">@Model.Category?.LocalizedName()</a> /
-        <span>@Model.LocalizedName()</span>
+        <a asp-controller="Products" asp-action="Index" asp-route-categoryId="@Model.CategoryId">@Model.Category?.LocalizedName()</a>
+        @if (Model.Subcategory != null)
+        {
+            <text> / <a asp-controller="Products" asp-action="Index" asp-route-categoryId="@Model.CategoryId" asp-route-subcategoryId="@Model.SubcategoryId">@Model.Subcategory.LocalizedName()</a></text>
+        }
+        / <span>@Model.LocalizedName()</span>
     </nav>
 
-    <div class="row g-5">
-        <div class="col-12 col-md-5">
-            <div class="product-zoom-container" id="zoomContainer">
-                <img src="@gallery[0]" alt="@Model.LocalizedName()" class="product-zoom-image" id="mainProductImage" />
-                <span class="zoom-hint"><i class="bi bi-zoom-in"></i> @Localizer["Hover to zoom · Click to enlarge"]</span>
-            </div>
-            @if (gallery.Count > 1)
+    <div class="row g-5 pdp-top-row">
+        <div class="col-12 col-lg-5 pdp-gallery-col">
+            @if (hasProductColors)
             {
-                <div class="product-thumbs">
-                    @for (int i = 0; i < gallery.Count; i++)
+                var initialActiveIndex = initialGallery.FindIndex(item => item.GetValueOrDefault("active") == "1");
+                if (initialActiveIndex < 0) { initialActiveIndex = 0; }
+                var firstItem = initialGallery[initialActiveIndex];
+                var firstIsVideo = firstItem["type"] == "Video";
+                <div class="product-gallery-layout">
+                    @if (initialGallery.Count > 1 || Model.ProductColors.Count > 1)
                     {
-                        <img src="@gallery[i]" class="product-thumb @(i == 0 ? "active" : "")" data-full="@gallery[i]" alt="@Model.LocalizedName() view @(i + 1)" />
+                        <div class="product-thumbs" id="productThumbs">
+                            @for (int i = 0; i < initialGallery.Count; i++)
+                            {
+                                var item = initialGallery[i];
+                                var isVideo = item["type"] == "Video";
+                                <span class="product-thumb-item">
+                                    <img src="@(item["thumb"] ?? ImagePlaceholder.DataUri)"
+                                         class="product-thumb @(i == initialActiveIndex ? "active" : "")"
+                                         data-full="@item["url"]" data-type="@item["type"]" data-color-id="@item.GetValueOrDefault("colorId")"
+                                         alt="@(item["alt"] ?? Model.LocalizedName())" />
+                                    @if (isVideo)
+                                    {
+                                        <i class="bi bi-play-circle-fill product-thumb-play"></i>
+                                    }
+                                </span>
+                            }
+                        </div>
+                    }
+                    <div class="product-zoom-container" id="zoomContainer">
+                        <img src="@(firstIsVideo ? (firstItem["thumb"] ?? ImagePlaceholder.DataUri) : firstItem["url"])" alt="@Model.LocalizedName()" class="product-zoom-image" id="mainProductImage" style="@(firstIsVideo ? "display:none;" : "")" />
+                        <video id="mainProductVideo" controls class="product-zoom-video" style="@(firstIsVideo ? "" : "display:none;")">
+                            @if (firstIsVideo)
+                            {
+                                <source src="@firstItem["url"]" />
+                            }
+                        </video>
+                        <span class="zoom-hint"><i class="bi bi-zoom-in"></i> @Localizer["Hover to zoom · Click to enlarge"]</span>
+                    </div>
+                </div>
+                <script type="application/json" id="colorGalleryData">@Html.Raw(galleryDataJson)</script>
+            }
+            else
+            {
+                <div class="product-gallery-layout">
+                    @if (gallery.Count > 1)
+                    {
+                        <div class="product-thumbs" id="productThumbs">
+                            @for (int i = 0; i < gallery.Count; i++)
+                            {
+                                <img src="@gallery[i]" class="product-thumb @(i == 0 ? "active" : "")" data-full="@gallery[i]" data-type="Image" alt="@Model.LocalizedName() view @(i + 1)" />
+                            }
+                        </div>
+                    }
+                    <div class="product-zoom-container" id="zoomContainer">
+                        <img src="@gallery[0]" alt="@Model.LocalizedName()" class="product-zoom-image" id="mainProductImage" />
+                        <span class="zoom-hint"><i class="bi bi-zoom-in"></i> @Localizer["Hover to zoom · Click to enlarge"]</span>
+                    </div>
+                </div>
+            }
+            @if (Model.Features.Count > 0)
+            {
+                <div class="pdp-icon-feature-row">
+                    @foreach (var feature in Model.Features)
+                    {
+                        <div class="pdp-icon-feature-item">
+                            <span class="pdp-icon-feature-circle"><i class="bi @(string.IsNullOrWhiteSpace(feature.IconClass) ? "bi-check-circle" : feature.IconClass)"></i></span>
+                            <span class="pdp-icon-feature-label">@(isArabicUi && !string.IsNullOrWhiteSpace(feature.NameAr) ? feature.NameAr : feature.Name)</span>
+                        </div>
                     }
                 </div>
             }
         </div>
-        <div class="col-12 col-md-7">
+        <div class="col-12 col-lg-7 pdp-content-col">
+            @if (Model.Brand != null)
+            {
+                <span class="pdp-brand-badge">@Model.Brand.LocalizedName()</span>
+            }
             <span class="category-tag">@Model.Category?.LocalizedName()</span>
             <h1>@Model.LocalizedName()</h1>
-            <partial name="_StarRating" model="Model" />
-            <p class="text-muted mt-1">@Localizer["SKU"]: @Model.Sku &middot; @Localizer["{0} reviews", Model.ReviewCount]</p>
+            <p class="pdp-meta-line mt-1 mb-1">
+                @Localizer["SKU"]: @Model.Sku
+                @if (Model.Brand != null)
+                {
+                    <text><span class="pdp-meta-sep">|</span> @Localizer["Brand"]: @Model.Brand.LocalizedName()</text>
+                }
+            </p>
+            <div class="pdp-rating-row">
+                <partial name="_StarRating" model="Model" />
+                <span class="pdp-review-count">(@Localizer["{0} reviews", Model.ReviewCount])</span>
+                <span class="pdp-rating-sep">|</span>
+                <a class="pdp-ask-question" asp-controller="Home" asp-action="Contact">@Localizer["Ask a question"]</a>
+            </div>
             @if (Model.Merchant != null)
             {
                 <p class="text-muted small mb-2"><i class="bi bi-shop"></i> @Localizer["Sold by"] <strong>@Model.Merchant.BusinessName</strong></p>
             }
-            @if (salePrice.HasValue)
-            {
-                <div class="d-flex align-items-center gap-2 mb-3">
-                    <span class="sale-ribbon"><i class="bi bi-stars"></i> @activeEvent!.Name &mdash; @activeEvent.DiscountPercent.ToString("0.##")% @Localizer["OFF (badge)"]</span>
-                </div>
-                <h3 class="price-detail mb-3">
-                    <span class="price-was">@Model.Price.ToDisplayCurrency()</span>
-                    <span class="price price-sale">@salePrice.Value.ToDisplayCurrency()</span>
-                </h3>
-            }
-            else
-            {
-                <h3 class="price mb-3">@Model.Price.ToDisplayCurrency()</h3>
-            }
-            <p>@Model.LocalizedDescription()</p>
+            <p>@(Model.LocalizedShortDescription() ?? Model.LocalizedDescription())</p>
 
             @if (Model.StockQuantity > 0)
             {
-                <p class="text-success"><i class="bi bi-check-circle"></i> @Localizer["In Stock ({0} available)", Model.StockQuantity]</p>
                 <form asp-controller="Cart" asp-action="Add" method="post">
                     <input type="hidden" name="productId" value="@Model.Id" />
 
-                    @if (Model.Colors.Count > 0)
+                    @if (salePrice.HasValue)
+                    {
+                        <div class="d-flex align-items-center gap-2 mb-1">
+                            <span class="sale-ribbon"><i class="bi bi-stars"></i> @activeEvent!.Name &mdash; @activeEvent.DiscountPercent.ToString("0.##")% @Localizer["OFF"]</span>
+                        </div>
+                    }
+                    <h2 class="pdp-price mb-1">@((salePrice ?? Model.Price).ToDisplayCurrency())</h2>
+                    @if (Model.VatRate.HasValue)
+                    {
+                        <p class="pdp-vat-note mb-1"><i class="bi bi-info-circle" title="@Localizer["Includes {0}% VAT", (Model.VatRate.Value * 100).ToString("0.##")]"></i> @Localizer["VAT Included"]</p>
+                    }
+                    @if (salePrice.HasValue)
+                    {
+                        var saveAmount = Model.Price - salePrice.Value;
+                        <p class="pdp-savings mb-1">@Localizer["You save {0} ({1}%)", saveAmount.ToDisplayCurrency(), activeEvent!.DiscountPercent.ToString("0.##")]</p>
+                    }
+                    <p class="pdp-stock-line mb-3">
+                        <span class="pdp-stock-dot"></span> @Localizer["Stock"]: @Localizer["{0} available", Model.StockQuantity]
+                        <span class="pdp-meta-sep">|</span>
+                        @Localizer["Total"]: <strong id="cartTotalPrice">@currencySymbol@effectiveUnitPrice.ToString("N2", System.Globalization.CultureInfo.InvariantCulture)</strong>
+                    </p>
+
+                    @if (hasProductColors)
                     {
                         <div class="mb-3">
                             <label class="option-label">@Localizer["Color"]</label>
                             <div class="color-options">
-                                @for (int i = 0; i < Model.Colors.Count; i++)
+                                @for (int i = 0; i < Model.ProductColors.Count; i++)
                                 {
-                                    var color = Model.Colors.ElementAt(i);
-                                    var swatchStyle = string.IsNullOrEmpty(color.ImageUrl)
-                                        ? $"background-color: {color.HexCode};"
-                                        : $"background-color: {color.HexCode}; background-image: url('{color.ImageUrl}');";
-                                    <label class="color-swatch" style="@swatchStyle" title="@color.Name">
-                                        <input type="radio" name="color" value="@color.Name" data-image="@(color.ImageUrl ?? Model.ImageUrl)" data-label="@color.Name" required="@(i == 0 ? "required" : null)" checked="@(i == 0 ? "checked" : null)" />
+                                    var pc = Model.ProductColors.ElementAt(i);
+                                    var isSelected = pc.Id == defaultProductColor!.Id;
+                                    var fallbackImage = galleryByColorId.GetValueOrDefault(pc.Id)?.FirstOrDefault()?.GetValueOrDefault("url");
+                                    // Solid swatch color always — a photo thumbnail here (even
+                                    // the color's own swatch photo) reads as visually identical
+                                    // across colors at this size and defeats the point of a
+                                    // color picker.
+                                    var swatchStyle = $"background-color: {pc.Color?.HexCode};";
+                                    <label class="color-swatch" style="@swatchStyle" title="@pc.Color?.Name">
+                                        <input type="radio" name="color" value="@pc.Color?.Name" data-color-id="@pc.Id" data-image="@(fallbackImage ?? Model.ImageUrl)" data-label="@pc.Color?.Name" required="@(i == 0 ? "required" : null)" checked="@(isSelected ? "checked" : null)" />
                                     </label>
                                 }
                             </div>
-                            <span class="option-value" id="selectedColorLabel">@Model.Colors.First().Name</span>
+                            <span class="option-value" id="selectedColorLabel">@defaultProductColor!.Color?.Name</span>
+                        </div>
+                    }
+                    else if (colorOptions.Count > 0)
+                    {
+                        <div class="mb-3">
+                            <label class="option-label">@Localizer["Color"]</label>
+                            <div class="color-options">
+                                @for (int i = 0; i < colorOptions.Count; i++)
+                                {
+                                    var opt = colorOptions[i];
+                                    var swatchStyle = $"background-color: {opt.Color.HexCode};";
+                                    <label class="color-swatch" style="@swatchStyle" title="@opt.Color.Name">
+                                        <input type="radio" name="color" value="@opt.Color.Name" data-image="@(opt.ImageUrl ?? Model.ImageUrl)" data-label="@opt.Color.Name" required="@(i == 0 ? "required" : null)" checked="@(i == 0 ? "checked" : null)" />
+                                    </label>
+                                }
+                            </div>
+                            <span class="option-value" id="selectedColorLabel">@colorOptions[0].Color.Name</span>
                         </div>
                     }
 
-                    @if (Model.Sizes.Count > 0)
+                    @if (initialSizeOptions.Count > 0 || hasProductColors)
                     {
                         <div class="mb-3">
                             <label class="option-label">@Localizer["Size"]</label>
-                            <div class="size-options">
-                                @for (int i = 0; i < Model.Sizes.Count; i++)
+                            <div class="size-options" id="sizeOptionsContainer">
+                                @for (int i = 0; i < initialSizeOptions.Count; i++)
                                 {
-                                    var size = Model.Sizes.ElementAt(i);
+                                    var size = initialSizeOptions[i];
                                     <label class="size-pill">
                                         <input type="radio" name="size" value="@size.Label" required="@(i == 0 ? "required" : null)" checked="@(i == 0 ? "checked" : null)" />
                                         <span>@size.Label</span>
@@ -104,31 +381,275 @@
                                 }
                             </div>
                         </div>
+                        @if (hasProductColors)
+                        {
+                            <script type="application/json" id="sizesByColorData">@Html.Raw(sizeDataJson)</script>
+                        }
                     }
 
-                    <div class="d-flex align-items-center gap-2">
-                        <input type="number" name="quantity" value="1" min="1" max="@Model.StockQuantity" class="form-control" style="width: 90px;" />
-                        <button type="submit" class="btn-wlm">@Localizer["Add to Cart"]</button>
+                    <div class="pdp-qty-cart-row mb-2">
+                        <div class="pdp-qty-stepper">
+                            <button type="button" class="pdp-qty-btn" id="cartQtyDecrement" aria-label="@Localizer["Decrease quantity"]">&minus;</button>
+                            <input type="number" name="quantity" id="cartQuantityInput" value="1" min="1" max="@Model.StockQuantity" class="pdp-qty-input"
+                                   data-unit-price="@effectiveUnitPrice.ToString(System.Globalization.CultureInfo.InvariantCulture)" data-currency-symbol="@currencySymbol" />
+                            <button type="button" class="pdp-qty-btn" id="cartQtyIncrement" aria-label="@Localizer["Increase quantity"]">&plus;</button>
+                        </div>
+                        <div class="pdp-btn-row">
+                            <button type="submit" class="pdp-btn-cart"><i class="bi bi-cart3"></i> @Localizer["Add to Cart"]</button>
+                            <button type="submit" name="redirectToCheckout" value="true" class="pdp-btn-buynow">@Localizer["Buy Now"]</button>
+                        </div>
+                    </div>
+                    @if (User.Identity?.IsAuthenticated == true)
+                    {
+                        <button type="button" class="pdp-btn-wishlist js-favorite-toggle @(detailIsFavorite ? "active" : "")" data-product-id="@Model.Id"
+                                aria-pressed="@(detailIsFavorite ? "true" : "false")">
+                            <i class="bi @(detailIsFavorite ? "bi-heart-fill" : "bi-heart")"></i> @Localizer["Add to Wishlist"]
+                        </button>
+                    }
+                    else
+                    {
+                        <a class="pdp-btn-wishlist" asp-area="Identity" asp-page="/Account/Login">
+                            <i class="bi bi-heart"></i> @Localizer["Add to Wishlist"]
+                        </a>
+                    }
+
+                    <div class="pdp-secondary-links">
+                        @if (User.Identity?.IsAuthenticated == true)
+                        {
+                            <button type="button" class="pdp-wishlist-link js-compare-toggle @(detailIsInCompare ? "active" : "")" data-product-id="@Model.Id"
+                                    aria-pressed="@(detailIsInCompare ? "true" : "false")">
+                                <i class="bi bi-arrow-left-right"></i> @(detailIsInCompare ? Localizer["In Comparison"] : Localizer["Add to Compare"])
+                            </button>
+                        }
+                        else
+                        {
+                            <a class="pdp-wishlist-link" asp-area="Identity" asp-page="/Account/Login">
+                                <i class="bi bi-arrow-left-right"></i> @Localizer["Add to Compare"]
+                            </a>
+                        }
+                        <a class="pdp-wishlist-link" asp-controller="QuoteRequests" asp-action="Create" asp-route-productDetails="@($"{Model.Name} (SKU: {Model.Sku})")">
+                            <i class="bi bi-file-earmark-text"></i> @Localizer["Request Wholesale Quote"]
+                        </a>
+                    </div>
+
+                    <div class="pdp-trust-mini-row mt-3">
+                        <div class="pdp-trust-mini-item">
+                            <i class="bi bi-truck"></i>
+                            <div><strong>@Localizer["Free Shipping"]</strong><span>@Localizer["Orders over AED 365"]</span></div>
+                        </div>
+                        <div class="pdp-trust-mini-item">
+                            <i class="bi bi-arrow-repeat"></i>
+                            <div><strong>@Localizer["Easy Returns"]</strong><span>@Localizer["Within 30 days"]</span></div>
+                        </div>
+                        <div class="pdp-trust-mini-item">
+                            <i class="bi bi-shield-check"></i>
+                            <div><strong>@Localizer["Secure Payment"]</strong><span>@Localizer["100% secure checkout"]</span></div>
+                        </div>
                     </div>
                 </form>
             }
             else
             {
-                <p class="text-danger"><i class="bi bi-x-circle"></i> @Localizer["Out of Stock"]</p>
+                @if (salePrice.HasValue)
+                {
+                    <div class="d-flex align-items-center gap-2 mb-2">
+                        <span class="sale-ribbon"><i class="bi bi-stars"></i> @activeEvent!.Name &mdash; @activeEvent.DiscountPercent.ToString("0.##")% @Localizer["OFF"]</span>
+                    </div>
+                }
+                <h2 class="pdp-price mb-1">@((salePrice ?? Model.Price).ToDisplayCurrency())</h2>
+                @if (Model.VatRate.HasValue)
+                {
+                    <p class="pdp-vat-note mb-1"><i class="bi bi-info-circle" title="@Localizer["Includes {0}% VAT", (Model.VatRate.Value * 100).ToString("0.##")]"></i> @Localizer["VAT Included"]</p>
+                }
+                <p class="text-danger mb-3"><i class="bi bi-x-circle"></i> @Localizer["Out of Stock"]</p>
+                @if (User.Identity?.IsAuthenticated == true)
+                {
+                    <button type="button" class="favorite-toggle favorite-toggle-detail js-favorite-toggle @(detailIsFavorite ? "active" : "")" data-product-id="@Model.Id"
+                            aria-label="@Localizer["Add to Favorites"]" aria-pressed="@(detailIsFavorite ? "true" : "false")">
+                        <i class="bi @(detailIsFavorite ? "bi-heart-fill" : "bi-heart")"></i>
+                    </button>
+                }
+                else
+                {
+                    <a class="favorite-toggle favorite-toggle-detail" asp-area="Identity" asp-page="/Account/Login" aria-label="@Localizer["Add to Favorites"]">
+                        <i class="bi bi-heart"></i>
+                    </a>
+                }
             }
+        </div>
+    </div>
+
+    <div class="pdp-trust-strip mt-3">
+        <div class="pdp-trust-strip-item">
+            <i class="bi bi-patch-check"></i>
+            <div><span>@Localizer["100% Authentic"]</span><strong>@Localizer["Original Products"]</strong></div>
+        </div>
+        <div class="pdp-trust-strip-item">
+            <i class="bi bi-shield-check"></i>
+            <div><span>@Localizer["Secure Payments"]</span><strong>@Localizer["100% secure checkout"]</strong></div>
+        </div>
+        <div class="pdp-trust-strip-item">
+            <i class="bi bi-arrow-repeat"></i>
+            <div><span>@Localizer["Easy Returns"]</span><strong>@Localizer["Within 30 days"]</strong></div>
+        </div>
+        <div class="pdp-trust-strip-item">
+            <i class="bi bi-headset"></i>
+            <div><span>@Localizer["Customer Support"]</span><strong>@Localizer["24/7 Dedicated Help"]</strong></div>
+        </div>
+    </div>
+
+    <div class="pdp-info-tabs mt-4">
+        <div class="nav pdp-tab-nav" role="tablist">
+            <button class="pdp-tab-link active" data-bs-toggle="pill" data-bs-target="#pdpTabDescription" type="button" role="tab">
+                @Localizer["Description"]
+            </button>
+            @if (specAttributeValues.Count > 0)
+            {
+                <button class="pdp-tab-link" data-bs-toggle="pill" data-bs-target="#pdpTabSpecifications" type="button" role="tab">
+                    @Localizer["Specifications"]
+                </button>
+            }
+            <button class="pdp-tab-link" data-bs-toggle="pill" data-bs-target="#pdpTabShipping" type="button" role="tab">
+                @Localizer["Shipping & Returns"]
+            </button>
+            <button class="pdp-tab-link" data-bs-toggle="pill" data-bs-target="#pdpTabReviews" type="button" role="tab">
+                @Localizer["Reviews"] (@Model.ReviewCount)
+            </button>
+        </div>
+        <div class="tab-content pdp-tab-content">
+            <div class="tab-pane fade show active" id="pdpTabDescription" role="tabpanel">
+                <div class="pdp-description-layout">
+                    <div class="pdp-description-text">
+                        @if (!string.IsNullOrWhiteSpace(Model.LocalizedShortDescription()))
+                        {
+                            <p>@Model.LocalizedShortDescription()</p>
+                        }
+                        @if (!string.IsNullOrWhiteSpace(Model.LocalizedDescription()))
+                        {
+                            <p>@Model.LocalizedDescription()</p>
+                        }
+                        @if (!string.IsNullOrWhiteSpace(Model.LocalizedOverview()))
+                        {
+                            @foreach (var paragraph in Model.LocalizedOverview()!.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+                            {
+                                <p>@paragraph</p>
+                            }
+                        }
+                        @if (featureBullets.Count > 0)
+                        {
+                            <ul class="pdp-checklist">
+                                @foreach (var bullet in featureBullets)
+                                {
+                                    <li><i class="bi bi-check-circle-fill"></i> @bullet</li>
+                                }
+                            </ul>
+                        }
+                    </div>
+                    @if (hasAnyLifestylePhoto)
+                    {
+                        <div class="pdp-description-photo" id="pdpLifestylePhoto" style="@(string.IsNullOrEmpty(initialLifestyleUrl) ? "display:none;" : "")">
+                            <img id="pdpLifestyleImage" src="@initialLifestyleUrl" alt="@Model.LocalizedName()" />
+                        </div>
+                        <script type="application/json" id="lifestyleByColorData">@Html.Raw(lifestyleDataJson)</script>
+                    }
+                </div>
+            </div>
+            @if (specAttributeValues.Count > 0)
+            {
+                <div class="tab-pane fade" id="pdpTabSpecifications" role="tabpanel">
+                    <table class="pdp-spec-table">
+                        <tbody>
+                            @foreach (var attr in specAttributeValues)
+                            {
+                                <tr>
+                                    <th>@(isArabicUi ? (attr.AttributeDefinition?.NameAr ?? attr.AttributeDefinition?.NameEn) : attr.AttributeDefinition?.NameEn)</th>
+                                    <td>@(isArabicUi && !string.IsNullOrWhiteSpace(attr.ValueAr) ? attr.ValueAr : attr.ValueEn)</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+            <div class="tab-pane fade" id="pdpTabShipping" role="tabpanel">
+                <p>@Localizer["We deliver across all seven Emirates, with free shipping on orders over AED 365."]</p>
+                <p>@Localizer["Most items ship out within 1-2 business days of your order."]</p>
+                <p>@Localizer["Not the right fit? Returns are accepted within 30 days of delivery — see our"] <a asp-controller="Home" asp-action="ReturnPolicy">@Localizer["Return & Refund Policy"]</a>.</p>
+            </div>
+            <div class="tab-pane fade" id="pdpTabReviews" role="tabpanel">
+                <div class="pdp-reviews-summary">
+                    <partial name="_StarRating" model="Model" />
+                    <span class="pdp-reviews-summary-count">@Model.Rating.ToString("0.0") &middot; @Localizer["{0} reviews", Model.ReviewCount]</span>
+                </div>
+
+                <div class="pdp-review-form-section">
+                    @if (User.Identity?.IsAuthenticated == true)
+                    {
+                        <h3 class="pdp-review-form-heading">@(myReview != null ? Localizer["Update Your Review"] : Localizer["Write a Review"])</h3>
+                        <form asp-controller="Reviews" asp-action="Submit" method="post" class="pdp-review-form">
+                            <input type="hidden" name="productId" value="@Model.Id" />
+                            <input type="hidden" name="slug" value="@Model.Slug" />
+                            <div class="pdp-star-input" id="reviewStarInput">
+                                @for (int i = 1; i <= 5; i++)
+                                {
+                                    <button type="button" class="pdp-star-input-btn @(myReview != null && myReview.Rating >= i ? "active" : "")" data-value="@i" aria-label="@Localizer["{0} stars", i]">
+                                        <i class="bi @(myReview != null && myReview.Rating >= i ? "bi-star-fill" : "bi-star")"></i>
+                                    </button>
+                                }
+                                <input type="hidden" name="rating" id="reviewRatingInput" value="@(myReview?.Rating ?? 0)" />
+                            </div>
+                            <textarea name="comment" class="pdp-review-textarea" minlength="10" maxlength="1000" required
+                                      placeholder="@Localizer["Share your thoughts about this product (10–1000 characters)..."]">@(myReview?.Comment)</textarea>
+                            <button type="submit" class="pdp-btn-buynow pdp-review-submit">@(myReview != null ? Localizer["Update Review"] : Localizer["Submit Review"])</button>
+                        </form>
+                    }
+                    else
+                    {
+                        <p class="pdp-review-login-prompt">
+                            @Localizer["Please log in to leave a review."]
+                            <a asp-area="Identity" asp-page="/Account/Login" asp-route-returnUrl="@Url.Action("Details", "Products", new { slug = Model.Slug })">@Localizer["Log in"]</a>
+                        </p>
+                    }
+                </div>
+
+                @if (productReviews.Count > 0)
+                {
+                    <div class="pdp-review-list">
+                        @foreach (var review in productReviews)
+                        {
+                            <div class="pdp-review-item">
+                                <div class="pdp-review-item-header">
+                                    <partial name="_StarRatingValue" model="(decimal)review.Rating" />
+                                    <span class="pdp-review-author">@review.ReviewerName</span>
+                                    <span class="pdp-review-date">@review.CreatedAt.ToString("MMM d, yyyy")</span>
+                                </div>
+                                <p class="pdp-review-comment">@review.Comment</p>
+                            </div>
+                        }
+                    </div>
+                }
+            </div>
         </div>
     </div>
 
     @if (related.Count > 0)
     {
-        <div class="section-title mt-5">
-            <h2>@Localizer["You May Also Like"]</h2>
+        <div class="d-flex justify-content-between align-items-center mt-5">
+            <div class="section-title mb-0">
+                <h2>@Localizer["You May Also Like"]</h2>
+            </div>
+            <a class="pdp-view-all" asp-controller="Products" asp-action="Index" asp-route-categoryId="@Model.CategoryId">@Localizer["View All"] <i class="bi bi-arrow-right"></i></a>
         </div>
-        <div class="product-grid">
-            @foreach (var product in related)
-            {
-                <partial name="_ProductCard" model="product" />
-            }
+        <div class="product-carousel">
+            <button type="button" class="product-carousel-arrow product-carousel-prev" aria-label="@Localizer["Previous"]"><i class="bi bi-chevron-left"></i></button>
+            <div class="product-carousel-track">
+                @foreach (var product in related)
+                {
+                    <div class="product-carousel-item">
+                        <partial name="_ProductCard" model="product" />
+                    </div>
+                }
+            </div>
+            <button type="button" class="product-carousel-arrow product-carousel-next" aria-label="@Localizer["Next"]"><i class="bi bi-chevron-right"></i></button>
         </div>
     }
 </div>
@@ -140,4 +661,51 @@
 
 @section Scripts {
     <script src="~/js/product-gallery.js" asp-append-version="true"></script>
+    @if (TempData["ReviewMessage"] != null)
+    {
+        <script>
+            document.addEventListener("DOMContentLoaded", function () {
+                var tabBtn = document.querySelector('[data-bs-target="#pdpTabReviews"]');
+                if (tabBtn && window.bootstrap) {
+                    new bootstrap.Tab(tabBtn).show();
+                }
+            });
+        </script>
+    }
+    <script>
+        (function () {
+            var qtyInput = document.getElementById("cartQuantityInput");
+            var totalEl = document.getElementById("cartTotalPrice");
+            if (!qtyInput || !totalEl) return;
+
+            var unitPrice = parseFloat(qtyInput.getAttribute("data-unit-price"));
+            var symbol = qtyInput.getAttribute("data-currency-symbol") || "";
+
+            function updateTotal() {
+                var qty = parseInt(qtyInput.value, 10);
+                if (!qty || qty < 1) qty = 1;
+                var total = unitPrice * qty;
+                totalEl.textContent = symbol + total.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            }
+
+            qtyInput.addEventListener("input", updateTotal);
+            qtyInput.addEventListener("change", updateTotal);
+
+            var decrementBtn = document.getElementById("cartQtyDecrement");
+            var incrementBtn = document.getElementById("cartQtyIncrement");
+            var min = parseInt(qtyInput.getAttribute("min"), 10) || 1;
+            var max = parseInt(qtyInput.getAttribute("max"), 10) || Infinity;
+
+            function step(delta) {
+                var qty = parseInt(qtyInput.value, 10);
+                if (!qty) qty = min;
+                qty = Math.min(max, Math.max(min, qty + delta));
+                qtyInput.value = qty;
+                updateTotal();
+            }
+
+            if (decrementBtn) decrementBtn.addEventListener("click", function () { step(-1); });
+            if (incrementBtn) incrementBtn.addEventListener("click", function () { step(1); });
+        })();
+    </script>
 }

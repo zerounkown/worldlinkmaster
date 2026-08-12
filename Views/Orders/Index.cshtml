@@ -32,7 +32,7 @@
                     <tr>
                         <td>#@order.Id</td>
                         <td>@order.OrderDate.ToLocalTime().ToString("MMM d, yyyy")</td>
-                        <td><span class="badge badge-status-@order.Status.ToString().ToLower()">@Localizer[order.Status.ToString()]</span></td>
+                        <td><span class="badge-status badge-status-@order.Status.ToString().ToLower()">@Localizer[order.Status.ToString()]</span></td>
                         <td>@order.Total.ToDisplayCurrency()</td>
                         <td><a asp-action="Details" asp-route-id="@order.Id" class="btn btn-sm btn-outline-primary">@Localizer["View"]</a></td>
                     </tr>

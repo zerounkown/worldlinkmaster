@@ -18,9 +18,25 @@
                     <label class="option-label">@Localizer["Size"]</label>
                     <div class="size-options" id="quickAddSizeOptions"></div>
                 </div>
-                <div class="quick-add-error" id="quickAddError">@Localizer["Please select a color and size."]</div>
-                <button type="button" class="btn-wlm w-100 mt-2" id="quickAddSubmitBtn">@Localizer["Add To Basket"]</button>
+
+                <div id="quickAddQtySection" class="mb-3">
+                    <label class="option-label">@Localizer["Quantity"]</label>
+                    <div class="qty-stepper">
+                        <button type="button" class="qty-btn" id="quickAddQtyMinus" aria-label="@Localizer["Decrease quantity"]">&minus;</button>
+                        <span id="quickAddQtyValue">1</span>
+                        <button type="button" class="qty-btn" id="quickAddQtyPlus" aria-label="@Localizer["Increase quantity"]">&plus;</button>
+                    </div>
+                </div>
+
+                <div class="quick-add-price-row mb-3" id="quickAddPriceDisplay"></div>
+
+                <div class="quick-add-error" id="quickAddError"></div>
+                <button type="button" class="btn-wlm w-100 mt-2" id="quickAddSubmitBtn" disabled>@Localizer["Add To Basket"]</button>
             </div>
         </div>
     </div>
+
+    <span id="quickAddSelectPromptText" class="d-none">@Localizer["Please select a color and size."]</span>
+    <span id="quickAddUnavailableText" class="d-none">@Localizer["This combination is currently unavailable."]</span>
+    <span id="quickAddOutOfStockText" class="d-none">@Localizer["Out of Stock"]</span>
 </div>

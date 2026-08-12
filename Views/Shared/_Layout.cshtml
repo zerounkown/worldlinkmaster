@@ -4,10 +4,14 @@
 @using WorldLinkMaster.Web.Data
 @using WorldLinkMaster.Web.Extensions
 @using WorldLinkMaster.Web.Services
+@using Microsoft.Extensions.Configuration
 @inject ApplicationDbContext DbContext
 @inject ICartService CartService
+@inject IFavoriteService FavoriteService
+@inject ICompareService CompareService
 @inject IPromoService PromoService
 @inject ICouponService CouponService
+@inject IConfiguration Configuration
 @{
     var activeSaleEvent = await PromoService.GetTopActiveEventAsync();
     Coupon? newWelcomeCoupon = null;
@@ -73,7 +77,7 @@
     {
         <a class="sale-strip welcome-strip" asp-area="" asp-controller="Coupons" asp-action="Index">
             <span class="sale-strip-icon">🎁</span>
-            <span>@Localizer["Welcome to World Link Master! Enjoy"] <strong>@newWelcomeCoupon.DiscountPercent.ToString("0.##")% @Localizer["off"]</strong> @Localizer["your first order with code"] <strong>@newWelcomeCoupon.Code</strong></span>
+            <span>@Localizer["Welcome to World Link Master! Enjoy"] <strong>@newWelcomeCoupon.DiscountPercent.ToString("0.##")%</strong> @Localizer["your first order with code"] <strong>@newWelcomeCoupon.Code</strong></span>
             <span class="sale-strip-cta">@Localizer["View My Coupons"] <i class="bi bi-arrow-right"></i></span>
         </a>
     }
@@ -90,19 +94,6 @@
             <span><i class="bi bi-truck"></i> @Localizer["Free shipping on orders over AED 365"]</span>
             <div class="topbar-right">
                 <a class="topbar-quote-link" asp-area="" asp-controller="QuoteRequests" asp-action="Create" aria-label="@Localizer["Bulk Pricing / Request a Quote"]"><i class="bi bi-file-earmark-text"></i> <span>@Localizer["Bulk Pricing / Request a Quote"]</span></a>
-                <div class="lang-switch">
-                    <form asp-area="" asp-controller="Localization" asp-action="SetLanguage" method="post" class="d-inline">
-                        <input type="hidden" name="returnUrl" value="@returnUrl" />
-                        <input type="hidden" name="culture" value="ar" />
-                        <button type="submit" class="lang-switch-btn @(isRtl ? "active" : "")">العربية</button>
-                    </form>
-                    <span class="lang-switch-sep">|</span>
-                    <form asp-area="" asp-controller="Localization" asp-action="SetLanguage" method="post" class="d-inline">
-                        <input type="hidden" name="returnUrl" value="@returnUrl" />
-                        <input type="hidden" name="culture" value="en" />
-                        <button type="submit" class="lang-switch-btn @(!isRtl ? "active" : "")">English</button>
-                    </form>
-                </div>
                 <span class="topbar-contact"><i class="bi bi-telephone"></i> 1-800-555-0199</span>
             </div>
         </div>
@@ -130,8 +121,27 @@
                     @{
                         var uaeFlagSvg = "<svg class=\"currency-flag\" viewBox=\"0 0 20 14\" xmlns=\"http://www.w3.org/2000/svg\"><rect width=\"20\" height=\"14\" fill=\"#fff\"/><rect width=\"20\" height=\"4.67\" fill=\"#00732f\"/><rect y=\"9.33\" width=\"20\" height=\"4.67\" fill=\"#000\"/><rect width=\"6\" height=\"14\" fill=\"#ce1126\"/></svg>";
                         var usFlagSvg = "<svg class=\"currency-flag\" viewBox=\"0 0 20 14\" xmlns=\"http://www.w3.org/2000/svg\"><rect width=\"20\" height=\"14\" fill=\"#b22234\"/><rect y=\"1.08\" width=\"20\" height=\"1.08\" fill=\"#fff\"/><rect y=\"3.23\" width=\"20\" height=\"1.08\" fill=\"#fff\"/><rect y=\"5.38\" width=\"20\" height=\"1.08\" fill=\"#fff\"/><rect y=\"7.54\" width=\"20\" height=\"1.08\" fill=\"#fff\"/><rect y=\"9.69\" width=\"20\" height=\"1.08\" fill=\"#fff\"/><rect y=\"11.85\" width=\"20\" height=\"1.08\" fill=\"#fff\"/><rect width=\"8\" height=\"7.54\" fill=\"#3c3b6e\"/></svg>";
+                        var ukFlagSvg = "<svg class=\"currency-flag\" viewBox=\"0 0 20 14\" xmlns=\"http://www.w3.org/2000/svg\"><rect width=\"20\" height=\"14\" fill=\"#00247d\"/><path d=\"M0,0 L20,14 M20,0 L0,14\" stroke=\"#fff\" stroke-width=\"2.4\"/><path d=\"M0,0 L20,14 M20,0 L0,14\" stroke=\"#cf142b\" stroke-width=\"0.8\"/><path d=\"M10,0 V14 M0,7 H20\" stroke=\"#fff\" stroke-width=\"4\"/><path d=\"M10,0 V14 M0,7 H20\" stroke=\"#cf142b\" stroke-width=\"2.4\"/></svg>";
                         var currentCurrencyFlagSvg = WorldLinkMaster.Web.Services.CurrencyContext.Current == "USD" ? usFlagSvg : uaeFlagSvg;
+                        var currentLangFlagSvg = isRtl ? uaeFlagSvg : ukFlagSvg;
                     }
+                    <div class="currency-switch">
+                        <button type="button" class="currency-switch-toggle" id="langSwitchToggle" aria-expanded="false">
+                            @Html.Raw(currentLangFlagSvg) @(isRtl ? "العربية" : "English") <i class="bi bi-chevron-down"></i>
+                        </button>
+                        <div class="currency-switch-panel" id="langSwitchPanel">
+                            <form asp-area="" asp-controller="Localization" asp-action="SetLanguage" method="post">
+                                <input type="hidden" name="returnUrl" value="@returnUrl" />
+                                <input type="hidden" name="culture" value="en" />
+                                <button type="submit" class="@(!isRtl ? "active" : "")">@Html.Raw(ukFlagSvg) English</button>
+                            </form>
+                            <form asp-area="" asp-controller="Localization" asp-action="SetLanguage" method="post">
+                                <input type="hidden" name="returnUrl" value="@returnUrl" />
+                                <input type="hidden" name="culture" value="ar" />
+                                <button type="submit" class="@(isRtl ? "active" : "")">@Html.Raw(uaeFlagSvg) العربية</button>
+                            </form>
+                        </div>
+                    </div>
                     <div class="currency-switch">
                         <button type="button" class="currency-switch-toggle" id="currencySwitchToggle" aria-expanded="false">
                             @Html.Raw(currentCurrencyFlagSvg) @WorldLinkMaster.Web.Services.CurrencyContext.Current <i class="bi bi-chevron-down"></i>
@@ -150,6 +160,34 @@
                         </div>
                     </div>
                     <partial name="_LoginPartial" />
+                    @if (User.Identity?.IsAuthenticated == true)
+                    {
+                        <a class="favorites-link" asp-area="" asp-controller="Favorites" asp-action="Index" title="@Localizer["My Favorites"]">
+                            <i class="bi bi-heart"></i>
+                            <span class="favorites-label">@Localizer["Favorites"] (<span class="favorites-count">@await FavoriteService.GetCountAsync()</span>)</span>
+                        </a>
+                    }
+                    else
+                    {
+                        <a class="favorites-link" asp-area="Identity" asp-page="/Account/Login" title="@Localizer["My Favorites"]">
+                            <i class="bi bi-heart"></i>
+                            <span class="favorites-label">@Localizer["Favorites"] (<span class="favorites-count">0</span>)</span>
+                        </a>
+                    }
+                    @if (User.Identity?.IsAuthenticated == true)
+                    {
+                        <a class="favorites-link" asp-area="" asp-controller="Compare" asp-action="Index" title="@Localizer["Compare"]">
+                            <i class="bi bi-arrow-left-right"></i>
+                            <span class="favorites-label">@Localizer["Compare"] (<span class="compare-count">@await CompareService.GetCountAsync()</span>)</span>
+                        </a>
+                    }
+                    else
+                    {
+                        <a class="favorites-link" asp-area="Identity" asp-page="/Account/Login" title="@Localizer["Compare"]">
+                            <i class="bi bi-arrow-left-right"></i>
+                            <span class="favorites-label">@Localizer["Compare"] (<span class="compare-count">0</span>)</span>
+                        </a>
+                    }
                     <a class="cart-link" asp-area="" asp-controller="Cart" asp-action="Index">
                         <i class="bi bi-bag"></i>
                         <span class="cart-label">@Localizer["Cart"] (<span class="cart-count">@CartService.GetItemCount()</span>)</span>
@@ -351,6 +389,8 @@
                 <ul>
                     <li><a asp-area="" asp-controller="Home" asp-action="About">@Localizer["About Us"]</a></li>
                     <li><a asp-area="" asp-controller="Home" asp-action="Contact">@Localizer["Contact"]</a></li>
+                    <li><a asp-area="" asp-controller="Home" asp-action="Terms">@Localizer["Terms & Conditions"]</a></li>
+                    <li><a asp-area="" asp-controller="Home" asp-action="ReturnPolicy">@Localizer["Return & Refund Policy"]</a></li>
                     <li><a asp-area="" asp-controller="Home" asp-action="Privacy">@Localizer["Privacy Policy"]</a></li>
                     <li><a asp-area="" asp-controller="MerchantOnboarding" asp-action="Apply">@Localizer["Sell on World Link Master"]</a></li>
                     <li><a asp-area="" asp-controller="Wholesale" asp-action="Apply">@Localizer["Trade / Wholesale Pricing"]</a></li>
@@ -365,13 +405,43 @@
                     <li><a asp-area="Identity" asp-page="/Account/Register">@Localizer["Create Account"]</a></li>
                 </ul>
             </div>
-            <div class="footer-col">
-                <h6>@Localizer["Connect"]</h6>
-                <div class="footer-social">
-                    <a href="#"><i class="bi bi-facebook"></i></a>
-                    <a href="#"><i class="bi bi-instagram"></i></a>
-                    <a href="#"><i class="bi bi-youtube"></i></a>
+            @{
+                var facebookUrl = Configuration["SocialLinks:Facebook"];
+                var instagramUrl = Configuration["SocialLinks:Instagram"];
+                var youtubeUrl = Configuration["SocialLinks:YouTube"];
+                var hasSocialLinks = !string.IsNullOrWhiteSpace(facebookUrl)
+                    || !string.IsNullOrWhiteSpace(instagramUrl)
+                    || !string.IsNullOrWhiteSpace(youtubeUrl);
+            }
+            @if (hasSocialLinks)
+            {
+                <div class="footer-col">
+                    <h6>@Localizer["Connect"]</h6>
+                    <div class="footer-social">
+                        @if (!string.IsNullOrWhiteSpace(facebookUrl))
+                        {
+                            <a href="@facebookUrl" target="_blank" rel="noopener noreferrer"><i class="bi bi-facebook"></i></a>
+                        }
+                        @if (!string.IsNullOrWhiteSpace(instagramUrl))
+                        {
+                            <a href="@instagramUrl" target="_blank" rel="noopener noreferrer"><i class="bi bi-instagram"></i></a>
+                        }
+                        @if (!string.IsNullOrWhiteSpace(youtubeUrl))
+                        {
+                            <a href="@youtubeUrl" target="_blank" rel="noopener noreferrer"><i class="bi bi-youtube"></i></a>
+                        }
+                    </div>
                 </div>
+            }
+        </div>
+        <div class="container footer-payments">
+            <span class="footer-payments-label">@Localizer["We Accept"]</span>
+            <div class="footer-payments-icons">
+                <img src="~/images/payments/visa.png" alt="Visa" />
+                <img src="~/images/payments/mastercard.png" alt="Mastercard" />
+                <img src="~/images/payments/apple-pay.jpg" alt="Apple Pay" />
+                <img src="~/images/payments/tabby.png" alt="Tabby" />
+                <img src="~/images/payments/tamara.png" alt="Tamara" />
             </div>
         </div>
         <div class="container footer-bottom">
@@ -381,10 +451,15 @@
 
     @{
         var showChatWidget = User.Identity?.IsAuthenticated == true && !User.IsInRole("Admin") && !User.IsInRole("Support");
+        var showWhatsAppWidget = !User.IsInRole("Admin") && !User.IsInRole("Support");
     }
     @if (showChatWidget)
     {
         <partial name="_ChatWidget" />
+    }
+    @if (showWhatsAppWidget)
+    {
+        <partial name="_WhatsAppWidget" />
     }
 
     <partial name="_QuickAddModal" />
@@ -396,12 +471,17 @@
     <script src="~/js/delete-button.js" asp-append-version="true"></script>
     <script src="~/js/main-nav-dropdown.js" asp-append-version="true"></script>
     <script src="~/js/currency-switch.js" asp-append-version="true"></script>
+    <script src="~/js/lang-switch-dropdown.js" asp-append-version="true"></script>
     <script src="~/js/header-search.js" asp-append-version="true"></script>
     <script src="~/js/sticky-header.js" asp-append-version="true"></script>
     @if (showChatWidget)
     {
         <script src="~/lib/signalr/dist/browser/signalr.min.js"></script>
         <script src="~/js/chat-widget.js" asp-append-version="true"></script>
+    }
+    @if (showWhatsAppWidget)
+    {
+        <script src="~/js/whatsapp-widget.js" asp-append-version="true"></script>
     }
     @await RenderSectionAsync("Scripts", required: false)
 </body>

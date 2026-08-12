@@ -45,7 +45,7 @@ public class OrdersController : AdminBaseController
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> UpdateStatus(int id, OrderStatus status)
+    public async Task<IActionResult> UpdateStatus(int id, OrderStatus status, string? trackingNumber)
     {
         var order = await _context.Orders.FindAsync(id);
         if (order == null)
@@ -54,6 +54,17 @@ public class OrdersController : AdminBaseController
         }
 
         order.Status = status;
+        order.TrackingNumber = string.IsNullOrWhiteSpace(trackingNumber) ? null : trackingNumber.Trim();
+
+        if (status == OrderStatus.Shipped && order.ShippedAt == null)
+        {
+            order.ShippedAt = DateTime.UtcNow;
+        }
+        if (status == OrderStatus.Delivered && order.DeliveredAt == null)
+        {
+            order.DeliveredAt = DateTime.UtcNow;
+        }
+
         await _context.SaveChangesAsync();
         TempData["AdminMessage"] = _localizer["Order #{0} status updated to {1}.", order.Id, _localizer[status.ToString()].Value].Value;
 

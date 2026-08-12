@@ -2,6 +2,9 @@
 @model Order
 @{
     ViewData["Title"] = Localizer["Order #{0}", Model.Id];
+    var stageOrder = new[] { OrderStatus.Pending, OrderStatus.Processing, OrderStatus.Shipped, OrderStatus.OutForDelivery, OrderStatus.Delivered };
+    var stageLabels = new[] { "Order Placed", "Processing", "Shipped", "Out for Delivery", "Delivered" };
+    var currentStageIndex = Array.IndexOf(stageOrder, Model.Status);
 }
 
 <div class="page-banner">
@@ -9,7 +12,52 @@
 </div>
 
 <div class="container mb-5">
-    <p><span class="badge badge-status-@Model.Status.ToString().ToLower()">@Localizer[Model.Status.ToString()]</span> &middot; @Localizer["Placed {0}", Model.OrderDate.ToLocalTime().ToString("MMM d, yyyy")]</p>
+    <p><span class="badge-status badge-status-@Model.Status.ToString().ToLower()">@Localizer[Model.Status.ToString()]</span> &middot; @Localizer["Placed {0}", Model.OrderDate.ToLocalTime().ToString("MMM d, yyyy")]</p>
+
+    <ol class="checkout-stepper order-tracking-stepper mb-4">
+        @for (int i = 0; i < stageOrder.Length; i++)
+        {
+            // The last stage (Delivered) has nothing after it to be "in progress" toward, so once
+            // it's the current status the whole timeline reads as complete rather than leaving the
+            // final circle showing a bare step number.
+            var isLastStage = i == stageOrder.Length - 1;
+            var cls = (i < currentStageIndex || (isLastStage && i == currentStageIndex))
+                ? "completed"
+                : (i == currentStageIndex ? "active" : "");
+            DateTime? stepDate = i == 0 ? Model.OrderDate : i == 2 ? Model.ShippedAt : i == 4 ? Model.DeliveredAt : null;
+            <li class="checkout-step @cls">
+                <span class="checkout-step-num">
+                    @if (cls == "completed")
+                    {
+                        <i class="bi bi-check-lg"></i>
+                    }
+                    else
+                    {
+                        @(i + 1)
+                    }
+                </span>
+                @Localizer[stageLabels[i]]
+                @if (stepDate.HasValue)
+                {
+                    <span class="order-tracking-step-date">@stepDate.Value.ToLocalTime().ToString("MMM d, yyyy")</span>
+                }
+            </li>
+        }
+    </ol>
+
+    @if (!string.IsNullOrEmpty(Model.TrackingUrl))
+    {
+        <div class="order-tracking-box mb-4">
+            <div>
+                <i class="bi bi-truck"></i>
+                <span><strong>@(string.IsNullOrEmpty(Model.Carrier) ? "FedEx" : Model.Carrier) &mdash; @Model.TrackingNumber</strong></span>
+            </div>
+            <a href="@Model.TrackingUrl" target="_blank" rel="noopener noreferrer" class="btn-wlm-outline-dark">
+                @Localizer["Track on FedEx"] <i class="bi bi-box-arrow-up-right"></i>
+            </a>
+        </div>
+    }
+
     <div class="row">
         <div class="col-12 col-md-7">
             <div class="table-responsive">

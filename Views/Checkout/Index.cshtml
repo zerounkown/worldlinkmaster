@@ -1,22 +1,38 @@
 @using WorldLinkMaster.Web.Models.ViewModels
+@using Microsoft.AspNetCore.Identity
+@using WorldLinkMaster.Web.Models
+@inject UserManager<ApplicationUser> UserManager
 @model CheckoutViewModel
 @{
     ViewData["Title"] = Localizer["Checkout"];
+    var checkoutUserEmail = User.Identity != null ? (await UserManager.GetUserAsync(User))?.Email : null;
 }
+
+@Html.AntiForgeryToken()
 
 <div class="page-banner">
     <div class="container"><h1>@Localizer["Checkout"]</h1></div>
 </div>
 
-<div class="container mb-5">
+<div class="container mb-5" id="checkout-wizard-root" data-user-email="@checkoutUserEmail">
     @if (TempData["CheckoutMessage"] != null)
     {
         <div class="alert alert-info">@TempData["CheckoutMessage"]</div>
     }
+
+    <ol class="checkout-stepper" id="checkoutStepper">
+        <li class="checkout-step active" data-step="1"><span class="checkout-step-num">1</span> @Localizer["Shipping"]</li>
+        <li class="checkout-step" data-step="2"><span class="checkout-step-num">2</span> @Localizer["Payment"]</li>
+        <li class="checkout-step" data-step="3"><span class="checkout-step-num">3</span> @Localizer["Review"]</li>
+        <li class="checkout-step" data-step="4"><span class="checkout-step-num">4</span> @Localizer["Confirmation"]</li>
+    </ol>
+
     <div class="row">
         <div class="col-12 col-md-7">
-            <h4 class="mb-3">@Localizer["Shipping Information"]</h4>
-            <form asp-controller="Checkout" asp-action="PlaceOrder" method="post">
+
+            @* ---------------- Step 1: Shipping ---------------- *@
+            <div class="checkout-step-panel" id="checkoutPanelShipping">
+                <h4 class="mb-3">@Localizer["Shipping Information"]</h4>
                 <div asp-validation-summary="ModelOnly" class="text-danger"></div>
                 <div class="mb-3">
                     <label asp-for="ShippingName" class="form-label"></label>
@@ -54,11 +70,41 @@
                 {
                     <div class="alert alert-warning">@Localizer["Stripe isn't configured yet. Add your Stripe test API keys to"] <code>appsettings.json</code> @Localizer["to enable checkout."]</div>
                 }
-                <p class="text-muted small"><i class="bi bi-shield-check"></i> @Localizer["We'll email you a one-time verification code before payment, then you'll enter your card details on Stripe's secure checkout page."]</p>
-                <button type="submit" class="btn-wlm" @(ViewBag.StripeConfigured != true ? "disabled" : null)>
+                <p class="text-muted small"><i class="bi bi-shield-check"></i> @Localizer["We'll email you a one-time verification code, then you'll enter your card details right here."]</p>
+                <div class="checkout-step-error" id="shippingError"></div>
+                <button type="button" class="btn-wlm" id="shippingContinueBtn" @(ViewBag.StripeConfigured != true ? "disabled" : null)>
                     <i class="bi bi-shield-lock"></i> @Localizer["Send Verification Code"]
                 </button>
-            </form>
+            </div>
+
+            @* ---------------- Step 2: Payment ---------------- *@
+            <div class="checkout-step-panel d-none" id="checkoutPanelPayment">
+                <h4 class="mb-3">@Localizer["Payment"]</h4>
+                <p class="text-muted small"><i class="bi bi-lock-fill"></i> @Localizer["Your card details are entered directly into Stripe's secure form below — they never touch our servers."]</p>
+                <div class="stripe-element-box">
+                    <div id="stripe-payment-element"></div>
+                </div>
+                <div class="checkout-step-error" id="paymentError"></div>
+                <div class="d-flex gap-2 mt-3">
+                    <button type="button" class="btn-wlm" id="paymentContinueBtn">@Localizer["Review Order"]</button>
+                </div>
+            </div>
+
+            @* ---------------- Step 3: Review ---------------- *@
+            <div class="checkout-step-panel d-none" id="checkoutPanelReview">
+                <h4 class="mb-3">@Localizer["Review Your Order"]</h4>
+                <div class="review-recap-box mb-3">
+                    <h6>@Localizer["Shipping To"]</h6>
+                    <div id="reviewShippingRecap" class="text-muted small"></div>
+                </div>
+                <p class="text-muted small"><i class="bi bi-credit-card"></i> @Localizer["You'll be charged using the card details entered in the previous step."]</p>
+                <div class="checkout-step-error" id="reviewError"></div>
+                <div class="d-flex gap-2 mt-3">
+                    <button type="button" class="btn btn-outline-secondary" id="reviewBackBtn">@Localizer["Back"]</button>
+                    <button type="button" class="btn-wlm" id="placeOrderBtn">@Localizer["Place Order"]</button>
+                </div>
+            </div>
+
         </div>
         <div class="col-12 col-md-5">
             <div class="summary-box">
@@ -122,6 +168,39 @@
     </div>
 </div>
 
+@* ---------------- OTP verification modal ---------------- *@
+<div class="modal fade checkout-otp-modal" id="checkoutOtpModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div>
+                    <h5 class="modal-title">@Localizer["Verify Your Email"]</h5>
+                    <div class="modal-subtitle">@Localizer["We sent a 6-digit code to"] <strong id="otpEmailLabel"></strong></div>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="@Localizer["Close"]"></button>
+            </div>
+            <div class="modal-body">
+                <input type="text" inputmode="numeric" maxlength="6" autocomplete="one-time-code" class="form-control otp-code-input" id="otpCodeInput" placeholder="######" />
+                <div class="checkout-step-error mt-2" id="otpError"></div>
+                <button type="button" class="btn-wlm w-100 mt-3" id="otpVerifyBtn">@Localizer["Verify"]</button>
+                <button type="button" class="btn btn-link w-100 mt-1" id="otpResendBtn">@Localizer["Resend Code"]</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 @section Scripts {
     <partial name="_ValidationScriptsPartial" />
+    <script src="https://js.stripe.com/v3/"></script>
+    <script>
+        window.checkoutConfig = {
+            sendOtpUrl: '@Url.Action("SendOtpAjax")',
+            verifyOtpUrl: '@Url.Action("VerifyOtpAjax")',
+            resendOtpUrl: '@Url.Action("ResendOtpAjax")',
+            createPaymentIntentUrl: '@Url.Action("CreatePaymentIntent")',
+            confirmOrderUrl: '@Url.Action("ConfirmOrder")',
+            publishableKey: '@ViewBag.StripePublishableKey'
+        };
+    </script>
+    <script src="~/js/checkout-wizard.js"></script>
 }

@@ -1,0 +1,48 @@
+name: Deploy to Azure
+
+# Runs after a PR merges into main. Both test jobs are re-run here (not just relied upon from the
+# PR's own checks) so deployment is self-gating on the exact commit being shipped, regardless of
+# whether branch protection is configured to require those checks — see "needs" below, which
+# only lets "deploy" run if both jobs succeed.
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  unit-integration-tests:
+    uses: ./.github/workflows/_unit-tests.yml
+
+  e2e-tests:
+    uses: ./.github/workflows/_e2e-tests.yml
+    secrets: inherit
+
+  deploy:
+    name: Deploy to Azure App Service
+    needs: [unit-integration-tests, e2e-tests]
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: ${{ steps.deploy-to-webapp.outputs.webapp-url }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+
+      - name: Publish
+        run: dotnet publish WorldLinkMaster.Web.csproj -c Release -o ./publish
+
+      # Production runtime configuration (ConnectionStrings__DefaultConnection, Stripe live/test
+      # keys, Jwt__Key, SMTP, etc.) lives in the Azure App Service's own Application Settings, not
+      # here — this step only replaces the deployed code/binaries.
+      - name: Deploy to Azure Web App
+        id: deploy-to-webapp
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: WLM
+          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
+          package: ./publish

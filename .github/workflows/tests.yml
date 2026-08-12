@@ -1,0 +1,9 @@
+name: Tests
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  unit-integration-tests:
+    uses: ./.github/workflows/_unit-tests.yml

@@ -24,6 +24,7 @@
         </button>
         <ul class="dropdown-menu dropdown-menu-end account-dropdown">
             <li><a class="dropdown-item" asp-area="" asp-controller="Profile" asp-action="Index"><i class="bi bi-person-badge"></i> @Localizer["My Profile"]</a></li>
+            <li><a class="dropdown-item" asp-area="" asp-controller="Favorites" asp-action="Index"><i class="bi bi-heart"></i> @Localizer["My Favorites"]</a></li>
             <li><a class="dropdown-item" asp-area="" asp-controller="Orders" asp-action="Index">@Localizer["My Orders"]</a></li>
             <li><a class="dropdown-item" asp-area="" asp-controller="Coupons" asp-action="Index"><i class="bi bi-ticket-perforated"></i> @Localizer["My Coupons"]</a></li>
             <li><a class="dropdown-item" asp-area="Identity" asp-page="/Account/Manage/Index">@Localizer["Account Settings"]</a></li>

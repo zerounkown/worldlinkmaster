@@ -33,7 +33,7 @@
                         <br /><small class="text-muted">@c.Description</small>
                     }
                 </td>
-                <td>@c.DiscountPercent.ToString("0.##")% @Localizer["OFF (badge)"]</td>
+                <td>@c.DiscountPercent.ToString("0.##")% @Localizer["OFF"]</td>
                 <td>@(c.StartsAt?.ToString("MMM d, yyyy") ?? Localizer["Any time"].Value) &rarr; @(c.ExpiresAt?.ToString("MMM d, yyyy") ?? Localizer["No expiry"].Value)</td>
                 <td>@c.RedemptionCount@(c.MaxRedemptions.HasValue ? $" / {c.MaxRedemptions}" : "")</td>
                 <td><span class="badge bg-@status.Item2">@status.Item1</span></td>

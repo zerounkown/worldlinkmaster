@@ -10,7 +10,7 @@
 }
 
 <h1>@Localizer["Delete Customer"]</h1>
-<p>@Localizer["Are you sure you want to delete {0}?", Model.Email]</p>
+<p>@Localizer["Are you sure you want to delete {0}?", Model.Email ?? string.Empty]</p>
 
 @if (blocked)
 {

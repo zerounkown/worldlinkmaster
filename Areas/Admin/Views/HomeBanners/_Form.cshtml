@@ -1,0 +1,57 @@
+@using WorldLinkMaster.Web.Models
+@model HomeBanner
+
+<div asp-validation-summary="ModelOnly" class="text-danger"></div>
+@if (Model.Id != 0)
+{
+    <input type="hidden" asp-for="Id" />
+}
+<input type="hidden" asp-for="CreatedAt" />
+
+<div class="row">
+    <div class="col-12 col-sm-6 mb-3">
+        <label asp-for="TitleEn" class="form-label">@Localizer["Title (English)"]</label>
+        <input asp-for="TitleEn" class="form-control" placeholder="e.g. UAE Summer Surprises" />
+        <span asp-validation-for="TitleEn" class="text-danger"></span>
+    </div>
+    <div class="col-12 col-sm-6 mb-3">
+        <label asp-for="TitleAr" class="form-label">@Localizer["Title (Arabic)"]</label>
+        <input asp-for="TitleAr" class="form-control" dir="rtl" />
+    </div>
+</div>
+<div class="row">
+    <div class="col-12 col-sm-6 mb-3">
+        <label asp-for="SubtitleEn" class="form-label">@Localizer["Subtitle (English)"]</label>
+        <input asp-for="SubtitleEn" class="form-control" placeholder="A short line under the title" />
+    </div>
+    <div class="col-12 col-sm-6 mb-3">
+        <label asp-for="SubtitleAr" class="form-label">@Localizer["Subtitle (Arabic)"]</label>
+        <input asp-for="SubtitleAr" class="form-control" dir="rtl" />
+    </div>
+</div>
+<div class="mb-3">
+    <label asp-for="ImageUrl" class="form-label">@Localizer["Image URL"]</label>
+    <input asp-for="ImageUrl" class="form-control" placeholder="https://..." />
+    <span asp-validation-for="ImageUrl" class="text-danger"></span>
+    <div class="form-text">@Localizer["Recommended: 2100×900px (21:9 wide banner), JPEG, under 500KB. Keep key subject matter centered — this crops to 4:3 on mobile."]</div>
+</div>
+<div class="mb-3">
+    <label asp-for="LinkUrl" class="form-label">@Localizer["Link URL (optional)"]</label>
+    <input asp-for="LinkUrl" class="form-control" placeholder="/Products?categoryId=3" />
+    <div class="form-text">@Localizer["Where clicking the banner takes the customer. Leave blank for a non-clickable banner."]</div>
+</div>
+<div class="row">
+    <div class="col-6 col-sm-4 mb-3">
+        <label asp-for="DisplayOrder" class="form-label">@Localizer["Display Order"]</label>
+        <input asp-for="DisplayOrder" class="form-control" />
+    </div>
+    <div class="col-6 col-sm-4 mb-3 d-flex align-items-end">
+        <div class="form-check">
+            <input asp-for="Active" class="form-check-input" />
+            <label asp-for="Active" class="form-check-label">@Localizer["Active"]</label>
+        </div>
+    </div>
+</div>
+
+<button type="submit" class="btn btn-primary">@Localizer["Save"]</button>
+<a asp-action="Index" class="btn btn-outline-secondary">@Localizer["Cancel"]</a>

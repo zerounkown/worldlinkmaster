@@ -18,45 +18,14 @@ public class HomeController : Controller
         _promoService = promoService;
     }
 
-    public async Task<IActionResult> Index()
+    // "/" is served by Welcome (see Program.cs "root" route). This action used to render a
+    // second, separately-maintained homepage at /Home/Index that nothing in the site linked to —
+    // it had drifted out of sync with Welcome (different footer copy, different product rows).
+    // Rather than keep two homepages in sync forever, /Home/Index now just forwards to the one
+    // real homepage so old bookmarks/links still land somewhere correct.
+    public IActionResult Index()
     {
-        ViewBag.Categories = await _context.Categories.OrderBy(c => c.Name).ToListAsync();
-        ViewBag.ActiveEvent = await _promoService.GetTopActiveEventAsync();
-        ViewBag.ShowcaseEvents = await _promoService.GetShowcaseEventsAsync();
-        var featured = await _context.Products
-            .Include(p => p.Category)
-            .Include(p => p.Colors.OrderBy(c => c.SortOrder))
-            .Include(p => p.Sizes.OrderBy(s => s.SortOrder))
-            .Where(p => p.IsFeatured)
-            .OrderBy(p => p.Name)
-            .Take(8)
-            .ToListAsync();
-        var featuredIds = featured.Select(p => p.Id).ToList();
-
-        // "Best sellers" — approximated by review volume/rating since there's no sales-count field yet.
-        ViewBag.BestSellers = await _context.Products
-            .Include(p => p.Category)
-            .Include(p => p.Colors.OrderBy(c => c.SortOrder))
-            .Include(p => p.Sizes.OrderBy(s => s.SortOrder))
-            .Where(p => !featuredIds.Contains(p.Id))
-            .OrderByDescending(p => p.ReviewCount)
-            .ThenByDescending(p => p.Rating)
-            .Take(4)
-            .ToListAsync();
-        var bestSellerIds = ((List<Product>)ViewBag.BestSellers).Select(p => p.Id).ToList();
-
-        // "Trending / variety" — a different slice (most recently added) so the homepage shows
-        // a broader assortment than just featured + best-sellers.
-        ViewBag.TrendingProducts = await _context.Products
-            .Include(p => p.Category)
-            .Include(p => p.Colors.OrderBy(c => c.SortOrder))
-            .Include(p => p.Sizes.OrderBy(s => s.SortOrder))
-            .Where(p => !featuredIds.Contains(p.Id) && !bestSellerIds.Contains(p.Id))
-            .OrderByDescending(p => p.CreatedAt)
-            .Take(8)
-            .ToListAsync();
-
-        return View(featured);
+        return RedirectToAction(nameof(Welcome));
     }
 
     public async Task<IActionResult> Welcome()
@@ -69,7 +38,45 @@ public class HomeController : Controller
             .Take(16)
             .ToListAsync();
         ViewBag.ScrollProducts = scrollProducts;
+        ViewBag.HomeBanners = await _context.HomeBanners
+            .Where(b => b.Active)
+            .OrderBy(b => b.DisplayOrder)
+            .ToListAsync();
         ViewBag.Categories = await _context.Categories.OrderBy(c => c.Name).ToListAsync();
+        // Only show brands with a real logo in the "Shop by Brand" row — mixing those in
+        // with plain text-wordmark placeholder tiles looked inconsistent.
+        ViewBag.Brands = await _context.Brands.Where(b => b.LogoUrl != null)
+            .OrderByDescending(b => b.Name == "WLM")
+            .ThenBy(b => b.Name)
+            .ToListAsync();
+        ViewBag.ActiveEvent = await _promoService.GetTopActiveEventAsync();
+
+        ViewBag.FeaturedProducts = await _context.Products
+            .Include(p => p.Variants).ThenInclude(v => v.Color)
+            .Include(p => p.Variants).ThenInclude(v => v.Size)
+            .Include(p => p.Variants).ThenInclude(v => v.ProductColor)
+            .Where(p => p.IsFeatured)
+            .OrderByDescending(p => p.Rating)
+            .Take(2)
+            .ToListAsync();
+
+        // "Best sellers" — approximated by review volume/rating since there's no sales-count field yet.
+        ViewBag.BestSellers = await _context.Products
+            .Include(p => p.Variants).ThenInclude(v => v.Color)
+            .Include(p => p.Variants).ThenInclude(v => v.Size)
+            .Include(p => p.Variants).ThenInclude(v => v.ProductColor)
+            .OrderByDescending(p => p.ReviewCount)
+            .ThenByDescending(p => p.Rating)
+            .Take(2)
+            .ToListAsync();
+
+        ViewBag.NewArrivals = await _context.Products
+            .Include(p => p.Variants).ThenInclude(v => v.Color)
+            .Include(p => p.Variants).ThenInclude(v => v.Size)
+            .Include(p => p.Variants).ThenInclude(v => v.ProductColor)
+            .OrderByDescending(p => p.CreatedAt)
+            .Take(2)
+            .ToListAsync();
 
         return View();
     }
@@ -81,7 +88,7 @@ public class HomeController : Controller
 
     public IActionResult Contact()
     {
-        return View();
+        return View(new WorldLinkMaster.Web.Models.ViewModels.LeadFormViewModel());
     }
 
     public IActionResult Locations()
@@ -90,6 +97,16 @@ public class HomeController : Controller
     }
 
     public IActionResult Privacy()
+    {
+        return View();
+    }
+
+    public IActionResult Terms()
+    {
+        return View();
+    }
+
+    public IActionResult ReturnPolicy()
     {
         return View();
     }

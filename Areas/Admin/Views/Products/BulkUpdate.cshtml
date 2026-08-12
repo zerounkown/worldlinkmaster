@@ -2,17 +2,19 @@
 @model BulkImportResult
 @{
     ViewData["Title"] = Localizer["Bulk Update (Excel)"];
-    var hasResult = Model.UpdatedCount > 0 || Model.CreatedCount > 0 || Model.Errors.Count > 0;
+    var hasResult = Model.UpdatedCount > 0 || Model.CreatedCount > 0 || Model.VariantsUpdatedCount > 0 || Model.VariantsCreatedCount > 0 || Model.Errors.Count > 0;
 }
 
 <h1>@Localizer["Bulk Update & Add Products (Excel)"]</h1>
-<p class="text-muted">@Localizer["Update prices, wholesale prices, and stock quantities — or add brand-new products — for many items at once."]</p>
+<p class="text-muted">@Localizer["Update prices, wholesale prices, stock quantities, and color/size variants — or add brand-new products — for many items at once."]</p>
 
 @if (hasResult)
 {
     <div class="alert @(Model.Errors.Count > 0 ? "alert-warning" : "alert-success")">
         <div><strong>@Localizer["{0} product(s) updated.", Model.UpdatedCount]</strong></div>
         <div><strong>@Localizer["{0} new product(s) created.", Model.CreatedCount]</strong></div>
+        <div><strong>@Localizer["{0} variant(s) updated.", Model.VariantsUpdatedCount]</strong></div>
+        <div><strong>@Localizer["{0} new variant(s) created.", Model.VariantsCreatedCount]</strong></div>
 
         @if (Model.Errors.Count > 0)
         {
@@ -35,7 +37,7 @@
     <div class="col-12 col-md-6">
         <div class="summary-box">
             <h4>@Localizer["1. Download the current catalog"]</h4>
-            <p>@Localizer["Get an Excel file with every product's SKU, name, category, price, wholesale price, stock quantity, and image URL."]</p>
+            <p>@Localizer["Get an Excel file with two sheets: Products (SKU, name, category, price, wholesale price, stock, image URL) and Variants (per color/size combo price and stock)."]</p>
             <a class="btn btn-outline-primary" asp-action="ExportExcel"><i class="bi bi-download"></i> @Localizer["Download Products.xlsx"]</a>
         </div>
     </div>
@@ -47,6 +49,9 @@
             </p>
             <p>
                 @Localizer["To add a brand-new product, add a new row with a SKU that doesn't exist yet, and fill in"] <strong>@Localizer["Name"]</strong>, <strong>@Localizer["Category"]</strong> (@Localizer["must exactly match an existing category name"]), <strong>@Localizer["Price (AED)"]</strong>, <strong>@Localizer["Stock Quantity"]</strong>, @Localizer["and, ideally,"] <strong>@Localizer["Image URL"]</strong>.
+            </p>
+            <p>
+                @Localizer["On the Variants sheet, keep an existing Variant Sku unchanged to update its price/stock, or add a new row with a new Variant Sku and a Product Sku (Parent) to create a new color/size combo — unknown color or size names are created automatically."]
             </p>
             <form asp-action="BulkUpdate" method="post" enctype="multipart/form-data" class="d-flex gap-2">
                 <input type="file" name="file" class="form-control" accept=".xlsx" required />

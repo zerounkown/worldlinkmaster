@@ -21,9 +21,15 @@ public class QuoteRequestsController : Controller
         _emailService = emailService;
     }
 
-    public async Task<IActionResult> Create()
+    // productDetails: optional pre-fill from a product's "Request Wholesale Quote" button.
+    public async Task<IActionResult> Create(string? productDetails = null)
     {
         var model = new QuoteRequestViewModel();
+        if (!string.IsNullOrWhiteSpace(productDetails))
+        {
+            model.ProductDetails = productDetails;
+        }
+
         if (User.Identity?.IsAuthenticated == true)
         {
             var user = await _userManager.GetUserAsync(User);

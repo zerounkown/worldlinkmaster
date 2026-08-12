@@ -21,7 +21,7 @@
                 <div class="coupon-card coupon-available">
                     <div class="coupon-card-left">
                         <span class="coupon-discount">@coupon.DiscountPercent.ToString("0.##")%</span>
-                        <span class="coupon-off">@Localizer["OFF (badge)"]</span>
+                        <span class="coupon-off">@Localizer["OFF"]</span>
                     </div>
                     <div class="coupon-card-right">
                         <span class="coupon-source">@(string.IsNullOrWhiteSpace(coupon.Description) ? Localizer["Promo Code"].Value : coupon.Description)</span>
@@ -59,7 +59,7 @@
                 <div class="coupon-card @statusClass">
                     <div class="coupon-card-left">
                         <span class="coupon-discount">@coupon.DiscountPercent.ToString("0.##")%</span>
-                        <span class="coupon-off">@Localizer["OFF (badge)"]</span>
+                        <span class="coupon-off">@Localizer["OFF"]</span>
                     </div>
                     <div class="coupon-card-right">
                         <span class="coupon-source">@sourceLabel</span>
