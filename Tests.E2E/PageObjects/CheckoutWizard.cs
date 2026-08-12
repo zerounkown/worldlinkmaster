@@ -75,7 +75,12 @@ public class CheckoutWizard
         var postal = stripeFrame.Locator("input[autocomplete='postal-code']");
         if (await postal.CountAsync() > 0)
         {
-            await postal.FillAsync("00000");
+            // "00000" passed locally but Stripe's postal-code validation rejected it in CI
+            // ("Your ZIP is invalid.") — likely country-dependent validation (Stripe infers the
+            // billing country from browser/IP signals, which differ between environments) treating
+            // an all-zero ZIP as a known-fake placeholder. A real, unambiguously valid US ZIP
+            // sidesteps the ambiguity regardless of which country's validation applies.
+            await postal.FillAsync("10001");
         }
 
         await _page.ClickAsync("#paymentContinueBtn");
