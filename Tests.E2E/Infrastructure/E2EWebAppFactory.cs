@@ -204,21 +204,42 @@ public class E2EWebAppFactory : IAsyncLifetime
 
         // EF's own "does __EFMigrationsHistory exist" existence check (NpgsqlHistoryRepository)
         // doesn't respect the connection string's Search Path the way ordinary DML/DDL does — it
-        // always checks nspname='public' specifically. Without this, Database.MigrateAsync()
-        // (called by SeedData.InitializeAsync at app startup) throws
-        // "relation \"__EFMigrationsHistory\" does not exist" against a fresh non-public schema,
-        // even though the table is about to be created there. Same workaround already proven
-        // during the migration-reconciliation work: pre-create it empty so the existence check
-        // (which only looks in "public") is bypassed and the real migration run proceeds normally.
+        // always checks nspname='public' specifically, regardless of which schema is actually
+        // targeted. That makes the correct workaround here depend on whether "public" happens to
+        // already have this table:
+        //   - Supabase (local dev): "public" is the real, long-lived app schema and already has
+        //     __EFMigrationsHistory from real migrations. The check reports "exists" (true, but
+        //     for the wrong schema), so EF skips CREATE TABLE and goes straight to reading applied
+        //     migrations — which, unqualified, resolves via Search Path to e2e_test and fails
+        //     unless a matching (empty) table already exists there. Pre-creating it is required.
+        //   - A fresh CI Postgres container: "public" is genuinely empty, so the check correctly
+        //     reports "does not exist" and EF issues a real CREATE TABLE — which also resolves via
+        //     Search Path to e2e_test. Pre-creating it there first makes that CREATE TABLE collide
+        //     ("already exists") and crash the app on startup. Don't pre-create in this case; let
+        //     EF create it itself.
+        bool publicHistoryTableExists;
         await using (var cmd = new NpgsqlCommand(
-            $"""
-             CREATE TABLE {SchemaName}."__EFMigrationsHistory" (
-                 "MigrationId" character varying(150) NOT NULL,
-                 "ProductVersion" character varying(32) NOT NULL,
-                 CONSTRAINT "PK___EFMigrationsHistory" PRIMARY KEY ("MigrationId")
-             )
-             """, conn))
+            """
+            SELECT EXISTS (
+                SELECT 1 FROM pg_catalog.pg_class c
+                JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
+                WHERE n.nspname = 'public' AND c.relname = '__EFMigrationsHistory'
+            )
+            """, conn))
         {
+            publicHistoryTableExists = (bool)(await cmd.ExecuteScalarAsync())!;
+        }
+
+        if (publicHistoryTableExists)
+        {
+            await using var cmd = new NpgsqlCommand(
+                $"""
+                 CREATE TABLE {SchemaName}."__EFMigrationsHistory" (
+                     "MigrationId" character varying(150) NOT NULL,
+                     "ProductVersion" character varying(32) NOT NULL,
+                     CONSTRAINT "PK___EFMigrationsHistory" PRIMARY KEY ("MigrationId")
+                 )
+                 """, conn);
             await cmd.ExecuteNonQueryAsync();
         }
     }
