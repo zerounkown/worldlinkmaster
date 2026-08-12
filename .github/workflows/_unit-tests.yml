@@ -25,6 +25,15 @@ jobs:
       # SQLite-backed (see Tests/IntegrationTests/CustomWebApplicationFactory.cs) — no external
       # database or secrets needed, which is exactly why this suite runs on every push/PR.
       - name: Test
+        env:
+          # Program.cs throws at startup if this is empty. CustomWebApplicationFactory also injects
+          # an in-memory placeholder for it via ConfigureWebHost — that's sufficient locally, but on
+          # this runner it doesn't reliably win the race against Program.cs's own startup check
+          # (real environment variables are read by WebApplicationBuilder.CreateBuilder(args) itself,
+          # deterministically, with no such timing dependency). The real SQLite DbContext registered
+          # in ConfigureWebHost's ConfigureServices replaces this at the DI level regardless, so the
+          # actual value here is never connected to.
+          ConnectionStrings__DefaultConnection: "Host=localhost;Database=placeholder;Username=placeholder;Password=placeholder"
         run: >
           dotnet test Tests/WorldLinkMaster.Tests.csproj --no-build
           --logger "trx;LogFileName=unit-tests.trx"
