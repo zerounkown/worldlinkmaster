@@ -52,6 +52,8 @@ public class E2EWebAppFactory : IAsyncLifetime
         Path.Combine(RepoRoot, "bin", "Debug", "net8.0", "WorldLinkMaster.Web.dll");
 
     private Process? _process;
+    private readonly List<string> _processOutput = new();
+    private readonly object _processOutputLock = new();
 
     public string BaseUrl { get; private set; } = string.Empty;
 
@@ -88,9 +90,11 @@ public class E2EWebAppFactory : IAsyncLifetime
         _process = Process.Start(startInfo) ?? throw new InvalidOperationException("Failed to start the app process.");
 
         // Drain stdout/stderr continuously — otherwise the child's console output eventually
-        // fills the redirected pipe's buffer and blocks the app.
-        _ = DrainAsync(_process.StandardOutput);
-        _ = DrainAsync(_process.StandardError);
+        // fills the redirected pipe's buffer and blocks the app. Captured (not discarded) so a
+        // startup crash can report the app's own exception/log output instead of just an exit
+        // code — this app process runs unattended in CI, where there's no other way to see it.
+        _ = DrainAsync(_process.StandardOutput, "stdout");
+        _ = DrainAsync(_process.StandardError, "stderr");
 
         await WaitUntilReadyAsync();
     }
@@ -107,18 +111,32 @@ public class E2EWebAppFactory : IAsyncLifetime
         await DropSchemaAsync();
     }
 
-    private static async Task DrainAsync(StreamReader reader)
+    private async Task DrainAsync(StreamReader reader, string streamName)
     {
         try
         {
-            while (await reader.ReadLineAsync() is not null)
+            string? line;
+            while ((line = await reader.ReadLineAsync()) is not null)
             {
-                // Discard — the process's own console output isn't needed for the test run.
+                lock (_processOutputLock)
+                {
+                    _processOutput.Add($"[{streamName}] {line}");
+                }
             }
         }
         catch (ObjectDisposedException)
         {
             // Process was killed while a read was in flight — expected during teardown.
+        }
+    }
+
+    private string GetCapturedOutput()
+    {
+        lock (_processOutputLock)
+        {
+            return _processOutput.Count == 0
+                ? "(no output captured)"
+                : string.Join(Environment.NewLine, _processOutput);
         }
     }
 
@@ -139,7 +157,13 @@ public class E2EWebAppFactory : IAsyncLifetime
         {
             if (_process is { HasExited: true })
             {
-                throw new InvalidOperationException($"App process exited early with code {_process.ExitCode} before becoming ready.");
+                // Give the drain loops a brief moment to flush the last few lines the process
+                // wrote right before exiting — ReadLineAsync can lag slightly behind the
+                // process's own exit signal.
+                await Task.Delay(200);
+                throw new InvalidOperationException(
+                    $"App process exited early with code {_process.ExitCode} before becoming ready.{Environment.NewLine}" +
+                    $"--- Captured app stdout/stderr ---{Environment.NewLine}{GetCapturedOutput()}");
             }
 
             try
@@ -158,7 +182,9 @@ public class E2EWebAppFactory : IAsyncLifetime
             await Task.Delay(500);
         }
 
-        throw new TimeoutException($"App did not become ready at {BaseUrl}/ready within 90s.");
+        throw new TimeoutException(
+            $"App did not become ready at {BaseUrl}/ready within 90s.{Environment.NewLine}" +
+            $"--- Captured app stdout/stderr ---{Environment.NewLine}{GetCapturedOutput()}");
     }
 
     private static async Task ResetSchemaAsync()
