@@ -72,14 +72,17 @@ public class CheckoutWizard
         await cardNumberField.FillAsync("4242424242424242");
         await stripeFrame.Locator("input[autocomplete='cc-exp']").FillAsync("12/34");
         await stripeFrame.Locator("input[autocomplete='cc-csc']").FillAsync("123");
-        var postal = stripeFrame.Locator("input[autocomplete='postal-code']");
+        // Confirmed via a form-field dump captured from a real CI failure: this field's actual
+        // autocomplete value is the compound "billing postal-code", not "postal-code" — an exact
+        // '=' match never found it (postal.CountAsync() was silently 0 the whole time, in both
+        // environments), so it was NEVER filled. That only "passed" locally by accident (Stripe
+        // apparently inferred a non-US billing country there, where postal code isn't mandatory);
+        // CI's country selector defaults to "US", where an empty postal code is a real validation
+        // error ("Your ZIP is invalid."). '~=' matches a whitespace-separated word within the
+        // attribute, so it works regardless of any "billing " prefix.
+        var postal = stripeFrame.Locator("input[autocomplete~='postal-code']");
         if (await postal.CountAsync() > 0)
         {
-            // "00000" passed locally but Stripe's postal-code validation rejected it in CI
-            // ("Your ZIP is invalid.") — likely country-dependent validation (Stripe infers the
-            // billing country from browser/IP signals, which differ between environments) treating
-            // an all-zero ZIP as a known-fake placeholder. A real, unambiguously valid US ZIP
-            // sidesteps the ambiguity regardless of which country's validation applies.
             await postal.FillAsync("10001");
         }
 
