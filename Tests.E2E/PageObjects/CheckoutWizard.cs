@@ -72,18 +72,49 @@ public class CheckoutWizard
         await cardNumberField.FillAsync("4242424242424242");
         await stripeFrame.Locator("input[autocomplete='cc-exp']").FillAsync("12/34");
         await stripeFrame.Locator("input[autocomplete='cc-csc']").FillAsync("123");
-        // Confirmed via a form-field dump captured from a real CI failure: this field's actual
-        // autocomplete value is the compound "billing postal-code", not "postal-code" — an exact
-        // '=' match never found it (postal.CountAsync() was silently 0 the whole time, in both
-        // environments), so it was NEVER filled. That only "passed" locally by accident (Stripe
-        // apparently inferred a non-US billing country there, where postal code isn't mandatory);
-        // CI's country selector defaults to "US", where an empty postal code is a real validation
-        // error ("Your ZIP is invalid."). '~=' matches a whitespace-separated word within the
-        // attribute, so it works regardless of any "billing " prefix.
-        var postal = stripeFrame.Locator("input[autocomplete~='postal-code']");
+
+        // Stripe's Payment Element infers a billing country from the environment (confirmed via
+        // form-field dumps: this sandbox resolves "AE", the GitHub-hosted CI runner resolves "US"),
+        // which changes what postal-code/phone-number formats it will accept and cascades into
+        // Link's own country selector too. Forcing it to a fixed "US" makes every downstream field
+        // format deterministic regardless of which environment this runs in, instead of chasing a
+        // different valid format per country.
+        var countrySelect = stripeFrame.Locator("select[name='country']");
+        if (await countrySelect.CountAsync() > 0)
+        {
+            await countrySelect.SelectOptionAsync("US");
+        }
+
+        // Field names below (postalCode, linkMobilePhoneCountry, linkMobilePhone, linkLegalName)
+        // confirmed via real form-field dumps — Stripe's "autocomplete" attributes on this form are
+        // compound (e.g. "billing postal-code") and its field names get progressively revealed as
+        // Link enrollment fields are filled in, so each is guarded with a CountAsync() check rather
+        // than assumed present.
+        var postal = stripeFrame.Locator("input[name='postalCode']");
         if (await postal.CountAsync() > 0)
         {
             await postal.FillAsync("10001");
+        }
+
+        // Stripe's Link enrollment section (shown once billing email is known — see
+        // checkout-wizard.js's defaultValues.billingDetails.email) requires a mobile number before
+        // confirmPayment() will succeed, even though this app never uses Link itself.
+        var linkPhoneCountry = stripeFrame.Locator("select[name='linkMobilePhoneCountry']");
+        if (await linkPhoneCountry.CountAsync() > 0)
+        {
+            await linkPhoneCountry.SelectOptionAsync("US");
+        }
+
+        var linkPhone = stripeFrame.Locator("input[name='linkMobilePhone']");
+        if (await linkPhone.CountAsync() > 0)
+        {
+            await linkPhone.FillAsync("2015551234");
+        }
+
+        var linkLegalName = stripeFrame.Locator("input[name='linkLegalName']");
+        if (await linkLegalName.CountAsync() > 0)
+        {
+            await linkLegalName.FillAsync("Jordan E2E");
         }
 
         await _page.ClickAsync("#paymentContinueBtn");
