@@ -105,9 +105,32 @@ public class CheckoutWizard
         catch (TimeoutException)
         {
             var errorText = await _page.Locator("#reviewError").InnerTextAsync();
+
+            // "Your ZIP is invalid" surfaced here in CI even after changing the postal value —
+            // dump the actual rendered Stripe form (every input/select, its name/autocomplete,
+            // and current value) rather than guess again, since the payment panel is hidden
+            // (step 3, review, is showing) by the time this runs but the iframe/fields still exist.
+            var stripeFormDump = "(could not inspect)";
+            try
+            {
+                var stripeFrame = _page.FrameLocator("#stripe-payment-element iframe[title='Secure payment input frame']");
+                stripeFormDump = await stripeFrame.Locator("form, div").First.EvaluateAsync<string>(
+                    """
+                    el => {
+                      const root = el.closest('form') || el.ownerDocument.body;
+                      const fields = [...root.querySelectorAll('input, select')];
+                      return fields.map(f => `${f.tagName}[name=${f.name}][autocomplete=${f.autocomplete}]=${f.value}`).join(' | ');
+                    }
+                    """);
+            }
+            catch
+            {
+                // Best-effort diagnostic only — don't let a failure here mask the real exception.
+            }
+
             throw new InvalidOperationException(
                 $"Checkout never reached the Confirmation page. Current URL: {_page.Url}. #reviewError text: '{errorText}'. " +
-                $"JS page errors: [{string.Join(" | ", jsErrors)}].");
+                $"JS page errors: [{string.Join(" | ", jsErrors)}]. Stripe form fields at failure time: {stripeFormDump}");
         }
     }
 }
