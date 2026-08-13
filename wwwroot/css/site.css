@@ -3787,6 +3787,132 @@ a:hover {
   color: white;
 }
 
+/* Find a Store (map locator) */
+.store-locator-search {
+  display: flex;
+  gap: 10px;
+  align-items: stretch;
+}
+
+.store-locator-search-input {
+  position: relative;
+  flex: 1 1 auto;
+}
+
+.store-locator-search-input i {
+  position: absolute;
+  left: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--wlm-blue);
+}
+
+.store-locator-search-input input {
+  padding-left: 38px;
+  height: 100%;
+}
+
+.store-locator-count {
+  color: var(--wlm-ink);
+  opacity: 0.75;
+  font-size: 0.9rem;
+}
+
+.store-locator-layout {
+  display: grid;
+  grid-template-columns: minmax(280px, 380px) 1fr;
+  gap: 20px;
+  align-items: start;
+}
+
+@media (max-width: 900px) {
+  .store-locator-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+.store-locator-results {
+  max-height: 560px;
+  overflow-y: auto;
+  border: 1px solid var(--wlm-sand-light);
+  border-radius: 8px;
+  padding: 4px;
+}
+
+.store-locator-map {
+  border: 1px solid var(--wlm-sand-light);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.store-locator-map #storeLocatorMap {
+  width: 100%;
+  height: 560px;
+}
+
+.store-result-card {
+  padding: 16px;
+  border-bottom: 1px solid var(--wlm-sand-light);
+  cursor: pointer;
+}
+
+.store-result-card:last-child {
+  border-bottom: none;
+}
+
+.store-result-card:hover {
+  background-color: #fafafa;
+}
+
+.store-result-card h4 {
+  font-size: 1.02rem;
+  margin: 6px 0 8px;
+}
+
+.store-result-card p {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 0.88rem;
+  color: var(--wlm-ink);
+  opacity: 0.85;
+  margin-bottom: 6px;
+}
+
+.store-result-card p i {
+  margin-top: 2px;
+  opacity: 0.7;
+}
+
+.store-result-card a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.store-category-badge {
+  display: inline-block;
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-weight: 600;
+  padding: 3px 9px;
+  border-radius: 20px;
+}
+
+.store-category-badge.store-category-official {
+  background-color: var(--wlm-forest);
+  color: white;
+}
+
+.store-category-badge.store-category-dealer {
+  background-color: var(--wlm-sand);
+  color: var(--wlm-ink);
+}
+
+.store-directions-btn {
+  margin-top: 4px;
+}
+
 .whatsapp-btn:hover {
   background-color: #1ebe5b;
   border-color: #1ebe5b;

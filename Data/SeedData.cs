@@ -27,6 +27,7 @@ public static class SeedData
         await SeedFeaturesAsync(context);
         await SeedPromoEventsAsync(context);
         await SeedPromoCouponsAsync(context);
+        await SeedStoresAsync(context);
     }
 
     private static Color GetOrCreateColor(Dictionary<string, Color> cache, string name, string hex)
@@ -227,6 +228,46 @@ public static class SeedData
                 product.Features.Add(feature);
             }
         }
+
+        await context.SaveChangesAsync();
+    }
+
+    // Seeds the two showrooms that used to be hardcoded in Views/Home/Locations.cshtml
+    // (sourced from the WhatsAppBranches config section) so the new map-based store locator
+    // isn't empty at launch. Coordinates are approximate city-area values — an admin should
+    // fine-tune them via the "Autofill from address" button once the Google Maps API key is set.
+    private static async Task SeedStoresAsync(ApplicationDbContext context)
+    {
+        if (await context.Stores.AnyAsync())
+        {
+            return;
+        }
+
+        context.Stores.AddRange(
+            new Store
+            {
+                Name = "Abu Dhabi Showroom",
+                Category = StoreCategory.OfficialStore,
+                Address = "Al Muroor Street, Al Muntazah Area, next to Abu Dhabi Cooperative Society — Shop No. 2, EW002",
+                City = "Abu Dhabi",
+                Phone = "+971 2 564 7071",
+                WhatsAppNumber = "971564450046",
+                Latitude = 24.4764m,
+                Longitude = 54.3705m,
+                DisplayOrder = 0
+            },
+            new Store
+            {
+                Name = "Al Ain Showroom",
+                Category = StoreCategory.OfficialStore,
+                Address = "Hessa Bint Mohamed Street, Al Jahili Area — Al Qalaa District, Al Massa Hotel, next to Arab Sweets",
+                City = "Al Ain",
+                Phone = "+971 3 754 7777",
+                WhatsAppNumber = "971561850083",
+                Latitude = 24.2075m,
+                Longitude = 55.7447m,
+                DisplayOrder = 1
+            });
 
         await context.SaveChangesAsync();
     }

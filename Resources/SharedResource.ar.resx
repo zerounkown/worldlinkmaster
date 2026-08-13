@@ -918,4 +918,39 @@
   <data name="Out for Delivery" xml:space="preserve"><value>قيد التوصيل</value></data>
   <data name="Track on FedEx" xml:space="preserve"><value>تتبع عبر FedEx</value></data>
   <data name="We couldn't start checkout. Please try again." xml:space="preserve"><value>تعذّر بدء عملية الدفع. يرجى المحاولة مرة أخرى.</value></data>
+  <data name="Name" xml:space="preserve"><value>الاسم</value></data>
+  <data name="Address" xml:space="preserve"><value>العنوان</value></data>
+  <data name="Stores" xml:space="preserve"><value>الفروع</value></data>
+  <data name="New Store" xml:space="preserve"><value>فرع جديد</value></data>
+  <data name="Shown on the public &quot;Find a Store&quot; map page, in Display Order. Only Active stores appear." xml:space="preserve"><value>يظهر في صفحة "ابحث عن فرع" العامة، حسب ترتيب العرض. تظهر الفروع النشطة فقط.</value></data>
+  <data name="Official Store" xml:space="preserve"><value>متجر رسمي</value></data>
+  <data name="Authorized Dealer" xml:space="preserve"><value>موزع معتمد</value></data>
+  <data name="No stores yet. Create one to show it on the Find a Store page." xml:space="preserve"><value>لا توجد فروع بعد. أضف فرعاً لعرضه في صفحة ابحث عن فرع.</value></data>
+  <data name="Edit Store" xml:space="preserve"><value>تعديل الفرع</value></data>
+  <data name="Delete Store" xml:space="preserve"><value>حذف الفرع</value></data>
+  <data name="Store Name" xml:space="preserve"><value>اسم الفرع</value></data>
+  <data name="WhatsApp Number (optional)" xml:space="preserve"><value>رقم واتساب (اختياري)</value></data>
+  <data name="Digits only, with country code, no + or spaces." xml:space="preserve"><value>أرقام فقط، مع رمز الدولة، بدون + أو مسافات.</value></data>
+  <data name="Website (optional)" xml:space="preserve"><value>الموقع الإلكتروني (اختياري)</value></data>
+  <data name="Latitude" xml:space="preserve"><value>خط العرض</value></data>
+  <data name="Longitude" xml:space="preserve"><value>خط الطول</value></data>
+  <data name="Autofill from address" xml:space="preserve"><value>تعبئة تلقائية من العنوان</value></data>
+  <data name="Set GoogleMaps:ApiKey to enable auto-filling coordinates from the address." xml:space="preserve"><value>قم بتعيين GoogleMaps:ApiKey لتفعيل تعبئة الإحداثيات تلقائياً من العنوان.</value></data>
+  <data name="Google Maps hasn't finished loading yet. Try again in a moment." xml:space="preserve"><value>لم يتم تحميل خرائط جوجل بعد. حاول مرة أخرى بعد قليل.</value></data>
+  <data name="Couldn't find that address. Please enter coordinates manually." xml:space="preserve"><value>تعذّر العثور على هذا العنوان. يرجى إدخال الإحداثيات يدوياً.</value></data>
+  <data name="Store '{0}' created." xml:space="preserve"><value>تم إنشاء الفرع '{0}'.</value></data>
+  <data name="Store '{0}' updated." xml:space="preserve"><value>تم تحديث الفرع '{0}'.</value></data>
+  <data name="Store '{0}' deleted." xml:space="preserve"><value>تم حذف الفرع '{0}'.</value></data>
+  <data name="Search by address or area to find the nearest showroom or authorized dealer." xml:space="preserve"><value>ابحث بالعنوان أو المنطقة للعثور على أقرب صالة عرض أو موزع معتمد.</value></data>
+  <data name="The store map isn't configured yet. Please check back soon." xml:space="preserve"><value>خريطة الفروع غير مُهيأة بعد. يرجى المحاولة مرة أخرى قريباً.</value></data>
+  <data name="No stores are listed yet. Please check back soon." xml:space="preserve"><value>لا توجد فروع مدرجة بعد. يرجى المحاولة مرة أخرى قريباً.</value></data>
+  <data name="Enter your address or area" xml:space="preserve"><value>أدخل عنوانك أو منطقتك</value></data>
+  <data name="Use my location" xml:space="preserve"><value>استخدام موقعي</value></data>
+  <data name="Locate me" xml:space="preserve"><value>حدد موقعي</value></data>
+  <data name="Search an address or use &quot;Locate me&quot; to see stores sorted by distance." xml:space="preserve"><value>ابحث عن عنوان أو استخدم "حدد موقعي" لعرض الفروع مرتبة حسب المسافة.</value></data>
+  <data name="Get directions" xml:space="preserve"><value>احصل على الاتجاهات</value></data>
+  <data name="You are here" xml:space="preserve"><value>أنت هنا</value></data>
+  <data name="Search results: {0}" xml:space="preserve"><value>نتائج البحث: {0}</value></data>
+  <data name="Couldn't find that address. Please try a different search." xml:space="preserve"><value>تعذّر العثور على هذا العنوان. يرجى تجربة بحث مختلف.</value></data>
+  <data name="Couldn't get your location. Please search by address instead." xml:space="preserve"><value>تعذّر تحديد موقعك. يرجى البحث بالعنوان بدلاً من ذلك.</value></data>
 </root>

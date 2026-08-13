@@ -1,0 +1,126 @@
+@using WorldLinkMaster.Web.Models
+@model Store
+@inject Microsoft.Extensions.Configuration.IConfiguration Configuration
+@{
+    var googleMapsApiKey = Configuration["GoogleMaps:ApiKey"];
+}
+
+<div asp-validation-summary="ModelOnly" class="text-danger"></div>
+@if (Model.Id != 0)
+{
+    <input type="hidden" asp-for="Id" />
+}
+<input type="hidden" asp-for="CreatedAt" />
+
+<div class="row">
+    <div class="col-12 col-sm-8 mb-3">
+        <label asp-for="Name" class="form-label">@Localizer["Store Name"]</label>
+        <input asp-for="Name" class="form-control" placeholder="e.g. Abu Dhabi Showroom" />
+        <span asp-validation-for="Name" class="text-danger"></span>
+    </div>
+    <div class="col-12 col-sm-4 mb-3">
+        <label class="form-label" for="Category">@Localizer["Category"]</label>
+        <select name="Category" id="Category" class="form-select">
+            <option value="@((int)StoreCategory.OfficialStore)" selected="@(Model.Category == StoreCategory.OfficialStore)">@Localizer["Official Store"]</option>
+            <option value="@((int)StoreCategory.AuthorizedDealer)" selected="@(Model.Category == StoreCategory.AuthorizedDealer)">@Localizer["Authorized Dealer"]</option>
+        </select>
+    </div>
+</div>
+
+<div class="mb-3">
+    <label asp-for="Address" class="form-label">@Localizer["Address"]</label>
+    <input asp-for="Address" id="storeAddress" class="form-control" placeholder="Street, area, landmark" />
+    <span asp-validation-for="Address" class="text-danger"></span>
+</div>
+
+<div class="row">
+    <div class="col-12 col-sm-6 mb-3">
+        <label asp-for="City" class="form-label">@Localizer["City"]</label>
+        <input asp-for="City" class="form-control" />
+    </div>
+    <div class="col-12 col-sm-6 mb-3">
+        <label asp-for="Phone" class="form-label">@Localizer["Phone"]</label>
+        <input asp-for="Phone" class="form-control" placeholder="+971 2 564 7071" />
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-12 col-sm-6 mb-3">
+        <label asp-for="WhatsAppNumber" class="form-label">@Localizer["WhatsApp Number (optional)"]</label>
+        <input asp-for="WhatsAppNumber" class="form-control" placeholder="971564450046" />
+        <div class="form-text">@Localizer["Digits only, with country code, no + or spaces."]</div>
+    </div>
+    <div class="col-12 col-sm-6 mb-3">
+        <label asp-for="Website" class="form-label">@Localizer["Website (optional)"]</label>
+        <input asp-for="Website" class="form-control" placeholder="https://..." />
+    </div>
+</div>
+
+<div class="row align-items-end">
+    <div class="col-6 col-sm-4 mb-3">
+        <label asp-for="Latitude" class="form-label">@Localizer["Latitude"]</label>
+        <input asp-for="Latitude" id="storeLatitude" class="form-control" type="number" step="0.000001" />
+        <span asp-validation-for="Latitude" class="text-danger"></span>
+    </div>
+    <div class="col-6 col-sm-4 mb-3">
+        <label asp-for="Longitude" class="form-label">@Localizer["Longitude"]</label>
+        <input asp-for="Longitude" id="storeLongitude" class="form-control" type="number" step="0.000001" />
+        <span asp-validation-for="Longitude" class="text-danger"></span>
+    </div>
+    @if (!string.IsNullOrWhiteSpace(googleMapsApiKey))
+    {
+        <div class="col-12 col-sm-4 mb-3">
+            <button type="button" id="geocodeAddressBtn" class="btn btn-outline-secondary w-100">
+                <i class="bi bi-crosshair"></i> @Localizer["Autofill from address"]
+            </button>
+        </div>
+    }
+</div>
+@if (string.IsNullOrWhiteSpace(googleMapsApiKey))
+{
+    <p class="form-text text-muted">@Localizer["Set GoogleMaps:ApiKey to enable auto-filling coordinates from the address."]</p>
+}
+
+<div class="row">
+    <div class="col-6 col-sm-4 mb-3">
+        <label asp-for="DisplayOrder" class="form-label">@Localizer["Display Order"]</label>
+        <input asp-for="DisplayOrder" class="form-control" />
+    </div>
+    <div class="col-6 col-sm-4 mb-3 d-flex align-items-end">
+        <div class="form-check">
+            <input asp-for="Active" class="form-check-input" />
+            <label asp-for="Active" class="form-check-label">@Localizer["Active"]</label>
+        </div>
+    </div>
+</div>
+
+<button type="submit" class="btn btn-primary">@Localizer["Save"]</button>
+<a asp-action="Index" class="btn btn-outline-secondary">@Localizer["Cancel"]</a>
+
+@if (!string.IsNullOrWhiteSpace(googleMapsApiKey))
+{
+    <script src="https://maps.googleapis.com/maps/api/js?key=@googleMapsApiKey&libraries=places" async defer></script>
+    <script>
+        document.getElementById("geocodeAddressBtn").addEventListener("click", function () {
+            var address = document.getElementById("storeAddress").value;
+            var city = document.getElementById("City") ? document.getElementById("City").value : "";
+            if (!address) {
+                return;
+            }
+            var full = city ? address + ", " + city : address;
+            if (typeof google === "undefined" || !google.maps || !google.maps.Geocoder) {
+                alert("@Localizer["Google Maps hasn't finished loading yet. Try again in a moment."]");
+                return;
+            }
+            new google.maps.Geocoder().geocode({ address: full }, function (results, status) {
+                if (status === "OK" && results && results[0]) {
+                    var loc = results[0].geometry.location;
+                    document.getElementById("storeLatitude").value = loc.lat().toFixed(6);
+                    document.getElementById("storeLongitude").value = loc.lng().toFixed(6);
+                } else {
+                    alert("@Localizer["Couldn't find that address. Please enter coordinates manually."]");
+                }
+            });
+        });
+    </script>
+}
