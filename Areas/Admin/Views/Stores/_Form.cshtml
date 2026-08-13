@@ -1,9 +1,5 @@
 @using WorldLinkMaster.Web.Models
 @model Store
-@inject Microsoft.Extensions.Configuration.IConfiguration Configuration
-@{
-    var googleMapsApiKey = Configuration["GoogleMaps:ApiKey"];
-}
 
 <div asp-validation-summary="ModelOnly" class="text-danger"></div>
 @if (Model.Id != 0)
@@ -67,19 +63,12 @@
         <input asp-for="Longitude" id="storeLongitude" class="form-control" type="number" step="0.000001" />
         <span asp-validation-for="Longitude" class="text-danger"></span>
     </div>
-    @if (!string.IsNullOrWhiteSpace(googleMapsApiKey))
-    {
-        <div class="col-12 col-sm-4 mb-3">
-            <button type="button" id="geocodeAddressBtn" class="btn btn-outline-secondary w-100">
-                <i class="bi bi-crosshair"></i> @Localizer["Autofill from address"]
-            </button>
-        </div>
-    }
+    <div class="col-12 col-sm-4 mb-3">
+        <button type="button" id="geocodeAddressBtn" class="btn btn-outline-secondary w-100">
+            <i class="bi bi-crosshair"></i> @Localizer["Autofill from address"]
+        </button>
+    </div>
 </div>
-@if (string.IsNullOrWhiteSpace(googleMapsApiKey))
-{
-    <p class="form-text text-muted">@Localizer["Set GoogleMaps:ApiKey to enable auto-filling coordinates from the address."]</p>
-}
 
 <div class="row">
     <div class="col-6 col-sm-4 mb-3">
@@ -97,30 +86,26 @@
 <button type="submit" class="btn btn-primary">@Localizer["Save"]</button>
 <a asp-action="Index" class="btn btn-outline-secondary">@Localizer["Cancel"]</a>
 
-@if (!string.IsNullOrWhiteSpace(googleMapsApiKey))
-{
-    <script src="https://maps.googleapis.com/maps/api/js?key=@googleMapsApiKey&libraries=places" async defer></script>
-    <script>
-        document.getElementById("geocodeAddressBtn").addEventListener("click", function () {
-            var address = document.getElementById("storeAddress").value;
-            var city = document.getElementById("City") ? document.getElementById("City").value : "";
-            if (!address) {
-                return;
-            }
-            var full = city ? address + ", " + city : address;
-            if (typeof google === "undefined" || !google.maps || !google.maps.Geocoder) {
-                alert("@Localizer["Google Maps hasn't finished loading yet. Try again in a moment."]");
-                return;
-            }
-            new google.maps.Geocoder().geocode({ address: full }, function (results, status) {
-                if (status === "OK" && results && results[0]) {
-                    var loc = results[0].geometry.location;
-                    document.getElementById("storeLatitude").value = loc.lat().toFixed(6);
-                    document.getElementById("storeLongitude").value = loc.lng().toFixed(6);
+<script>
+    document.getElementById("geocodeAddressBtn").addEventListener("click", function () {
+        var address = document.getElementById("storeAddress").value;
+        var city = document.getElementById("City") ? document.getElementById("City").value : "";
+        if (!address) {
+            return;
+        }
+        var full = city ? address + ", " + city : address;
+        fetch("/Home/GeocodeSearch?query=" + encodeURIComponent(full))
+            .then(function (resp) { return resp.json(); })
+            .then(function (result) {
+                if (result.success) {
+                    document.getElementById("storeLatitude").value = Number(result.lat).toFixed(6);
+                    document.getElementById("storeLongitude").value = Number(result.lng).toFixed(6);
                 } else {
                     alert("@Localizer["Couldn't find that address. Please enter coordinates manually."]");
                 }
+            })
+            .catch(function () {
+                alert("@Localizer["Couldn't find that address. Please enter coordinates manually."]");
             });
-        });
-    </script>
-}
+    });
+</script>

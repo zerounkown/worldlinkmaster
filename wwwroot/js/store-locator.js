@@ -2,20 +2,19 @@
     "use strict";
 
     var data = window.storeLocatorData;
-    if (!data) {
+    if (!data || typeof L === "undefined") {
         return;
     }
 
-    var map, geocoder, autocomplete, infoWindow;
+    var map, youAreHereMarker;
     var storeMarkers = [];
-    var youAreHereMarker = null;
 
     function toRad(deg) {
         return (deg * Math.PI) / 180;
     }
 
     // Straight-line distance, not driving distance — see the plan's rationale for
-    // preferring Haversine over the Distance Matrix API for a "nearest store" sort.
+    // preferring Haversine over a routing API for a "nearest store" sort.
     function haversineKm(lat1, lng1, lat2, lng2) {
         var earthRadiusKm = 6371;
         var dLat = toRad(lat2 - lat1);
@@ -31,19 +30,14 @@
         return "https://www.google.com/maps/dir/?api=1&destination=" + store.lat + "," + store.lng;
     }
 
-    function openInfoWindow(marker, store) {
-        infoWindow.setContent("<strong>" + store.name + "</strong><br>" + store.address);
-        infoWindow.open(map, marker);
-    }
-
     function focusStore(store) {
-        map.panTo({ lat: store.lat, lng: store.lng });
+        map.panTo([store.lat, store.lng]);
         map.setZoom(15);
         var marker = storeMarkers.filter(function (m) {
             return m.__storeId === store.id;
         })[0];
         if (marker) {
-            openInfoWindow(marker, store);
+            marker.openPopup();
         }
     }
 
@@ -97,61 +91,44 @@
 
     function clearStoreMarkers() {
         storeMarkers.forEach(function (m) {
-            m.setMap(null);
+            map.removeLayer(m);
         });
         storeMarkers = [];
     }
 
     function renderMarkers(stores, userLocation) {
         clearStoreMarkers();
-        var bounds = new google.maps.LatLngBounds();
+        var latLngs = [];
 
         stores.forEach(function (store) {
-            var marker = new google.maps.Marker({
-                position: { lat: store.lat, lng: store.lng },
-                map: map,
-                title: store.name
-            });
+            var marker = L.marker([store.lat, store.lng]).addTo(map);
+            marker.bindPopup("<strong>" + store.name + "</strong><br>" + store.address);
             marker.__storeId = store.id;
-            marker.addListener("click", function () {
-                openInfoWindow(marker, store);
-            });
             storeMarkers.push(marker);
-            bounds.extend(marker.getPosition());
+            latLngs.push([store.lat, store.lng]);
         });
 
         if (youAreHereMarker) {
-            youAreHereMarker.setMap(null);
+            map.removeLayer(youAreHereMarker);
             youAreHereMarker = null;
         }
 
         if (userLocation) {
-            youAreHereMarker = new google.maps.Marker({
-                position: userLocation,
-                map: map,
-                icon: {
-                    path: google.maps.SymbolPath.CIRCLE,
-                    scale: 9,
-                    fillColor: "#e53935",
-                    fillOpacity: 1,
-                    strokeColor: "#ffffff",
-                    strokeWeight: 2
-                },
-                title: data.youAreHereLabel,
-                zIndex: 999
-            });
-            var youAreHereInfo = new google.maps.InfoWindow({
-                content: "<strong>" + data.youAreHereLabel + "</strong>"
-            });
-            youAreHereInfo.open(map, youAreHereMarker);
-            bounds.extend(userLocation);
+            youAreHereMarker = L.circleMarker([userLocation.lat, userLocation.lng], {
+                radius: 9,
+                fillColor: "#e53935",
+                color: "#ffffff",
+                weight: 2,
+                fillOpacity: 1
+            }).addTo(map);
+            youAreHereMarker.bindPopup("<strong>" + data.youAreHereLabel + "</strong>").openPopup();
+            latLngs.push([userLocation.lat, userLocation.lng]);
         }
 
-        if (!bounds.isEmpty()) {
-            map.fitBounds(bounds, 60);
-            if (stores.length + (userLocation ? 1 : 0) <= 1) {
-                map.setZoom(13);
-            }
+        if (latLngs.length === 1) {
+            map.setView(latLngs[0], 13);
+        } else if (latLngs.length > 1) {
+            map.fitBounds(L.latLngBounds(latLngs), { padding: [60, 60] });
         }
     }
 
@@ -180,14 +157,20 @@
     }
 
     function geocodeAndSearch(query) {
-        geocoder.geocode({ address: query }, function (results, status) {
-            if (status === "OK" && results && results[0]) {
-                var loc = results[0].geometry.location;
-                renderResults({ lat: loc.lat(), lng: loc.lng() });
-            } else {
+        fetch(data.geocodeSearchUrl + "?query=" + encodeURIComponent(query))
+            .then(function (resp) {
+                return resp.json();
+            })
+            .then(function (result) {
+                if (result.success) {
+                    renderResults({ lat: result.lat, lng: result.lng });
+                } else {
+                    alert(data.noAddressFoundLabel);
+                }
+            })
+            .catch(function () {
                 alert(data.noAddressFoundLabel);
-            }
-        });
+            });
     }
 
     function bindControls() {
@@ -202,6 +185,8 @@
             }
         });
 
+        // Deliberately no live/per-keystroke lookups here — Nominatim's usage policy caps
+        // requests at 1/second, so geocoding only fires on an explicit submit.
         searchInput.addEventListener("keydown", function (e) {
             if (e.key === "Enter") {
                 e.preventDefault();
@@ -228,35 +213,17 @@
         });
     }
 
-    function setupAutocomplete() {
-        autocomplete = new google.maps.places.Autocomplete(document.getElementById("storeSearchInput"));
-        autocomplete.addListener("place_changed", function () {
-            var place = autocomplete.getPlace();
-            if (!place.geometry || !place.geometry.location) {
-                return;
-            }
-            renderResults({ lat: place.geometry.location.lat(), lng: place.geometry.location.lng() });
-        });
+    var mapEl = document.getElementById("storeLocatorMap");
+    if (!mapEl) {
+        return;
     }
 
-    // Called by the Google Maps JS SDK once it finishes loading (see the &callback= param
-    // on the script tag in Views/Home/Locations.cshtml) — everything that touches `google.maps`
-    // has to wait until then, so this is the single entry point for the whole page.
-    window.initStoreLocatorMap = function () {
-        var mapEl = document.getElementById("storeLocatorMap");
-        if (!mapEl) {
-            return;
-        }
+    map = L.map(mapEl).setView([24.35, 54.7], 8);
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        attribution: "&copy; <a href=\"https://www.openstreetmap.org/copyright\">OpenStreetMap</a> contributors",
+        maxZoom: 19
+    }).addTo(map);
 
-        geocoder = new google.maps.Geocoder();
-        infoWindow = new google.maps.InfoWindow();
-        map = new google.maps.Map(mapEl, {
-            center: { lat: 24.35, lng: 54.7 },
-            zoom: 8
-        });
-
-        setupAutocomplete();
-        bindControls();
-        renderResults(null);
-    };
+    bindControls();
+    renderResults(null);
 })();

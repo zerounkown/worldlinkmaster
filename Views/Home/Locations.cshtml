@@ -1,9 +1,7 @@
 @using WorldLinkMaster.Web.Models
 @model List<Store>
-@inject Microsoft.Extensions.Configuration.IConfiguration Configuration
 @{
     ViewData["Title"] = Localizer["Find a Store"];
-    var googleMapsApiKey = Configuration["GoogleMaps:ApiKey"];
     var storesJson = System.Text.Json.JsonSerializer.Serialize(Model.Select(s => new
     {
         id = s.Id,
@@ -20,6 +18,8 @@
     }));
 }
 
+<link rel="stylesheet" href="~/lib/leaflet/leaflet.css" asp-append-version="true" />
+
 <div class="page-banner">
     <div class="container">
         <h1>@Localizer["Find a Store"]</h1>
@@ -31,34 +31,6 @@
     @if (Model.Count == 0)
     {
         <div class="alert alert-info">@Localizer["No stores are listed yet. Please check back soon."]</div>
-    }
-    else if (string.IsNullOrWhiteSpace(googleMapsApiKey))
-    {
-        @* Interactive map isn't configured yet — fall back to a plain address list so store
-           info is still available, matching what the old static Locations page always showed. *@
-        <div class="locations-grid">
-            @foreach (var store in Model)
-            {
-                <div class="location-card">
-                    <span class="location-pickup-badge">
-                        @(store.Category == StoreCategory.OfficialStore ? Localizer["Official Store"] : Localizer["Authorized Dealer"])
-                    </span>
-                    <h4><i class="bi bi-geo-alt"></i> @store.Name</h4>
-                    <p>@store.Address@(string.IsNullOrWhiteSpace(store.City) ? "" : $", {store.City}")</p>
-                    <div class="location-contact-actions">
-                        @if (!string.IsNullOrWhiteSpace(store.Phone))
-                        {
-                            <a class="btn-wlm-outline" href="tel:@store.Phone.Replace(" ", "")"><i class="bi bi-telephone"></i> @store.Phone</a>
-                        }
-                        @if (!string.IsNullOrWhiteSpace(store.WhatsAppNumber))
-                        {
-                            <a class="btn-wlm whatsapp-btn" href="https://wa.me/@store.WhatsAppNumber" target="_blank" rel="noopener noreferrer"><i class="bi bi-whatsapp"></i> @store.WhatsAppNumber</a>
-                        }
-                        <a class="btn-wlm-outline" href="https://www.google.com/maps/dir/?api=1&destination=@store.Latitude,@store.Longitude" target="_blank" rel="noopener noreferrer"><i class="bi bi-signpost-split"></i> @Localizer["Get directions"]</a>
-                    </div>
-                </div>
-            }
-        </div>
     }
     else
     {
@@ -102,7 +74,7 @@
     }
 </div>
 
-@if (Model.Count > 0 && !string.IsNullOrWhiteSpace(googleMapsApiKey))
+@if (Model.Count > 0)
 {
     @section Scripts {
         <script>
@@ -112,10 +84,11 @@
                 getDirectionsLabel: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Localizer["Get directions"].Value)),
                 resultCountLabel: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Localizer["Search results: {0}"].Value)),
                 noAddressFoundLabel: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Localizer["Couldn't find that address. Please try a different search."].Value)),
-                geolocationDeniedLabel: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Localizer["Couldn't get your location. Please search by address instead."].Value))
+                geolocationDeniedLabel: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Localizer["Couldn't get your location. Please search by address instead."].Value)),
+                geocodeSearchUrl: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Url.Action("GeocodeSearch", "Home")))
             };
         </script>
+        <script src="~/lib/leaflet/leaflet.js" asp-append-version="true"></script>
         <script src="~/js/store-locator.js" asp-append-version="true"></script>
-        <script src="https://maps.googleapis.com/maps/api/js?key=@googleMapsApiKey&libraries=places&callback=initStoreLocatorMap" async defer></script>
     }
 }

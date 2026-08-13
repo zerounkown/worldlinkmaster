@@ -194,6 +194,11 @@ builder.Services.AddScoped<IEmailService, SmtpEmailService>();
 builder.Services.AddScoped<IJwtService, JwtService>();
 builder.Services.AddScoped<IOrderFulfillmentService, OrderFulfillmentService>();
 builder.Services.AddHttpClient<IRecaptchaService, RecaptchaService>();
+builder.Services.AddHttpClient<IGeocodingService, NominatimGeocodingService>(client =>
+{
+    client.BaseAddress = new Uri("https://nominatim.openstreetmap.org/");
+    client.DefaultRequestHeaders.UserAgent.ParseAdd("WorldLinkMasterStoreLocator/1.0 (+https://wlinkmasters.com)");
+});
 
 // ---------------------------------------------------------------------------
 // JWT Bearer auth for the REST API surface (api/auth/*, etc.). Added alongside

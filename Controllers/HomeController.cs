@@ -11,11 +11,13 @@ public class HomeController : Controller
 {
     private readonly ApplicationDbContext _context;
     private readonly IPromoService _promoService;
+    private readonly IGeocodingService _geocodingService;
 
-    public HomeController(ApplicationDbContext context, IPromoService promoService)
+    public HomeController(ApplicationDbContext context, IPromoService promoService, IGeocodingService geocodingService)
     {
         _context = context;
         _promoService = promoService;
+        _geocodingService = geocodingService;
     }
 
     // "/" is served by Welcome (see Program.cs "root" route). This action used to render a
@@ -98,6 +100,25 @@ public class HomeController : Controller
             .OrderBy(s => s.DisplayOrder)
             .ToListAsync();
         return View(stores);
+    }
+
+    // Shared geocoding proxy for the Find a Store search box and the admin Stores
+    // "Autofill from address" button — see IGeocodingService for why this is server-side.
+    [HttpGet]
+    public async Task<IActionResult> GeocodeSearch(string query)
+    {
+        if (string.IsNullOrWhiteSpace(query))
+        {
+            return Json(new { success = false, message = "Enter an address to search." });
+        }
+
+        var result = await _geocodingService.GeocodeAsync(query);
+        if (result == null)
+        {
+            return Json(new { success = false, message = "Couldn't find that address." });
+        }
+
+        return Json(new { success = true, lat = result.Lat, lng = result.Lng, displayName = result.DisplayName });
     }
 
     public IActionResult Privacy()
