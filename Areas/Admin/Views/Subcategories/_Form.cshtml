@@ -25,6 +25,20 @@
     <input asp-for="Slug" class="form-control" />
     <span asp-validation-for="Slug" class="text-danger"></span>
 </div>
+<div class="mb-3">
+    <label asp-for="ImageUrl" class="form-label">@Localizer["Image URL"]</label>
+    <input asp-for="ImageUrl" class="form-control" />
+    <div class="form-text">@Localizer["Shown as this subcategory's tile image on its parent category's page. Leave blank to skip it in the tile row."]</div>
+</div>
+<div class="mb-3">
+    <label asp-for="Description" class="form-label">@Localizer["Description"]</label>
+    <textarea asp-for="Description" class="form-control" rows="3"></textarea>
+    <div class="form-text">@Localizer["Shown in this subcategory's own hero banner. Falls back to the parent category's banner if left blank."]</div>
+</div>
+<div class="mb-3">
+    <label asp-for="DescriptionAr" class="form-label">@Localizer["Description (Arabic)"]</label>
+    <textarea asp-for="DescriptionAr" class="form-control" rows="3" dir="rtl"></textarea>
+</div>
 
 <button type="submit" class="btn btn-primary">@Localizer["Save"]</button>
 <a asp-action="Index" class="btn btn-outline-secondary">@Localizer["Cancel"]</a>

@@ -4157,6 +4157,105 @@ a:hover {
   margin-top: 6px;
 }
 
+/* Category/subcategory hero banner (Views/Products/Index.cshtml) — same optional-photo
+   technique as .page-banner-sale-photo: the gradient overlay is composited into the same
+   background-image value as the photo, set inline, so a category with no ImageUrl just
+   renders as a plain .page-banner with no extra markup/code path. */
+.page-banner-category-photo {
+  background-size: cover;
+  background-position: center;
+  min-height: 340px;
+  display: flex;
+  align-items: center;
+}
+
+@media (max-width: 575.98px) {
+  .page-banner-category-photo {
+    min-height: 220px;
+  }
+}
+
+.category-hero-title {
+  font-size: 2.4rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  text-shadow: 0 3px 12px rgba(0, 0, 0, 0.5);
+}
+
+.category-hero-description {
+  max-width: 560px;
+  color: rgba(255, 255, 255, 0.88);
+  margin-top: 10px;
+  margin-bottom: 0;
+}
+
+/* Subcategory showcase row, directly under the hero banner. A grid (not a single flex row)
+   so it wraps to multiple rows instead of clipping/scrolling for categories with many
+   subcategories (e.g. Gear & Accessories has 28) — same approach as the mega-menu fix. */
+.category-subcat-row {
+  background: white;
+  padding: 32px 0;
+  margin-bottom: 32px;
+  border-bottom: 1px solid var(--wlm-sand-light);
+}
+
+.category-subcat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 24px;
+}
+
+.category-subcat-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-decoration: none;
+  text-align: center;
+}
+
+.category-subcat-tile-img-wrap {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--wlm-sand-light);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 12px;
+  transition: box-shadow 0.25s ease;
+}
+
+.category-subcat-tile:hover .category-subcat-tile-img-wrap {
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.18);
+}
+
+.category-subcat-tile-img-wrap img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.35s ease;
+}
+
+.category-subcat-tile:hover .category-subcat-tile-img-wrap img {
+  transform: scale(1.06);
+}
+
+.category-subcat-tile-placeholder {
+  color: var(--wlm-blue);
+  font-size: 1.8rem;
+}
+
+.category-subcat-tile-label {
+  font-family: var(--font-heading);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  font-size: 0.82rem;
+  color: var(--wlm-ink);
+}
+
 .no-sale-state {
   text-align: center;
   padding: 60px 20px;

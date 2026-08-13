@@ -23,6 +23,12 @@ public class Subcategory
     [StringLength(500)]
     public string? ImageUrl { get; set; }
 
+    [StringLength(400)]
+    public string? Description { get; set; }
+
+    [StringLength(400)]
+    public string? DescriptionAr { get; set; }
+
     public int CategoryId { get; set; }
     public Category? Category { get; set; }
 
