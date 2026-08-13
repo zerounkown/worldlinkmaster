@@ -91,9 +91,13 @@ public class HomeController : Controller
         return View(new WorldLinkMaster.Web.Models.ViewModels.LeadFormViewModel());
     }
 
-    public IActionResult Locations()
+    public async Task<IActionResult> Locations()
     {
-        return View();
+        var stores = await _context.Stores
+            .Where(s => s.Active)
+            .OrderBy(s => s.DisplayOrder)
+            .ToListAsync();
+        return View(stores);
     }
 
     public IActionResult Privacy()

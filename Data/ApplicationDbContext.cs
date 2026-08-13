@@ -43,6 +43,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
     public DbSet<HomeBanner> HomeBanners => Set<HomeBanner>();
     public DbSet<CompareItem> CompareItems => Set<CompareItem>();
     public DbSet<ProductReview> ProductReviews => Set<ProductReview>();
+    public DbSet<Store> Stores => Set<Store>();
 
     // Postgres' default "timestamp" column type has no timezone and rejects DateTime
     // values with Kind=Utc (which DateTime.UtcNow — used throughout this codebase — always

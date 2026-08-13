@@ -1,0 +1,10 @@
+@using WorldLinkMaster.Web.Models
+@model Store
+@{
+    ViewData["Title"] = Localizer["Edit Store"];
+}
+
+<h1>@Localizer["Edit Store"]</h1>
+<form asp-action="Edit" asp-route-id="@Model.Id" method="post">
+    <partial name="_Form" />
+</form>
