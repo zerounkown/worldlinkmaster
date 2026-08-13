@@ -935,8 +935,6 @@
   <data name="Latitude" xml:space="preserve"><value>خط العرض</value></data>
   <data name="Longitude" xml:space="preserve"><value>خط الطول</value></data>
   <data name="Autofill from address" xml:space="preserve"><value>تعبئة تلقائية من العنوان</value></data>
-  <data name="Set GoogleMaps:ApiKey to enable auto-filling coordinates from the address." xml:space="preserve"><value>قم بتعيين GoogleMaps:ApiKey لتفعيل تعبئة الإحداثيات تلقائياً من العنوان.</value></data>
-  <data name="Google Maps hasn't finished loading yet. Try again in a moment." xml:space="preserve"><value>لم يتم تحميل خرائط جوجل بعد. حاول مرة أخرى بعد قليل.</value></data>
   <data name="Couldn't find that address. Please enter coordinates manually." xml:space="preserve"><value>تعذّر العثور على هذا العنوان. يرجى إدخال الإحداثيات يدوياً.</value></data>
   <data name="Store '{0}' created." xml:space="preserve"><value>تم إنشاء الفرع '{0}'.</value></data>
   <data name="Store '{0}' updated." xml:space="preserve"><value>تم تحديث الفرع '{0}'.</value></data>
