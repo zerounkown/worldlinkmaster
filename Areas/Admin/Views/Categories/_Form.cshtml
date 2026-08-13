@@ -20,10 +20,16 @@
 <div class="mb-3">
     <label asp-for="Description" class="form-label">@Localizer["Description"]</label>
     <textarea asp-for="Description" class="form-control" rows="3"></textarea>
+    <div class="form-text">@Localizer["Shown under the title in this category's hero banner."]</div>
+</div>
+<div class="mb-3">
+    <label asp-for="DescriptionAr" class="form-label">@Localizer["Description (Arabic)"]</label>
+    <textarea asp-for="DescriptionAr" class="form-control" rows="3" dir="rtl"></textarea>
 </div>
 <div class="mb-3">
     <label asp-for="ImageUrl" class="form-label">@Localizer["Image URL"]</label>
     <input asp-for="ImageUrl" class="form-control" />
+    <div class="form-text">@Localizer["Background photo for this category's hero banner. Leave blank for a plain banner."]</div>
 </div>
 
 <button type="submit" class="btn btn-primary">@Localizer["Save"]</button>

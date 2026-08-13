@@ -33,6 +33,9 @@ public static class LocalizedContentExtensions
     public static string LocalizedName(this Subcategory subcategory) =>
         IsArabic && !string.IsNullOrWhiteSpace(subcategory.NameAr) ? subcategory.NameAr! : subcategory.Name;
 
+    public static string? LocalizedDescription(this Subcategory subcategory) =>
+        IsArabic && !string.IsNullOrWhiteSpace(subcategory.DescriptionAr) ? subcategory.DescriptionAr : subcategory.Description;
+
     public static string LocalizedName(this Brand brand) =>
         IsArabic && !string.IsNullOrWhiteSpace(brand.NameAr) ? brand.NameAr! : brand.Name;
 

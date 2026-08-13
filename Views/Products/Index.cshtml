@@ -38,17 +38,80 @@
     if (Model.MaxPrice.HasValue) { stateParams.Add($"maxPrice={Model.MaxPrice}"); }
     if (!string.IsNullOrWhiteSpace(Model.SortBy)) { stateParams.Add($"sort={Model.SortBy}"); }
     var filterState = string.Join("&", stateParams);
+
+    // A category (or a subcategory within one) is selected — show the rich hero banner +
+    // subcategory tile row instead of the plain text banner. Falls back gracefully: a
+    // subcategory page without its own image/description uses its parent category's; a
+    // category with neither renders identically to the old plain banner (no broken images).
+    var showCategoryHero = currentCategory != null;
+    var heroImageUrl = currentSubcategory?.ImageUrl ?? currentCategory?.ImageUrl;
+    var heroDescription = currentSubcategory?.LocalizedDescription() ?? currentCategory?.LocalizedDescription();
+    var heroHasImage = !string.IsNullOrWhiteSpace(heroImageUrl);
 }
 
-<div class="page-banner">
-    <div class="container">
-        <h1>@(currentSubcategory?.LocalizedName() ?? currentCategory?.LocalizedName() ?? selectedBrandForTitle?.LocalizedName() ?? Localizer["All Products"])</h1>
-        @if (!string.IsNullOrWhiteSpace(Model.SearchTerm))
-        {
-            <p class="mb-0">@Localizer["Search results for \"{0}\"", Model.SearchTerm]</p>
-        }
+@if (showCategoryHero)
+{
+    <div class="page-banner page-banner-category @(heroHasImage ? "page-banner-category-photo" : "")" style="@(heroHasImage ? $"background-image: linear-gradient(90deg, rgba(5,5,5,0.75) 0%, rgba(5,5,5,0.45) 55%, rgba(5,5,5,0.15) 100%), url('{heroImageUrl}');" : "")">
+        <div class="container">
+            <h1 class="category-hero-title">@(currentSubcategory?.LocalizedName() ?? currentCategory!.LocalizedName())</h1>
+            @if (!string.IsNullOrWhiteSpace(heroDescription))
+            {
+                <p class="category-hero-description">@heroDescription</p>
+            }
+        </div>
     </div>
-</div>
+
+    if (currentCategory!.Subcategories.Any())
+    {
+        <div class="category-subcat-row">
+            <div class="container">
+                <div class="category-subcat-grid">
+                    <a class="category-subcat-tile" asp-action="Index" asp-route-categoryId="@currentCategory.Id">
+                        <span class="category-subcat-tile-img-wrap">
+                            @if (!string.IsNullOrWhiteSpace(currentCategory.ImageUrl))
+                            {
+                                <img src="@currentCategory.ImageUrl" alt="@Localizer["All {0}", currentCategory.LocalizedName()]" />
+                            }
+                            else
+                            {
+                                <span class="category-subcat-tile-placeholder"><i class="bi bi-box-seam"></i></span>
+                            }
+                        </span>
+                        <span class="category-subcat-tile-label">@Localizer["All {0}", currentCategory.LocalizedName()]</span>
+                    </a>
+                    @foreach (var sub in currentCategory.Subcategories.OrderBy(s => s.DisplayOrder).ThenBy(s => s.Name))
+                    {
+                        <a class="category-subcat-tile" asp-action="Index" asp-route-categoryId="@currentCategory.Id" asp-route-subcategoryId="@sub.Id">
+                            <span class="category-subcat-tile-img-wrap">
+                                @if (!string.IsNullOrWhiteSpace(sub.ImageUrl))
+                                {
+                                    <img src="@sub.ImageUrl" alt="@sub.LocalizedName()" />
+                                }
+                                else
+                                {
+                                    <span class="category-subcat-tile-placeholder"><i class="bi bi-box-seam"></i></span>
+                                }
+                            </span>
+                            <span class="category-subcat-tile-label">@sub.LocalizedName()</span>
+                        </a>
+                    }
+                </div>
+            </div>
+        </div>
+    }
+}
+else
+{
+    <div class="page-banner">
+        <div class="container">
+            <h1>@(selectedBrandForTitle?.LocalizedName() ?? Localizer["All Products"])</h1>
+            @if (!string.IsNullOrWhiteSpace(Model.SearchTerm))
+            {
+                <p class="mb-0">@Localizer["Search results for \"{0}\"", Model.SearchTerm]</p>
+            }
+        </div>
+    </div>
+}
 
 @if (isBrowsingAllCategories)
 {
