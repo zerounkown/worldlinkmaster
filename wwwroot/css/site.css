@@ -21,22 +21,31 @@
   box-sizing: border-box;
 }
 
-/* overflow-x: hidden lived on both html AND body, which (per the CSS overflow spec's
-   mixed-axis rule: an unset overflow-y computes to auto whenever overflow-x isn't
+/* overflow-x: hidden used to live on both html AND body, which (per the CSS overflow
+   spec's mixed-axis rule: an unset overflow-y computes to auto whenever overflow-x isn't
    visible) made BOTH elements independently scrollable — a real, competing scroll
    container on body swallowed the page's actual overflow while html (the nominal
    document.scrollingElement) reported almost no scrollable height of its own. That
    mismatch is what produced a large blank region during/after scrolling: content was
    really there, just laid out inside a second scroll context the browser wasn't
-   compositing predictably alongside the sticky header. Keeping it on html only (there's
-   nothing above html to bleed horizontally past anyway) leaves exactly one scrolling
-   element, which is what position: sticky on the header assumes. */
+   compositing predictably alongside the sticky header. html keeps overflow-x: hidden
+   (there's nothing above it to bleed horizontally past anyway) as the sole scrolling
+   element, which is what position: sticky on the header assumes.
+
+   body still needs *some* horizontal clipping though — off-canvas elements like
+   .side-nav are deliberately positioned past the viewport edge (position: fixed +
+   transform) when closed, and that width always counts toward scrollWidth regardless of
+   clipping. Using overflow-x: hidden here would reintroduce the exact dual-scroll-
+   container bug above. overflow-x: clip is the fix: it visually clips the same as
+   hidden, but (per spec) does *not* trigger the mixed-axis auto-coercion, so body's
+   overflow-y stays visible and html remains the only scroll container. */
 html {
   height: 100%;
   overflow-x: hidden;
 }
 
 body {
+  overflow-x: clip;
   font-family: var(--font-body);
   color: var(--wlm-ink);
   background-color: var(--wlm-cream);
