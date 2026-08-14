@@ -276,22 +276,21 @@ a:hover {
 }
 
 /* Mega-menu variant of the dropdown panel — black/yellow, matching the rest of the
-   tactical-brand nav. One column per category, subcategories listed underneath, all fully
-   expanded (no per-column scrollbars/clipping — every column shows its complete list). A
-   fixed 3-column grid wraps our 5 categories into 2 rows; since grid rows size
-   independently, the row holding the largest category (Gear & Accessories, 29 items) grows
-   tall on its own without forcing the other row's shorter columns (e.g. Outdoor Equipment,
-   1 item) to stretch to match.
+   tactical-brand nav. All 5 categories sit in a single row (matching the reference layout)
+   instead of wrapping to a second row, so every category header is visible at a glance with
+   no vertical scroll needed just to see that a category exists. Each column still shows its
+   complete subcategory list — no per-column clipping.
 
-   That second row is tall enough (~950px) that the whole panel can exceed a typical browser
-   viewport height, putting it mostly below the fold with no visual cue that scrolling the
-   whole page would reveal it — most people don't expect a nav dropdown to require page
-   scroll. Capping the panel itself to a viewport-relative max-height with its own scrollbar
-   keeps every column's full list intact (still no clipping) while guaranteeing the whole
-   panel is reachable without scrolling the page behind it. */
+   Gear & Accessories alone has 29 items (~950px tall), and since every column in a single
+   CSS Grid row shares that row's height, the whole row — and so the whole panel — is that
+   tall regardless of column count. A typical browser viewport can't fit that, so the panel
+   keeps its own max-height + scrollbar: reaching the bottom of Gear & Accessories' list
+   still takes a scroll, but that's a consequence of one category having far more items than
+   the others, not a layout bug — every category and its first several items are visible
+   immediately, and the panel scrolls independently of the page behind it either way. */
 .main-nav-dropdown-panel-mega {
-  min-width: 720px;
-  max-width: min(960px, 90vw);
+  min-width: 900px;
+  max-width: min(1080px, 94vw);
   max-height: min(75vh, 640px);
   overflow-y: auto;
   padding: 22px;
@@ -327,8 +326,8 @@ a:hover {
 
 .main-nav-mega-columns {
   display: grid;
-  grid-template-columns: repeat(3, minmax(150px, 1fr));
-  gap: 22px 28px;
+  grid-template-columns: repeat(5, minmax(150px, 1fr));
+  gap: 22px 20px;
 }
 
 .main-nav-mega-col {
