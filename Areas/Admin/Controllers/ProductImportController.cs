@@ -98,11 +98,10 @@ public class ProductImportController : AdminBaseController
             await SyncProductStockFromVariantsAsync(productsBySku);
         }
 
-        var touchedProductCodes = new HashSet<string>(productsBySku.Keys, StringComparer.OrdinalIgnoreCase);
-
+        var mediaTouchedProductCodes = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         if (workbook.Worksheets.Contains("Media"))
         {
-            await ImportMediaAsync(workbook.Worksheet("Media"), productsBySku, productColorsByCode, result);
+            mediaTouchedProductCodes = await ImportMediaAsync(workbook.Worksheet("Media"), productsBySku, productColorsByCode, result);
         }
 
         if (workbook.Worksheets.Contains("Attributes"))
@@ -112,8 +111,10 @@ public class ProductImportController : AdminBaseController
 
         // Keep the existing storefront-visible fields (Product.ImageUrl, ProductImages,
         // ProductVariant.ImageUrl) usable even though the new per-color gallery-swap UI isn't
-        // built yet — otherwise imported products would look broken/empty on the site.
-        await SyncStorefrontDisplayFieldsAsync(touchedProductCodes, productsBySku);
+        // built yet — otherwise imported products would look broken/empty on the site. Scoped to
+        // only products with rows in this upload's Media sheet — a product present here just for
+        // a price/stock update, with no Media rows of its own, must keep its existing gallery.
+        await SyncStorefrontDisplayFieldsAsync(mediaTouchedProductCodes, productsBySku);
         await _context.SaveChangesAsync();
 
         return View("Index", result);
@@ -640,7 +641,7 @@ public class ProductImportController : AdminBaseController
         await _context.SaveChangesAsync();
     }
 
-    private async Task ImportMediaAsync(
+    private async Task<HashSet<string>> ImportMediaAsync(
         IXLWorksheet sheet, Dictionary<string, Product> productsBySku,
         Dictionary<string, ProductColor> productColorsByCode, ProductImportResult result)
     {
@@ -660,10 +661,12 @@ public class ProductImportController : AdminBaseController
         var altArCol = FindColumn(headers, "Alt Text AR");
         var activeCol = FindColumn(headers, "Active");
 
+        var touchedProductCodes = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
         if (productCol == null || urlCol == null || scopeCol == null)
         {
             result.Errors.Add("Media sheet: couldn't find required columns (Product Code, Media Scope, Media URL).");
-            return;
+            return touchedProductCodes;
         }
 
         // Rows have no stable natural key to match against for an update, so each product
@@ -752,6 +755,7 @@ public class ProductImportController : AdminBaseController
                 newMediaByProduct[product.Id] = list;
             }
             list.Add(media);
+            touchedProductCodes.Add(productCode);
 
             if (isMain && media.Active && productColorId.HasValue)
             {
@@ -770,7 +774,7 @@ public class ProductImportController : AdminBaseController
 
         if (newMediaByProduct.Count == 0)
         {
-            return;
+            return touchedProductCodes;
         }
 
         var productIds = newMediaByProduct.Keys.ToList();
@@ -783,6 +787,7 @@ public class ProductImportController : AdminBaseController
         }
 
         await _context.SaveChangesAsync();
+        return touchedProductCodes;
     }
 
     private async Task ImportAttributesAsync(IXLWorksheet sheet, Dictionary<string, Product> productsBySku, ProductImportResult result)
