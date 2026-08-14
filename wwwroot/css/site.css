@@ -276,9 +276,11 @@ a:hover {
 }
 
 /* Mega-menu variant of the dropdown panel — black/yellow, matching the rest of the
-   tactical-brand nav. One column per category, subcategories listed underneath. Long
-   columns (e.g. Accessories with 28 items) scroll internally instead of stretching the
-   whole panel to an unreasonable height. */
+   tactical-brand nav. One column per category, subcategories listed underneath, all fully
+   expanded (no internal scrollbars/clipping). A fixed 3-column grid wraps our 5 categories
+   into 2 rows; since grid rows size independently, the row holding the largest category
+   (Gear & Accessories, 28 items) grows tall on its own without forcing the other row's
+   shorter columns (e.g. Outdoor Equipment, 1 item) to stretch to match. */
 .main-nav-dropdown-panel-mega {
   min-width: 720px;
   max-width: min(960px, 90vw);
@@ -286,22 +288,33 @@ a:hover {
   background: var(--wlm-forest-dark);
 }
 
+.main-nav-mega-viewall {
+  display: inline-block;
+  font-family: var(--font-heading);
+  font-weight: 700 !important;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  font-size: 0.95rem;
+  color: var(--wlm-sand) !important;
+  padding-bottom: 12px;
+  margin-bottom: 16px;
+  border-bottom: 2px solid rgba(255, 255, 255, 0.15);
+}
+
 .main-nav-mega-columns {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-  gap: 22px;
+  grid-template-columns: repeat(3, minmax(150px, 1fr));
+  gap: 22px 28px;
 }
 
 .main-nav-mega-col {
   display: flex;
   flex-direction: column;
-  max-height: 320px;
-  overflow-y: auto;
 }
 
 .main-nav-mega-header {
   font-family: var(--font-heading);
-  font-weight: 700;
+  font-weight: 700 !important;
   text-transform: uppercase;
   letter-spacing: 0.03em;
   font-size: 0.82rem;
@@ -311,12 +324,16 @@ a:hover {
   border-bottom: 2px solid rgba(255, 255, 255, 0.15);
 }
 
-.main-nav-mega-col a {
+.main-nav-mega-header:hover {
+  color: #ffffff !important;
+}
+
+.main-nav-mega-subitem {
   padding: 5px 4px !important;
   color: rgba(255, 255, 255, 0.85) !important;
 }
 
-.main-nav-mega-col a:hover {
+.main-nav-mega-subitem:hover {
   background: var(--wlm-sand) !important;
   color: var(--wlm-forest-dark) !important;
 }
