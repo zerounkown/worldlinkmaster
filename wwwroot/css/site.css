@@ -277,15 +277,39 @@ a:hover {
 
 /* Mega-menu variant of the dropdown panel — black/yellow, matching the rest of the
    tactical-brand nav. One column per category, subcategories listed underneath, all fully
-   expanded (no internal scrollbars/clipping). A fixed 3-column grid wraps our 5 categories
-   into 2 rows; since grid rows size independently, the row holding the largest category
-   (Gear & Accessories, 28 items) grows tall on its own without forcing the other row's
-   shorter columns (e.g. Outdoor Equipment, 1 item) to stretch to match. */
+   expanded (no per-column scrollbars/clipping — every column shows its complete list). A
+   fixed 3-column grid wraps our 5 categories into 2 rows; since grid rows size
+   independently, the row holding the largest category (Gear & Accessories, 29 items) grows
+   tall on its own without forcing the other row's shorter columns (e.g. Outdoor Equipment,
+   1 item) to stretch to match.
+
+   That second row is tall enough (~950px) that the whole panel can exceed a typical browser
+   viewport height, putting it mostly below the fold with no visual cue that scrolling the
+   whole page would reveal it — most people don't expect a nav dropdown to require page
+   scroll. Capping the panel itself to a viewport-relative max-height with its own scrollbar
+   keeps every column's full list intact (still no clipping) while guaranteeing the whole
+   panel is reachable without scrolling the page behind it. */
 .main-nav-dropdown-panel-mega {
   min-width: 720px;
   max-width: min(960px, 90vw);
+  max-height: min(75vh, 640px);
+  overflow-y: auto;
   padding: 22px;
   background: var(--wlm-forest-dark);
+  scrollbar-color: var(--wlm-sand) var(--wlm-forest-mid);
+}
+
+.main-nav-dropdown-panel-mega::-webkit-scrollbar {
+  width: 8px;
+}
+
+.main-nav-dropdown-panel-mega::-webkit-scrollbar-track {
+  background: var(--wlm-forest-mid);
+}
+
+.main-nav-dropdown-panel-mega::-webkit-scrollbar-thumb {
+  background: var(--wlm-sand);
+  border-radius: 4px;
 }
 
 .main-nav-mega-viewall {
