@@ -1,5 +1,11 @@
-// The "Shop" mega-menu opens on click and stays open (fixed) until the trigger is clicked
-// again or the user clicks outside it — clicking a link inside just navigates away normally.
+// Standard mega-menu pattern: hovering a nav item ("New Arrivals"/"Shop"/"Categories") opens
+// its panel automatically, and clicking the trigger link navigates normally (it's a real
+// <a href>, not just a toggle). Closing on mouseleave is delayed briefly rather than instant —
+// without that delay, moving the cursor from the trigger down into the panel would cross the
+// visual gap between them (the panel's margin-top) and close the menu before the cursor ever
+// reaches it, since that gap is outside both elements' boxes for an instant. The delay gives
+// the follow-up mouseenter (fired once the cursor reaches the panel, a DOM descendant of the
+// same .main-nav-dropdown wrapper) time to cancel the pending close.
 (function () {
     "use strict";
 
@@ -7,6 +13,9 @@
     if (dropdowns.length === 0) {
         return;
     }
+
+    var CLOSE_DELAY_MS = 200;
+    var closeTimer = null;
 
     function closeAll() {
         dropdowns.forEach(function (d) {
@@ -20,20 +29,23 @@
         });
     }
 
-    dropdowns.forEach(function (dropdown) {
-        var toggle = dropdown.querySelector(".main-nav-link");
-        if (!toggle) {
-            return;
-        }
+    function scheduleClose() {
+        clearTimeout(closeTimer);
+        closeTimer = setTimeout(closeAll, CLOSE_DELAY_MS);
+    }
 
-        toggle.addEventListener("click", function (e) {
-            e.preventDefault();
-            var wasOpen = dropdown.classList.contains("open");
-            closeAll();
-            if (!wasOpen) {
-                dropdown.classList.add("open");
-            }
+    function openNow(dropdown) {
+        clearTimeout(closeTimer);
+        dropdowns.forEach(function (d) {
+            d.classList.toggle("open", d === dropdown);
         });
+    }
+
+    dropdowns.forEach(function (dropdown) {
+        dropdown.addEventListener("mouseenter", function () {
+            openNow(dropdown);
+        });
+        dropdown.addEventListener("mouseleave", scheduleClose);
     });
 
     document.addEventListener("click", function (e) {

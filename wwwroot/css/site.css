@@ -321,6 +321,19 @@ a:hover {
   color: var(--wlm-forest-dark) !important;
 }
 
+/* "Categories" preview panel — a small photo-tile picker, not the wide multi-column text
+   layout the mega-menu variant is built for. It used to reuse .main-nav-dropdown-panel-mega
+   (dark background, forced 720-960px min-width), which made it render far wider than its
+   actual content and blend into whatever photo happened to be behind it (e.g. a hero
+   banner) since dark-on-dark gave it no visible edge. A dedicated white, content-sized
+   panel keeps it visually contained regardless of what's behind it. */
+.main-nav-dropdown-panel-categories {
+  width: max-content;
+  max-width: min(600px, 90vw);
+  padding: 18px;
+  background: white;
+}
+
 /* "Categories" preview panel — a quick visual photo-tile picker, one tile per category.
    Flex-wrap + centering (rather than a grid) so a remainder row — e.g. 5 tiles wrapping
    to a 4+1 split — centers its leftover tile instead of stranding it flush-left with a

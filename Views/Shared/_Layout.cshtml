@@ -282,7 +282,7 @@
             </div>
             <div class="main-nav-item main-nav-dropdown">
                 <a class="main-nav-link @(isCategoriesActive ? "active" : "")" asp-area="" asp-controller="Categories" asp-action="Index">@Localizer["Categories"] <i class="bi bi-chevron-down"></i></a>
-                <div class="main-nav-dropdown-panel main-nav-dropdown-panel-mega">
+                <div class="main-nav-dropdown-panel main-nav-dropdown-panel-categories">
                     <div class="main-nav-categories-grid">
                         @foreach (var category in navCategories)
                         {
