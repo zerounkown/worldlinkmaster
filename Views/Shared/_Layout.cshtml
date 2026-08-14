@@ -43,7 +43,6 @@
     var currentAction = ViewContext.RouteData.Values["action"]?.ToString() ?? "";
     var isNewArrivalsActive = currentController == "Products" && currentAction == "NewArrivals";
     var isShopActive = currentController == "Products" && (currentAction == "Index" || currentAction == "Details");
-    var isCategoriesActive = currentController == "Categories";
     var isContactActive = currentController == "Home" && currentAction == "Contact";
     var isLocationsActive = currentController == "Home" && currentAction == "Locations";
     var isTradeProgramActive = currentController == "Wholesale";
@@ -274,20 +273,6 @@
                                     <a class="main-nav-mega-subitem" asp-area="" asp-controller="Products" asp-action="Index" asp-route-categoryId="@category.Id" asp-route-subcategoryId="@subcategory.Id">@subcategory.LocalizedName()</a>
                                 }
                             </div>
-                        }
-                    </div>
-                </div>
-            </div>
-            <div class="main-nav-item main-nav-dropdown">
-                <a class="main-nav-link @(isCategoriesActive ? "active" : "")" asp-area="" asp-controller="Categories" asp-action="Index">@Localizer["Categories"] <i class="bi bi-chevron-down"></i></a>
-                <div class="main-nav-dropdown-panel main-nav-dropdown-panel-categories">
-                    <div class="main-nav-categories-grid">
-                        @foreach (var category in navCategories)
-                        {
-                            <a class="main-nav-category-tile" asp-controller="Products" asp-action="Index" asp-route-categoryId="@category.Id">
-                                <img src="@category.ImageUrl" alt="@category.LocalizedName()" />
-                                <span>@category.LocalizedName()</span>
-                            </a>
                         }
                     </div>
                 </div>
