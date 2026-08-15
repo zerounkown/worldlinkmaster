@@ -24,6 +24,19 @@
         }
     }
     var navCategories = await DbContext.Categories.Include(c => c.Subcategories.OrderBy(s => s.Name)).OrderBy(c => c.Name).ToListAsync();
+
+    // Short one-line promo captions for the Shop mega-menu's image panel — same convention as
+    // Welcome.cshtml's collectionsTagBySlug (decorative marketing copy, not core category data,
+    // so a small slug-keyed dictionary here beats a new database field). Always English, matching
+    // the same "reference design" choice collectionsTagBySlug already made for its own tags.
+    var megaMenuPromoCaptionBySlug = new Dictionary<string, string>
+    {
+        ["bags-and-packs"] = "Rugged, mission-ready packs for every load.",
+        ["tactical-apparel"] = "Field-tested apparel built to move with you.",
+        ["footwear"] = "Boots and shoes engineered for the long haul.",
+        ["gear-and-accessories"] = "Everyday carry essentials for any mission.",
+        ["outdoor-equipment"] = "Camp and field gear that goes the distance."
+    };
     var categoryPreviews = new Dictionary<int, List<Product>>();
     foreach (var navCategory in navCategories)
     {
@@ -261,17 +274,42 @@
             </div>
             <div class="main-nav-item main-nav-dropdown">
                 <a class="main-nav-link @(isShopActive ? "active" : "")" asp-area="" asp-controller="Products" asp-action="Index">@Localizer["Shop"] <i class="bi bi-chevron-down"></i></a>
-                <div class="main-nav-dropdown-panel main-nav-dropdown-panel-mega">
-                    <a class="main-nav-mega-viewall" asp-area="" asp-controller="Products" asp-action="Index">@Localizer["All Products"]</a>
-                    <div class="main-nav-mega-columns">
-                        @foreach (var category in navCategories)
-                        {
-                            <div class="main-nav-mega-col">
-                                <a class="main-nav-mega-header" asp-area="" asp-controller="Products" asp-action="Index" asp-route-categoryId="@category.Id">@category.LocalizedName()</a>
-                                @foreach (var subcategory in category.Subcategories)
+                <div class="main-nav-dropdown-panel main-nav-dropdown-panel-mega main-nav-dropdown-panel-shop">
+                    <div class="main-nav-mega-body">
+                        <div class="main-nav-mega-main">
+                            <a class="main-nav-mega-viewall" asp-area="" asp-controller="Products" asp-action="Index">@Localizer["All Products"]</a>
+                            <div class="main-nav-mega-columns">
+                                @foreach (var category in navCategories)
                                 {
-                                    <a class="main-nav-mega-subitem" asp-area="" asp-controller="Products" asp-action="Index" asp-route-categoryId="@category.Id" asp-route-subcategoryId="@subcategory.Id">@subcategory.LocalizedName()</a>
+                                    var promoCaption = megaMenuPromoCaptionBySlug.GetValueOrDefault(category.Slug, category.LocalizedName());
+                                    var promoHref = Url.Action("Index", "Products", new { categoryId = category.Id });
+                                    <div class="main-nav-mega-col"
+                                         data-promo-image="@category.ImageUrl"
+                                         data-promo-caption="@promoCaption"
+                                         data-promo-cta-text="@Localizer["Shop {0}", category.LocalizedName()]"
+                                         data-promo-cta-href="@promoHref">
+                                        <a class="main-nav-mega-header" asp-area="" asp-controller="Products" asp-action="Index" asp-route-categoryId="@category.Id">@category.LocalizedName()</a>
+                                        @foreach (var subcategory in category.Subcategories)
+                                        {
+                                            <a class="main-nav-mega-subitem" asp-area="" asp-controller="Products" asp-action="Index" asp-route-categoryId="@category.Id" asp-route-subcategoryId="@subcategory.Id">@subcategory.LocalizedName()</a>
+                                        }
+                                    </div>
                                 }
+                            </div>
+                        </div>
+                        @{
+                            var firstCategory = navCategories.FirstOrDefault();
+                            var firstPromoCaption = firstCategory != null ? megaMenuPromoCaptionBySlug.GetValueOrDefault(firstCategory.Slug, firstCategory.LocalizedName()) : "";
+                            var firstPromoHref = firstCategory != null ? Url.Action("Index", "Products", new { categoryId = firstCategory.Id }) : "#";
+                        }
+                        @if (firstCategory != null)
+                        {
+                            <div class="main-nav-mega-promo">
+                                <img class="js-mega-promo-image" src="@firstCategory.ImageUrl" alt="" />
+                                <p class="js-mega-promo-caption">@firstPromoCaption</p>
+                                <a class="main-nav-mega-promo-cta js-mega-promo-cta" href="@firstPromoHref">
+                                    <span class="js-mega-promo-cta-text">@Localizer["Shop {0}", firstCategory.LocalizedName()]</span>
+                                </a>
                             </div>
                         }
                     </div>

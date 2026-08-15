@@ -218,6 +218,7 @@ a:hover {
 }
 
 .main-nav-link {
+  position: relative;
   display: inline-flex;
   align-items: center;
   gap: 4px;
@@ -228,6 +229,7 @@ a:hover {
   font-size: 0.95rem;
   font-weight: 500;
   white-space: nowrap;
+  padding-bottom: 6px;
 }
 
 .main-nav-link:hover {
@@ -236,6 +238,25 @@ a:hover {
 
 .main-nav-link.active {
   color: var(--wlm-sand);
+}
+
+/* Thin gold underline on the active/hovered top-level tab — an absolutely-positioned
+   pseudo-element rather than a real border-bottom, so it doesn't shift the nav bar's height. */
+.main-nav-link::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 2px;
+  background: var(--wlm-gold-bronze);
+  transform: scaleX(0);
+  transition: transform 0.15s ease;
+}
+
+.main-nav-link:hover::after,
+.main-nav-link.active::after {
+  transform: scaleX(1);
 }
 
 .main-nav-dropdown {
@@ -364,6 +385,135 @@ a:hover {
 .main-nav-mega-subitem:hover {
   background: var(--wlm-sand) !important;
   color: var(--wlm-forest-dark) !important;
+}
+
+/* Shop mega-menu — light/minimal skin + promo image panel, scoped to .main-nav-dropdown-panel-shop
+   only (combined with the existing .main-nav-dropdown-panel-mega class) so New Arrivals' dropdown,
+   which shares that base class for its sizing/scroll mechanics, keeps its current dark theme
+   untouched — its own content (.main-nav-preview-name etc.) is hardcoded white-on-dark and would
+   break if the shared class's background changed globally. */
+.main-nav-dropdown-panel-mega.main-nav-dropdown-panel-shop {
+  background: white;
+  scrollbar-color: var(--wlm-gold-bronze) var(--wlm-sand-light);
+  /* min-width/max-width intentionally left at the base .main-nav-dropdown-panel-mega values
+     (900px / min(1080px, 94vw)) here — proven to fit real laptop widths (measured: fits cleanly
+     at 1366px). Only widened, and the promo panel only shown, above 1600px where there's
+     confirmed room (measured: 1600px viewport leaves ~160px margin) — the "Shop" nav item's own
+     position varies with viewport width, so this couldn't be computed purely from the panel's
+     own width; see the 1600px media query below. */
+}
+
+.main-nav-dropdown-panel-shop::-webkit-scrollbar-track {
+  background: var(--wlm-sand-light);
+}
+
+.main-nav-dropdown-panel-shop::-webkit-scrollbar-thumb {
+  background: var(--wlm-gold-bronze);
+  border-radius: 4px;
+}
+
+.main-nav-dropdown-panel-shop .main-nav-mega-viewall {
+  color: var(--wlm-gold-bronze) !important;
+  border-bottom-color: var(--wlm-sand-light);
+}
+
+.main-nav-mega-body {
+  display: flex;
+  gap: 28px;
+}
+
+.main-nav-mega-main {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.main-nav-dropdown-panel-shop .main-nav-mega-header {
+  color: var(--wlm-ink) !important;
+  border-bottom-color: #e5e0d8;
+}
+
+.main-nav-dropdown-panel-shop .main-nav-mega-header:hover {
+  color: var(--wlm-gold-bronze) !important;
+}
+
+.main-nav-dropdown-panel-shop .main-nav-mega-subitem {
+  color: var(--wlm-forest-mid) !important;
+  border-radius: 3px;
+}
+
+.main-nav-dropdown-panel-shop .main-nav-mega-subitem:hover {
+  background: #f5f0e8 !important;
+  color: var(--wlm-ink) !important;
+}
+
+.main-nav-dropdown-panel-shop .main-nav-mega-col + .main-nav-mega-col {
+  border-inline-start: 1px solid #ece7de;
+  padding-inline-start: 20px;
+}
+
+/* Promotional image panel — swapped per hovered/focused category column by a small listener in
+   site.js (mirrors the Featured Products "View All" link swap pattern). Rendered server-side
+   already populated with the first category's data so it's never empty on open.
+
+   Hidden below 1600px (see media query further down): the "Shop" nav item's horizontal position
+   shifts with viewport width, so a fixed cutoff couldn't be computed purely from the promo
+   panel's own size — measured directly instead. At 1366px (a common laptop width) the panel with
+   the promo column added ran ~45px past the right edge of the screen; at 1600px it comfortably
+   fits with ~160px to spare. Below 1600px the category columns alone (already proven to fit at
+   1366px before this redesign) render without the promo column, rather than risk part of the
+   menu landing off-screen. */
+.main-nav-mega-promo {
+  display: none;
+  flex-direction: column;
+  flex: 0 0 230px;
+  border-inline-start: 1px solid #ece7de;
+  padding-inline-start: 24px;
+}
+
+@media (min-width: 1600px) {
+  .main-nav-dropdown-panel-mega.main-nav-dropdown-panel-shop {
+    min-width: 1150px;
+    max-width: min(1300px, 94vw);
+  }
+
+  .main-nav-mega-promo {
+    display: flex;
+  }
+}
+
+.main-nav-mega-promo img {
+  width: 100%;
+  aspect-ratio: 3 / 4;
+  object-fit: cover;
+  border-radius: 8px;
+  background: var(--wlm-sand-light);
+  margin-bottom: 12px;
+}
+
+.main-nav-mega-promo p {
+  font-size: 0.82rem;
+  line-height: 1.4;
+  color: var(--wlm-forest-mid);
+  margin-bottom: 14px;
+}
+
+.main-nav-mega-promo-cta {
+  display: block;
+  text-align: center;
+  background: var(--wlm-ink);
+  color: white !important;
+  font-family: var(--font-heading);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-size: 0.78rem;
+  padding: 12px 14px !important;
+  border-radius: 4px;
+  transition: background-color 0.15s ease;
+}
+
+.main-nav-mega-promo-cta:hover {
+  background: var(--wlm-gold-bronze) !important;
 }
 
 
