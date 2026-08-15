@@ -12,11 +12,15 @@
   --wlm-blue-dark: #1a1a1a;
   --wlm-blue: #6b6b6b;
   --wlm-danger: #b5482c;
-  /* Warm bronze/gold and off-white panel — used only by the homepage's "Featured Products"
-     tabbed panel, deliberately distinct from --wlm-sand (bright CTA-button yellow) and
-     --wlm-cream (pure white) so that section reads as its own framed block on the page. */
+  /* Warm bronze/gold — used by the Shop mega-menu's light theme (a deliberately muted accent,
+     distinct from --wlm-sand's brighter CTA-button yellow, chosen for that component's own
+     look). Not used by the homepage "Featured Products" panel anymore — that section was moved
+     to --wlm-sand, the same brand gold already used by primary CTA buttons like "Start Shopping
+     With Us", per explicit design feedback. */
   --wlm-gold-bronze: #a6793d;
-  --wlm-cream-panel: #f5f0e8;
+  /* Off-white panel background for the homepage "Featured Products" panel — barely warmer than
+     --wlm-cream (pure white), just enough to read as its own framed block against the page. */
+  --wlm-cream-panel: #fbfaf7;
   --font-heading: 'Oswald', sans-serif;
   --font-body: 'Inter', sans-serif;
 
@@ -1891,8 +1895,8 @@ a:hover {
 .featured-products-divider {
   height: 1px;
   width: 80px;
-  background: var(--wlm-gold-bronze);
-  opacity: 0.5;
+  background: var(--wlm-sand);
+  opacity: 0.8;
 }
 
 .featured-products-badge {
@@ -1902,8 +1906,8 @@ a:hover {
   width: 40px;
   height: 40px;
   border-radius: 50%;
-  border: 1px solid var(--wlm-gold-bronze);
-  color: var(--wlm-gold-bronze);
+  border: 1px solid var(--wlm-sand);
+  color: var(--wlm-sand);
   font-size: 1.1rem;
   flex: 0 0 auto;
 }
@@ -1956,11 +1960,11 @@ a:hover {
 
 .featured-tab-link.active {
   color: var(--wlm-ink);
-  border-bottom-color: var(--wlm-gold-bronze);
+  border-bottom-color: var(--wlm-sand);
 }
 
 .featured-tab-link.active i {
-  color: var(--wlm-gold-bronze);
+  color: var(--wlm-sand);
 }
 
 .featured-products-viewall {
@@ -1970,7 +1974,7 @@ a:hover {
   display: flex;
   align-items: center;
   gap: 4px;
-  color: var(--wlm-gold-bronze);
+  color: var(--wlm-sand);
   font-weight: 600;
   font-size: 0.9rem;
   text-decoration: none;
@@ -2045,7 +2049,7 @@ a:hover {
 }
 
 .featured-product-price {
-  color: var(--wlm-gold-bronze);
+  color: var(--wlm-sand);
   font-weight: 700;
   font-size: 1rem;
 }
@@ -2064,10 +2068,10 @@ a:hover {
   gap: 8px;
   width: 100%;
   background: transparent;
-  border: 1px solid var(--wlm-gold-bronze);
+  border: 1px solid var(--wlm-sand);
   border-radius: 4px;
   padding: 10px 12px;
-  color: var(--wlm-gold-bronze);
+  color: var(--wlm-forest-dark);
   font-family: var(--font-heading);
   font-weight: 600;
   text-transform: uppercase;
@@ -2077,8 +2081,8 @@ a:hover {
 }
 
 .featured-product-add-btn:hover:not(:disabled) {
-  background: var(--wlm-gold-bronze);
-  color: var(--wlm-cream);
+  background: var(--wlm-sand);
+  color: var(--wlm-forest-dark);
 }
 
 .featured-product-add-btn:disabled {
