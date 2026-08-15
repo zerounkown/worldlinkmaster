@@ -53,15 +53,6 @@ public class HomeController : Controller
             .ToListAsync();
         ViewBag.ActiveEvent = await _promoService.GetTopActiveEventAsync();
 
-        ViewBag.FeaturedProducts = await _context.Products
-            .Include(p => p.Variants).ThenInclude(v => v.Color)
-            .Include(p => p.Variants).ThenInclude(v => v.Size)
-            .Include(p => p.Variants).ThenInclude(v => v.ProductColor)
-            .Where(p => p.IsFeatured)
-            .OrderByDescending(p => p.Rating)
-            .Take(6)
-            .ToListAsync();
-
         // "Best sellers" — approximated by review volume/rating since there's no sales-count field yet.
         ViewBag.BestSellers = await _context.Products
             .Include(p => p.Variants).ThenInclude(v => v.Color)

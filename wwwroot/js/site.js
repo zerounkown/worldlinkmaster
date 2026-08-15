@@ -519,3 +519,29 @@ enable3dTilt(".category-preview-card", 12, -6);
         paint(parseInt(hiddenInput.value, 10) || 0);
     });
 })();
+
+// Homepage "Featured Products" panel: the single top-right "View All" link points at whichever
+// tab (Best Sellers / New Arrivals) is currently active, since each has its own listing target.
+// Tab switching itself is plain Bootstrap pills (data-bs-toggle="pill") — this just keeps the one
+// shared link in sync via Bootstrap's own shown.bs.tab event, no tab logic duplicated here.
+(function () {
+    var viewAllLink = document.querySelector(".js-featured-viewall");
+    var viewAllText = viewAllLink ? viewAllLink.querySelector(".js-featured-viewall-text") : null;
+    var tabButtons = document.querySelectorAll(".featured-tab-link");
+    if (!viewAllLink || tabButtons.length === 0) {
+        return;
+    }
+
+    tabButtons.forEach(function (btn) {
+        btn.addEventListener("shown.bs.tab", function () {
+            var href = btn.getAttribute("data-view-all-href");
+            var text = btn.getAttribute("data-view-all-text");
+            if (href) {
+                viewAllLink.setAttribute("href", href);
+            }
+            if (text && viewAllText) {
+                viewAllText.textContent = text;
+            }
+        });
+    });
+})();
