@@ -100,7 +100,7 @@
 <div class="homepage-body">
 @if (welcomeCategories.Count > 0)
 {
-    <div class="container">
+    <div class="container-listing">
         <h2 class="collections-title">@Localizer["Shop by Category"]</h2>
         <div class="collections-grid">
             @foreach (var category in welcomeCategories)
@@ -127,7 +127,7 @@
 
 @if (welcomeBrands.Count > 0)
 {
-    <div class="container">
+    <div class="container-listing">
         <h2 class="collections-title">@Localizer["Shop by Brand"]</h2>
         <div class="product-carousel brand-carousel" aria-label="@Localizer["Shop by Brand"]">
             <button type="button" class="product-carousel-arrow product-carousel-prev" aria-label="@Localizer["Previous"]"><i class="bi bi-chevron-left"></i></button>
@@ -154,7 +154,7 @@
 
 @if (featuredProducts.Count > 0 || bestSellers.Count > 0 || newArrivals.Count > 0)
 {
-    <div class="container mb-5">
+    <div class="container-listing mb-5">
         <div class="product-columns-row">
             @if (featuredProducts.Count > 0)
             {
