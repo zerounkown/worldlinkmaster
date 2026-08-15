@@ -6,7 +6,6 @@
     var homeBanners = ViewBag.HomeBanners as List<HomeBanner> ?? new List<HomeBanner>();
     var welcomeCategories = ViewBag.Categories as List<Category> ?? new List<Category>();
     var welcomeBrands = ViewBag.Brands as List<Brand> ?? new List<Brand>();
-    var featuredProducts = ViewBag.FeaturedProducts as List<Product> ?? new List<Product>();
     var bestSellers = ViewBag.BestSellers as List<Product> ?? new List<Product>();
     var newArrivals = ViewBag.NewArrivals as List<Product> ?? new List<Product>();
 
@@ -152,57 +151,70 @@
     </div>
 }
 
-@if (featuredProducts.Count > 0 || bestSellers.Count > 0 || newArrivals.Count > 0)
+@{
+    var hasBestSellers = bestSellers.Count > 0;
+    var hasNewArrivals = newArrivals.Count > 0;
+    var showFeaturedTabs = hasBestSellers && hasNewArrivals;
+}
+@if (hasBestSellers || hasNewArrivals)
 {
-    <div class="container-listing mb-5">
-        <div class="product-columns-row">
-            @if (featuredProducts.Count > 0)
-            {
-                <div class="product-column">
-                    <div class="section-title">
-                        <h2>@Localizer["Featured Products"]</h2>
-                        <a asp-controller="Products" asp-action="Index">@Localizer["View All"] &rarr;</a>
-                    </div>
-                    <div class="product-grid product-grid-column">
-                        @foreach (var product in featuredProducts)
-                        {
-                            <partial name="_ProductCard" model="product" />
-                        }
-                    </div>
-                </div>
-            }
+    <div class="container">
+        <div class="featured-products-panel">
+            <div class="featured-products-header">
+                <span class="featured-products-divider"></span>
+                <span class="featured-products-badge"><i class="bi bi-award-fill"></i></span>
+                <span class="featured-products-divider"></span>
+            </div>
+            <h2 class="featured-products-title">@Localizer["Featured Products"]</h2>
 
-            @if (bestSellers.Count > 0)
-            {
-                <div class="product-column">
-                    <div class="section-title">
-                        <h2>@Localizer["Best Selling"]</h2>
-                        <a asp-controller="Products" asp-action="Index">@Localizer["View All"] &rarr;</a>
+            <div class="featured-products-tabs-row">
+                @if (showFeaturedTabs)
+                {
+                    <div class="nav featured-products-tabs" role="tablist">
+                        <button class="featured-tab-link active" data-bs-toggle="pill" data-bs-target="#fpTabBestSellers" type="button" role="tab"
+                                data-view-all-href="@Url.Action("Index", "Products")" data-view-all-text="@Localizer["View All"]">
+                            <i class="bi bi-star-fill"></i> @Localizer["Best Sellers"]
+                        </button>
+                        <button class="featured-tab-link" data-bs-toggle="pill" data-bs-target="#fpTabNewArrivals" type="button" role="tab"
+                                data-view-all-href="@Url.Action("NewArrivals", "Products")" data-view-all-text="@Localizer["View All"]">
+                            <i class="bi bi-star"></i> @Localizer["New Arrivals"]
+                        </button>
                     </div>
-                    <div class="product-grid product-grid-column">
-                        @foreach (var product in bestSellers)
-                        {
-                            <partial name="_ProductCard" model="product" />
-                        }
-                    </div>
-                </div>
-            }
+                }
+                else
+                {
+                    <span></span>
+                }
+                <a class="featured-products-viewall js-featured-viewall"
+                   href="@(hasBestSellers ? Url.Action("Index", "Products") : Url.Action("NewArrivals", "Products"))">
+                    <span class="js-featured-viewall-text">@Localizer["View All"]</span> <i class="bi bi-chevron-right"></i>
+                </a>
+            </div>
 
-            @if (newArrivals.Count > 0)
-            {
-                <div class="product-column">
-                    <div class="section-title">
-                        <h2>@Localizer["New Arrivals"]</h2>
-                        <a asp-controller="Products" asp-action="NewArrivals">@Localizer["View All"] &rarr;</a>
+            <div class="tab-content featured-products-tab-content">
+                @if (hasBestSellers)
+                {
+                    <div class="tab-pane fade show active" id="fpTabBestSellers" role="tabpanel">
+                        <div class="featured-products-grid">
+                            @foreach (var product in bestSellers)
+                            {
+                                <partial name="_FeaturedProductCard" model="product" />
+                            }
+                        </div>
                     </div>
-                    <div class="product-grid product-grid-column">
-                        @foreach (var product in newArrivals)
-                        {
-                            <partial name="_ProductCard" model="product" />
-                        }
+                }
+                @if (hasNewArrivals)
+                {
+                    <div class="tab-pane fade @(hasBestSellers ? "" : "show active")" id="fpTabNewArrivals" role="tabpanel">
+                        <div class="featured-products-grid">
+                            @foreach (var product in newArrivals)
+                            {
+                                <partial name="_FeaturedProductCard" model="product" />
+                            }
+                        </div>
                     </div>
-                </div>
-            }
+                }
+            </div>
         </div>
     </div>
 }

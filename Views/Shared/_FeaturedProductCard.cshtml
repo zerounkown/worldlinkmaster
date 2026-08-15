@@ -1,0 +1,125 @@
+@using WorldLinkMaster.Web.Models
+@using WorldLinkMaster.Web.Extensions
+@using WorldLinkMaster.Web.Services
+@using System.Text.Json
+@model Product
+@{
+    var activeEvent = ViewBag.ActiveEvent as PromoEvent;
+    var salePrice = activeEvent != null ? Model.Price * (1 - activeEvent.DiscountPercent / 100m) : (decimal?)null;
+    var hasVariants = Model.Variants.Count > 0;
+    var cardImageUrl = string.IsNullOrEmpty(Model.ImageUrl) ? ImagePlaceholder.DataUri : Model.ImageUrl;
+
+    // Same color-swatch data every card already carries for the quick-add modal — read-only dots
+    // here, not interactive, just a visual "this comes in N colors" cue.
+    var swatchColors = Model.Variants
+        .Where(v => v.Color != null)
+        .GroupBy(v => v.ColorId)
+        .Select(g => g.First().Color!)
+        .Take(5)
+        .ToList();
+
+    string quickAddJson = "null";
+    if (hasVariants)
+    {
+        var colors = Model.Variants
+            .Where(v => v.Color != null)
+            .GroupBy(v => v.ColorId)
+            .Select(g => new
+            {
+                name = g.First().Color!.Name,
+                hex = g.First().Color!.HexCode,
+                image = g.First().ProductColor?.SwatchImageUrl
+            })
+            .ToList();
+
+        var sizes = Model.Variants
+            .Where(v => v.Size != null)
+            .GroupBy(v => v.SizeId)
+            .Select(g => new { label = g.First().Size!.Label })
+            .ToList();
+
+        var variants = Model.Variants.Select(v =>
+        {
+            var basePriceForVariant = v.Price ?? Model.Price;
+            var finalPrice = activeEvent != null
+                ? basePriceForVariant * (1 - activeEvent.DiscountPercent / 100m)
+                : basePriceForVariant;
+
+            return new
+            {
+                color = v.Color?.Name,
+                size = v.Size?.Label,
+                price = finalPrice.ToDisplayCurrencyValue(),
+                listPrice = activeEvent != null ? basePriceForVariant.ToDisplayCurrencyValue() : (decimal?)null,
+                priceFormatted = finalPrice.ToDisplayCurrency(),
+                listPriceFormatted = activeEvent != null ? basePriceForVariant.ToDisplayCurrency() : null,
+                stock = v.StockQuantity,
+                active = v.Active
+            };
+        }).ToList();
+
+        var quickAddData = new
+        {
+            id = Model.Id,
+            name = Model.LocalizedName(),
+            currencySymbol = CurrencyContext.Current == "USD" ? "$" : "AED ",
+            colors,
+            sizes,
+            variants
+        };
+
+        quickAddJson = JsonSerializer.Serialize(quickAddData, new JsonSerializerOptions
+        {
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+        });
+    }
+}
+
+<div class="featured-product-card">
+    <a class="featured-product-card-media" asp-area="" asp-controller="Products" asp-action="Details" asp-route-slug="@Model.Slug">
+        <img src="@cardImageUrl" alt="@Model.LocalizedName()" />
+    </a>
+    <div class="featured-product-card-body">
+        @if (swatchColors.Count > 0)
+        {
+            <div class="featured-product-swatches">
+                @foreach (var color in swatchColors)
+                {
+                    <span class="featured-product-swatch" style="--swatch-color: @color.HexCode" title="@color.Name"></span>
+                }
+            </div>
+        }
+        <h3><a asp-area="" asp-controller="Products" asp-action="Details" asp-route-slug="@Model.Slug">@Model.LocalizedName()</a></h3>
+        <div class="featured-product-price-row">
+            @if (salePrice.HasValue)
+            {
+                <span class="featured-product-price-was">@Model.Price.ToDisplayCurrency()</span>
+                <span class="featured-product-price">@salePrice.Value.ToDisplayCurrency()</span>
+            }
+            else
+            {
+                <span class="featured-product-price">@Model.Price.ToDisplayCurrency()</span>
+            }
+        </div>
+
+        @if (Model.StockQuantity > 0)
+        {
+            @if (hasVariants)
+            {
+                <button type="button" class="featured-product-add-btn js-quick-add" data-product='@Html.Raw(quickAddJson)'>
+                    <i class="bi bi-cart3"></i> @Localizer["Add to Cart"]
+                </button>
+            }
+            else
+            {
+                <button type="button" class="featured-product-add-btn js-inline-add" data-product-id="@Model.Id" data-product-name="@Model.Name">
+                    <i class="bi bi-cart3"></i> @Localizer["Add to Cart"]
+                </button>
+            }
+        }
+        else
+        {
+            <button type="button" class="featured-product-add-btn" disabled>@Localizer["Out of Stock"]</button>
+        }
+    </div>
+</div>
