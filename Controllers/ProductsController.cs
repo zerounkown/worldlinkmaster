@@ -231,16 +231,6 @@ public class ProductsController : Controller
         var subcategoryLookup = categories.SelectMany(c => c.Subcategories).ToDictionary(s => s.Id);
         var brandLookup = allBrands.ToDictionary(b => b.Id);
 
-        // "Best sellers" — approximated by review volume/rating since there's no sales-count field yet.
-        ViewBag.BestSellers = await _context.Products
-            .Include(p => p.Variants).ThenInclude(v => v.Color)
-            .Include(p => p.Variants).ThenInclude(v => v.Size)
-            .Include(p => p.Variants).ThenInclude(v => v.ProductColor)
-            .OrderByDescending(p => p.ReviewCount)
-            .ThenByDescending(p => p.Rating)
-            .Take(8)
-            .ToListAsync();
-
         var vm = new ProductListViewModel
         {
             Products = products,
