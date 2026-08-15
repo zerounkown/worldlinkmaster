@@ -3923,6 +3923,24 @@ a:hover {
   margin-bottom: 32px;
 }
 
+/* Edge-to-edge content wrapper for category/All Products pages — replaces the centered
+   max-width .container on these pages specifically (hero banner, subcategory tile row, filter
+   sidebar, product grid) so content runs to both screen edges with only small internal padding,
+   instead of leaving a wide idle margin on large screens. Not used site-wide — Bootstrap's
+   centered .container is still the right choice for narrower content like forms and checkout. */
+.container-listing {
+  width: 100%;
+  padding-left: 16px;
+  padding-right: 16px;
+}
+
+@media (min-width: 768px) {
+  .container-listing {
+    padding-left: 24px;
+    padding-right: 24px;
+  }
+}
+
 .page-banner h1 {
   color: white;
   margin: 0;
