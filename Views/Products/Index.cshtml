@@ -8,19 +8,6 @@
     var selectedBrandForTitle = Model.SelectedBrandIds.Count == 1 ? Model.Brands.FirstOrDefault(b => b.Id == Model.SelectedBrandIds[0]) : null;
     ViewData["Title"] = currentSubcategory?.LocalizedName() ?? currentCategory?.LocalizedName() ?? selectedBrandForTitle?.LocalizedName() ?? Localizer["All Products"];
     var isBrowsingAllCategories = Model.SelectedCategoryId == null && Model.SelectedBrandIds.Count == 0 && string.IsNullOrWhiteSpace(Model.SearchTerm);
-    var bestSellers = ViewBag.BestSellers as List<Product> ?? new List<Product>();
-
-    // Short plain-language tag shown under each "Shop Mission-Ready Loadouts" tile label,
-    // e.g. "TACTICAL APPAREL (clothing)" — purely decorative, not stored on Category.
-    // Always shown in English regardless of site language, to match the reference design.
-    var loadoutTagBySlug = new Dictionary<string, string>
-    {
-        ["tactical-apparel"] = "clothing",
-        ["bags-and-packs"] = "bags",
-        ["footwear"] = "shoes",
-        ["gear-and-accessories"] = "gear",
-        ["outdoor-equipment"] = "outdoor"
-    };
 
     // Full current filter state as a query string (minus "page") so pagination links can
     // carry every active facet forward — asp-route-* can't express repeated array params.
@@ -115,65 +102,12 @@ else
 
 @if (isBrowsingAllCategories)
 {
-    <div class="container mb-5">
-        <div class="d-flex justify-content-between align-items-center mb-3">
+    <div class="container mb-3 mt-3">
+        <div class="d-flex justify-content-between align-items-center">
             <a asp-controller="Categories" asp-action="Index"><i class="bi bi-grid-3x3-gap"></i> @Localizer["Browse All Collections"]</a>
             <a class="categories-quote-cta" asp-controller="QuoteRequests" asp-action="Create"><i class="bi bi-file-earmark-text"></i> @Localizer["Request a Quote"]</a>
         </div>
-
-        <!-- Mission-loadout banner: a photo-tile shortcut per category, tactical-brand style -->
-        <div class="loadout-banner">
-            <span class="loadout-eyebrow">@Localizer["Ready For Anything"]</span>
-            <h3 class="loadout-heading">@Localizer["Shop Mission-Ready Loadouts"]</h3>
-            <div class="loadout-grid">
-                @foreach (var category in Model.Categories)
-                {
-                    <a class="loadout-tile" asp-action="Index" asp-route-categoryId="@category.Id">
-                        <img src="@category.ImageUrl" alt="@category.LocalizedName()" />
-                        <span class="loadout-tile-label">
-                            @category.LocalizedName()
-                            @if (loadoutTagBySlug.TryGetValue(category.Slug, out var loadoutTag))
-                            {
-                                <span class="loadout-tile-tag">(@loadoutTag)</span>
-                            }
-                        </span>
-                    </a>
-                }
-            </div>
-        </div>
     </div>
-
-    @if (bestSellers.Count > 0)
-    {
-        <section class="spotlight-banner" style="background-image: url('@bestSellers[0].ImageUrl')">
-            <div class="container">
-                <div class="spotlight-content">
-                    <span class="spotlight-badge">@Localizer["Team Picks"]</span>
-                    <h2>@Localizer["Discover Our Team's Top Picks"]</h2>
-                    <a class="spotlight-cta" asp-action="Index">@Localizer["Shop Now"]</a>
-                </div>
-            </div>
-        </section>
-
-        <div class="container">
-            <div class="best-selling-section">
-                <span class="best-selling-eyebrow">@Localizer["Best Selling"]</span>
-                <h2 class="best-selling-heading">@Localizer["Field-Tested Favorites"]</h2>
-                <div class="product-carousel">
-                    <button type="button" class="product-carousel-arrow product-carousel-prev" aria-label="@Localizer["Previous"]"><i class="bi bi-chevron-left"></i></button>
-                    <div class="product-carousel-track">
-                        @foreach (var product in bestSellers)
-                        {
-                            <div class="product-carousel-item">
-                                <partial name="_ProductCard" model="product" />
-                            </div>
-                        }
-                    </div>
-                    <button type="button" class="product-carousel-arrow product-carousel-next" aria-label="@Localizer["Next"]"><i class="bi bi-chevron-right"></i></button>
-                </div>
-            </div>
-        </div>
-    }
 }
 
 <div class="container mb-5">
