@@ -59,7 +59,7 @@ public class HomeController : Controller
             .Include(p => p.Variants).ThenInclude(v => v.ProductColor)
             .Where(p => p.IsFeatured)
             .OrderByDescending(p => p.Rating)
-            .Take(2)
+            .Take(6)
             .ToListAsync();
 
         // "Best sellers" — approximated by review volume/rating since there's no sales-count field yet.
@@ -69,7 +69,7 @@ public class HomeController : Controller
             .Include(p => p.Variants).ThenInclude(v => v.ProductColor)
             .OrderByDescending(p => p.ReviewCount)
             .ThenByDescending(p => p.Rating)
-            .Take(2)
+            .Take(6)
             .ToListAsync();
 
         ViewBag.NewArrivals = await _context.Products
@@ -77,7 +77,7 @@ public class HomeController : Controller
             .Include(p => p.Variants).ThenInclude(v => v.Size)
             .Include(p => p.Variants).ThenInclude(v => v.ProductColor)
             .OrderByDescending(p => p.CreatedAt)
-            .Take(2)
+            .Take(6)
             .ToListAsync();
 
         return View();

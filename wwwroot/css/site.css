@@ -1732,8 +1732,15 @@ a:hover {
   padding-inline-start: 32px;
 }
 
-.product-grid-column {
-  grid-template-columns: repeat(2, 1fr);
+/* Combined with .product-grid (not just .product-grid-column alone) so this rule reliably
+   wins the cascade over .product-grid's own grid-template-columns — same specificity, later
+   selector, same-property fights are otherwise decided by source order alone, which is fragile.
+   auto-FIT (not auto-fill) is deliberate: auto-fill still reserves a full-width empty track for
+   any column that has no item in it, which is exactly what left a ~300px dead gap after 2 items
+   in a row with room for 3+ columns. auto-fit collapses those empty tracks instead, letting the
+   real items' 1fr share expand to fill the row — no reserved blank space on a partial row. */
+.product-grid.product-grid-column {
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
   gap: 16px;
 }
 
