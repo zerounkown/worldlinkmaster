@@ -9,11 +9,9 @@
 @inject ICartService CartService
 @inject IFavoriteService FavoriteService
 @inject ICompareService CompareService
-@inject IPromoService PromoService
 @inject ICouponService CouponService
 @inject IConfiguration Configuration
 @{
-    var activeSaleEvent = await PromoService.GetTopActiveEventAsync();
     Coupon? newWelcomeCoupon = null;
     if (User.Identity?.IsAuthenticated == true)
     {
@@ -105,14 +103,6 @@
             <span class="sale-strip-icon">🎁</span>
             <span>@Localizer["Welcome to World Link Master! Enjoy"] <strong>@newWelcomeCoupon.DiscountPercent.ToString("0.##")%</strong> @Localizer["your first order with code"] <strong>@newWelcomeCoupon.Code</strong></span>
             <span class="sale-strip-cta">@Localizer["View My Coupons"] <i class="bi bi-arrow-right"></i></span>
-        </a>
-    }
-    @if (activeSaleEvent != null)
-    {
-        <a class="sale-strip" asp-area="" asp-controller="Products" asp-action="Sales">
-            <span class="sale-strip-icon">@activeSaleEvent.IconEmoji</span>
-            <span><strong>@activeSaleEvent.Name</strong> @Localizer["is live"] &mdash; @activeSaleEvent.DiscountPercent.ToString("0.##")% @Localizer["OFF everything, storewide!"]</span>
-            <span class="sale-strip-cta">@Localizer["Shop Now"] <i class="bi bi-arrow-right"></i></span>
         </a>
     }
     <div class="topbar">
@@ -269,6 +259,7 @@
             }
             <a class="main-nav-link" asp-area="" asp-controller="Home" asp-action="Welcome" asp-fragment="shop-by-brand">@Localizer["Brands"]</a>
             <a class="main-nav-link @(isNewArrivalsActive ? "active" : "")" asp-area="" asp-controller="Products" asp-action="NewArrivals">@Localizer["New Arrival"]</a>
+            <a class="main-nav-link main-nav-link-sale" asp-area="" asp-controller="Products" asp-action="Sales">@Localizer["Special Sales"]</a>
         </div>
     </nav>
     </div>
@@ -280,6 +271,7 @@
             <button type="button" class="side-nav-close" id="sideNavClose" aria-label="@Localizer["Close menu"]">&times;</button>
         </div>
         <nav class="side-nav-links">
+            <a class="side-nav-link-sale" asp-area="" asp-controller="Products" asp-action="Sales"><i class="bi bi-fire"></i> @Localizer["Special Sales"]</a>
             <a asp-area="" asp-controller="Products" asp-action="Index"><i class="bi bi-grid"></i> @Localizer["All Products"]</a>
             @foreach (var category in navCategories)
             {
