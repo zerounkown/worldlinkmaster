@@ -12,9 +12,9 @@ public class LocalizationRtlTests : E2ETestBase
 
     private async Task SwitchToArabicAsync()
     {
-        // Views/Shared/_Layout.cshtml — the language dropdown is a hidden panel toggled open by
-        // #langSwitchToggle, containing two real POST forms to Localization/SetLanguage.
-        await Page.ClickAsync("#langSwitchToggle");
+        // Views/Shared/_Layout.cshtml — the EN | AR toggle is two plain-text buttons, each its
+        // own real POST form to Localization/SetLanguage, submitted directly with no dropdown
+        // panel to open first.
         await Page.ClickAsync("form:has(input[name='culture'][value='ar']) button[type='submit']");
         await Page.WaitForLoadStateAsync(LoadState.NetworkIdle);
     }

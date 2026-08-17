@@ -25,7 +25,7 @@
     }
     var navCategories = await DbContext.Categories.Include(c => c.Subcategories.OrderBy(s => s.Name)).OrderBy(c => c.Name).ToListAsync();
 
-    // Short one-line promo captions for the Shop mega-menu's image panel — same convention as
+    // Short one-line promo captions for each category dropdown's image panel — same convention as
     // Welcome.cshtml's collectionsTagBySlug (decorative marketing copy, not core category data,
     // so a small slug-keyed dictionary here beats a new database field). Always English, matching
     // the same "reference design" choice collectionsTagBySlug already made for its own tags.
@@ -37,6 +37,21 @@
         ["gear-and-accessories"] = "Everyday carry essentials for any mission.",
         ["outdoor-equipment"] = "Camp and field gear that goes the distance."
     };
+    // Shortened nav-bar labels vs. the full category name (e.g. "Tactical Apparel" -> "Apparel"),
+    // matching the reference header's nav text. Falls back to the full localized name for any
+    // category not listed here.
+    var navLabelBySlug = new Dictionary<string, string>
+    {
+        ["tactical-apparel"] = "Apparel",
+        ["bags-and-packs"] = "Bags & Packs"
+    };
+    // Explicit nav display order (not alphabetical) matching the reference header. Categories not
+    // in this list (future additions) sort after the listed ones, alphabetically among themselves.
+    var navDisplayOrder = new List<string> { "tactical-apparel", "footwear", "bags-and-packs", "gear-and-accessories", "outdoor-equipment" };
+    var orderedNavCategories = navCategories
+        .OrderBy(c => { var i = navDisplayOrder.IndexOf(c.Slug); return i < 0 ? int.MaxValue : i; })
+        .ThenBy(c => c.Name)
+        .ToList();
     var categoryPreviews = new Dictionary<int, List<Product>>();
     foreach (var navCategory in navCategories)
     {
@@ -47,15 +62,13 @@
             .Take(4)
             .ToListAsync();
     }
-    var navNewArrivals = await DbContext.Products.OrderByDescending(p => p.CreatedAt).Take(3).ToListAsync();
-    var navSpecials = await DbContext.Products.Where(p => p.IsFeatured).OrderByDescending(p => p.Rating).Take(3).ToListAsync();
     var currentCulture = CultureInfo.CurrentUICulture.TwoLetterISOLanguageName;
     var isRtl = currentCulture == "ar";
     var returnUrl = Context.Request.Path + Context.Request.QueryString;
     var currentController = ViewContext.RouteData.Values["controller"]?.ToString() ?? "";
     var currentAction = ViewContext.RouteData.Values["action"]?.ToString() ?? "";
+    var isHomeActive = currentController == "Home" && currentAction == "Welcome";
     var isNewArrivalsActive = currentController == "Products" && currentAction == "NewArrivals";
-    var isShopActive = currentController == "Products" && (currentAction == "Index" || currentAction == "Details");
     var isContactActive = currentController == "Home" && currentAction == "Contact";
     var isLocationsActive = currentController == "Home" && currentAction == "Locations";
     var isTradeProgramActive = currentController == "Wholesale";
@@ -104,7 +117,13 @@
     }
     <div class="topbar">
         <div class="container topbar-inner">
-            <span><i class="bi bi-truck"></i> @Localizer["Free shipping on orders over AED 365"]</span>
+            <div class="topbar-left">
+                <span><i class="bi bi-truck"></i> @Localizer["Free shipping on orders over AED 365"]</span>
+                <a class="topbar-link @(isContactActive ? "active" : "")" asp-area="" asp-controller="Home" asp-action="Contact">@Localizer["Contact Us"]</a>
+                <a class="topbar-link @(isLocationsActive ? "active" : "")" asp-area="" asp-controller="Home" asp-action="Locations">@Localizer["Find a Store"]</a>
+                <a class="topbar-link @(isTradeProgramActive ? "active" : "")" asp-area="" asp-controller="Wholesale" asp-action="Apply">@Localizer["Trade Program"]</a>
+                <a class="topbar-link" asp-area="" asp-controller="Products" asp-action="Sales">@Localizer["Sales"]</a>
+            </div>
             <div class="topbar-right">
                 <a class="topbar-quote-link" asp-area="" asp-controller="QuoteRequests" asp-action="Create" aria-label="@Localizer["Bulk Pricing / Request a Quote"]"><i class="bi bi-file-earmark-text"></i> <span>@Localizer["Bulk Pricing / Request a Quote"]</span></a>
                 <span class="topbar-contact"><i class="bi bi-telephone"></i> 1-800-555-0199</span>
@@ -114,61 +133,53 @@
 
     <header class="site-header">
         <div class="container header-inner">
-            <div class="header-col header-col-start">
+            <div class="header-branding">
                 <button type="button" class="menu-toggle" id="sideNavToggle" aria-label="@Localizer["Open menu"]" aria-controls="sideNav" aria-expanded="false">
                     <i class="bi bi-list"></i>
                     <span>@Localizer["Menu"]</span>
                 </button>
+                <a class="brand brand-logo" asp-route="root">
+                    <img src="~/images/logo.png" alt="World Link Masters" asp-append-version="true" />
+                </a>
             </div>
 
-            <a class="brand brand-logo" asp-route="root">
-                <img src="~/images/logo.png" alt="World Link Masters" asp-append-version="true" />
-            </a>
+            <form class="header-search-inline" asp-area="" asp-controller="Products" asp-action="Index" method="get">
+                <input type="text" name="search" placeholder="@Localizer["SEARCH STORE..."]" aria-label="@Localizer["Search"]" />
+                <button type="submit" aria-label="@Localizer["Search"]"><i class="bi bi-search"></i></button>
+            </form>
 
             <div class="header-col header-col-end">
-                <button type="button" class="search-toggle" id="headerSearchToggle" aria-expanded="false" aria-controls="headerSearchPanel" aria-label="@Localizer["Search"]">
-                    <i class="bi bi-search"></i>
-                </button>
-
                 <div class="header-actions">
-                    @{
-                        var uaeFlagSvg = "<svg class=\"currency-flag\" viewBox=\"0 0 20 14\" xmlns=\"http://www.w3.org/2000/svg\"><rect width=\"20\" height=\"14\" fill=\"#fff\"/><rect width=\"20\" height=\"4.67\" fill=\"#00732f\"/><rect y=\"9.33\" width=\"20\" height=\"4.67\" fill=\"#000\"/><rect width=\"6\" height=\"14\" fill=\"#ce1126\"/></svg>";
-                        var usFlagSvg = "<svg class=\"currency-flag\" viewBox=\"0 0 20 14\" xmlns=\"http://www.w3.org/2000/svg\"><rect width=\"20\" height=\"14\" fill=\"#b22234\"/><rect y=\"1.08\" width=\"20\" height=\"1.08\" fill=\"#fff\"/><rect y=\"3.23\" width=\"20\" height=\"1.08\" fill=\"#fff\"/><rect y=\"5.38\" width=\"20\" height=\"1.08\" fill=\"#fff\"/><rect y=\"7.54\" width=\"20\" height=\"1.08\" fill=\"#fff\"/><rect y=\"9.69\" width=\"20\" height=\"1.08\" fill=\"#fff\"/><rect y=\"11.85\" width=\"20\" height=\"1.08\" fill=\"#fff\"/><rect width=\"8\" height=\"7.54\" fill=\"#3c3b6e\"/></svg>";
-                        var ukFlagSvg = "<svg class=\"currency-flag\" viewBox=\"0 0 20 14\" xmlns=\"http://www.w3.org/2000/svg\"><rect width=\"20\" height=\"14\" fill=\"#00247d\"/><path d=\"M0,0 L20,14 M20,0 L0,14\" stroke=\"#fff\" stroke-width=\"2.4\"/><path d=\"M0,0 L20,14 M20,0 L0,14\" stroke=\"#cf142b\" stroke-width=\"0.8\"/><path d=\"M10,0 V14 M0,7 H20\" stroke=\"#fff\" stroke-width=\"4\"/><path d=\"M10,0 V14 M0,7 H20\" stroke=\"#cf142b\" stroke-width=\"2.4\"/></svg>";
-                        var currentCurrencyFlagSvg = WorldLinkMaster.Web.Services.CurrencyContext.Current == "USD" ? usFlagSvg : uaeFlagSvg;
-                        var currentLangFlagSvg = isRtl ? uaeFlagSvg : ukFlagSvg;
-                    }
-                    <div class="currency-switch">
-                        <button type="button" class="currency-switch-toggle" id="langSwitchToggle" aria-expanded="false">
-                            @Html.Raw(currentLangFlagSvg) @(isRtl ? "العربية" : "English") <i class="bi bi-chevron-down"></i>
-                        </button>
-                        <div class="currency-switch-panel" id="langSwitchPanel">
-                            <form asp-area="" asp-controller="Localization" asp-action="SetLanguage" method="post">
-                                <input type="hidden" name="returnUrl" value="@returnUrl" />
-                                <input type="hidden" name="culture" value="en" />
-                                <button type="submit" class="@(!isRtl ? "active" : "")">@Html.Raw(ukFlagSvg) English</button>
-                            </form>
-                            <form asp-area="" asp-controller="Localization" asp-action="SetLanguage" method="post">
-                                <input type="hidden" name="returnUrl" value="@returnUrl" />
-                                <input type="hidden" name="culture" value="ar" />
-                                <button type="submit" class="@(isRtl ? "active" : "")">@Html.Raw(uaeFlagSvg) العربية</button>
-                            </form>
-                        </div>
+                    <button type="button" class="search-toggle" id="headerSearchToggle" aria-expanded="false" aria-controls="headerSearchPanel" aria-label="@Localizer["Search"]">
+                        <i class="bi bi-search"></i>
+                    </button>
+                    <div class="lang-switch">
+                        <form asp-area="" asp-controller="Localization" asp-action="SetLanguage" method="post">
+                            <input type="hidden" name="returnUrl" value="@returnUrl" />
+                            <input type="hidden" name="culture" value="en" />
+                            <button type="submit" class="lang-switch-option @(!isRtl ? "active" : "")">EN</button>
+                        </form>
+                        <span class="lang-switch-divider">|</span>
+                        <form asp-area="" asp-controller="Localization" asp-action="SetLanguage" method="post">
+                            <input type="hidden" name="returnUrl" value="@returnUrl" />
+                            <input type="hidden" name="culture" value="ar" />
+                            <button type="submit" class="lang-switch-option @(isRtl ? "active" : "")">AR</button>
+                        </form>
                     </div>
                     <div class="currency-switch">
                         <button type="button" class="currency-switch-toggle" id="currencySwitchToggle" aria-expanded="false">
-                            @Html.Raw(currentCurrencyFlagSvg) @WorldLinkMaster.Web.Services.CurrencyContext.Current <i class="bi bi-chevron-down"></i>
+                            @WorldLinkMaster.Web.Services.CurrencyContext.Current <i class="bi bi-chevron-down"></i>
                         </button>
                         <div class="currency-switch-panel" id="currencySwitchPanel">
                             <form asp-area="" asp-controller="Currency" asp-action="SetCurrency" method="post">
                                 <input type="hidden" name="returnUrl" value="@returnUrl" />
                                 <input type="hidden" name="currency" value="AED" />
-                                <button type="submit" class="@(WorldLinkMaster.Web.Services.CurrencyContext.Current == "AED" ? "active" : "")">@Html.Raw(uaeFlagSvg) AED — @Localizer["UAE Dirham"]</button>
+                                <button type="submit" class="@(WorldLinkMaster.Web.Services.CurrencyContext.Current == "AED" ? "active" : "")">AED — @Localizer["UAE Dirham"]</button>
                             </form>
                             <form asp-area="" asp-controller="Currency" asp-action="SetCurrency" method="post">
                                 <input type="hidden" name="returnUrl" value="@returnUrl" />
                                 <input type="hidden" name="currency" value="USD" />
-                                <button type="submit" class="@(WorldLinkMaster.Web.Services.CurrencyContext.Current == "USD" ? "active" : "")">@Html.Raw(usFlagSvg) USD — @Localizer["US Dollar"]</button>
+                                <button type="submit" class="@(WorldLinkMaster.Web.Services.CurrencyContext.Current == "USD" ? "active" : "")">USD — @Localizer["US Dollar"]</button>
                             </form>
                         </div>
                     </div>
@@ -225,100 +236,39 @@
 
     <nav class="main-nav">
         <div class="container main-nav-inner">
-            <div class="main-nav-item main-nav-dropdown">
-                <a class="main-nav-link @(isNewArrivalsActive ? "active" : "")" asp-area="" asp-controller="Products" asp-action="NewArrivals">@Localizer["New Arrivals"] <i class="bi bi-chevron-down"></i></a>
-                <div class="main-nav-dropdown-panel main-nav-dropdown-panel-mega">
-                    <div class="main-nav-preview-columns">
-                        <div class="main-nav-preview-col">
-                            <div class="main-nav-preview-header">
-                                <span>@Localizer["New Arrivals"]</span>
-                                <a asp-controller="Products" asp-action="NewArrivals">@Localizer["View All"] &rarr;</a>
+            <a class="main-nav-link @(isHomeActive ? "active" : "")" asp-route="root">@Localizer["Home"]</a>
+            @foreach (var category in orderedNavCategories)
+            {
+                var isCategoryActive = currentController == "Products" && currentAction == "Index" && Context.Request.Query["categoryId"].ToString() == category.Id.ToString();
+                var navLabel = navLabelBySlug.GetValueOrDefault(category.Slug, category.LocalizedName());
+                var promoCaption = megaMenuPromoCaptionBySlug.GetValueOrDefault(category.Slug, category.LocalizedName());
+                var promoHref = Url.Action("Index", "Products", new { categoryId = category.Id });
+                <div class="main-nav-item main-nav-dropdown">
+                    <a class="main-nav-link @(isCategoryActive ? "active" : "")" asp-area="" asp-controller="Products" asp-action="Index" asp-route-categoryId="@category.Id">@navLabel <i class="bi bi-chevron-down"></i></a>
+                    <div class="main-nav-dropdown-panel main-nav-dropdown-panel-mega">
+                        <div class="main-nav-mega-body">
+                            <div class="main-nav-mega-main">
+                                <a class="main-nav-mega-viewall" asp-area="" asp-controller="Products" asp-action="Index" asp-route-categoryId="@category.Id">@Localizer["View All {0}", navLabel]</a>
+                                <div class="main-nav-mega-subitems-grid">
+                                    @foreach (var subcategory in category.Subcategories)
+                                    {
+                                        <a class="main-nav-mega-subitem" asp-area="" asp-controller="Products" asp-action="Index" asp-route-categoryId="@category.Id" asp-route-subcategoryId="@subcategory.Id">@subcategory.LocalizedName()</a>
+                                    }
+                                </div>
                             </div>
-                            <div class="main-nav-preview-grid">
-                                @foreach (var product in navNewArrivals)
-                                {
-                                    <a class="main-nav-preview-tile" asp-controller="Products" asp-action="Details" asp-route-slug="@product.Slug">
-                                        <img src="@product.ImageUrl" alt="@product.LocalizedName()" />
-                                        <span class="main-nav-preview-name">@product.LocalizedName()</span>
-                                        <span class="main-nav-preview-price">@product.Price.ToDisplayCurrency()</span>
-                                    </a>
-                                }
-                            </div>
-                        </div>
-                        <div class="main-nav-preview-col">
-                            <div class="main-nav-preview-header">
-                                <span>@Localizer["Specials"]</span>
-                                <a asp-controller="Products" asp-action="NewArrivals">@Localizer["View All"] &rarr;</a>
-                            </div>
-                            <div class="main-nav-preview-grid">
-                                @foreach (var product in navSpecials)
-                                {
-                                    var salePrice = activeSaleEvent != null ? product.Price * (1 - activeSaleEvent.DiscountPercent / 100m) : (decimal?)null;
-                                    <a class="main-nav-preview-tile" asp-controller="Products" asp-action="Details" asp-route-slug="@product.Slug">
-                                        <img src="@product.ImageUrl" alt="@product.LocalizedName()" />
-                                        <span class="main-nav-preview-name">@product.LocalizedName()</span>
-                                        @if (salePrice.HasValue)
-                                        {
-                                            <span><span class="main-nav-preview-price-was">@product.Price.ToDisplayCurrency()</span> <span class="main-nav-preview-price">@salePrice.Value.ToDisplayCurrency()</span></span>
-                                        }
-                                        else
-                                        {
-                                            <span class="main-nav-preview-price">@product.Price.ToDisplayCurrency()</span>
-                                        }
-                                    </a>
-                                }
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div class="main-nav-item main-nav-dropdown">
-                <a class="main-nav-link @(isShopActive ? "active" : "")" asp-area="" asp-controller="Products" asp-action="Index">@Localizer["Shop"] <i class="bi bi-chevron-down"></i></a>
-                <div class="main-nav-dropdown-panel main-nav-dropdown-panel-mega main-nav-dropdown-panel-shop">
-                    <div class="main-nav-mega-body">
-                        <div class="main-nav-mega-main">
-                            <a class="main-nav-mega-viewall" asp-area="" asp-controller="Products" asp-action="Index">@Localizer["All Products"]</a>
-                            <div class="main-nav-mega-columns">
-                                @foreach (var category in navCategories)
-                                {
-                                    var promoCaption = megaMenuPromoCaptionBySlug.GetValueOrDefault(category.Slug, category.LocalizedName());
-                                    var promoHref = Url.Action("Index", "Products", new { categoryId = category.Id });
-                                    <div class="main-nav-mega-col"
-                                         data-promo-image="@category.ImageUrl"
-                                         data-promo-caption="@promoCaption"
-                                         data-promo-cta-text="@Localizer["Shop {0}", category.LocalizedName()]"
-                                         data-promo-cta-href="@promoHref">
-                                        <a class="main-nav-mega-header" asp-area="" asp-controller="Products" asp-action="Index" asp-route-categoryId="@category.Id">@category.LocalizedName()</a>
-                                        @foreach (var subcategory in category.Subcategories)
-                                        {
-                                            <a class="main-nav-mega-subitem" asp-area="" asp-controller="Products" asp-action="Index" asp-route-categoryId="@category.Id" asp-route-subcategoryId="@subcategory.Id">@subcategory.LocalizedName()</a>
-                                        }
-                                    </div>
-                                }
-                            </div>
-                        </div>
-                        @{
-                            var firstCategory = navCategories.FirstOrDefault();
-                            var firstPromoCaption = firstCategory != null ? megaMenuPromoCaptionBySlug.GetValueOrDefault(firstCategory.Slug, firstCategory.LocalizedName()) : "";
-                            var firstPromoHref = firstCategory != null ? Url.Action("Index", "Products", new { categoryId = firstCategory.Id }) : "#";
-                        }
-                        @if (firstCategory != null)
-                        {
                             <div class="main-nav-mega-promo">
-                                <img class="js-mega-promo-image" src="@firstCategory.ImageUrl" alt="" />
-                                <p class="js-mega-promo-caption">@firstPromoCaption</p>
-                                <a class="main-nav-mega-promo-cta js-mega-promo-cta" href="@firstPromoHref">
-                                    <span class="js-mega-promo-cta-text">@Localizer["Shop {0}", firstCategory.LocalizedName()]</span>
+                                <img src="@category.ImageUrl" alt="" />
+                                <p>@promoCaption</p>
+                                <a class="main-nav-mega-promo-cta" href="@promoHref">
+                                    <span>@Localizer["Shop {0}", navLabel]</span>
                                 </a>
                             </div>
-                        }
+                        </div>
                     </div>
                 </div>
-            </div>
-            <a class="main-nav-link @(isContactActive ? "active" : "")" asp-area="" asp-controller="Home" asp-action="Contact">@Localizer["Contact Us"]</a>
-            <a class="main-nav-link @(isLocationsActive ? "active" : "")" asp-area="" asp-controller="Home" asp-action="Locations">@Localizer["Find a Store"]</a>
-            <a class="main-nav-link @(isTradeProgramActive ? "active" : "")" asp-area="" asp-controller="Wholesale" asp-action="Apply">@Localizer["Trade Program"]</a>
-            <a class="main-nav-link" asp-area="" asp-controller="Products" asp-action="Sales">@Localizer["Sales"]</a>
+            }
+            <a class="main-nav-link" asp-area="" asp-controller="Home" asp-action="Welcome" asp-fragment="shop-by-brand">@Localizer["Brands"]</a>
+            <a class="main-nav-link @(isNewArrivalsActive ? "active" : "")" asp-area="" asp-controller="Products" asp-action="NewArrivals">@Localizer["New Arrival"]</a>
         </div>
     </nav>
     </div>
@@ -493,7 +443,6 @@
     <script src="~/js/delete-button.js" asp-append-version="true"></script>
     <script src="~/js/main-nav-dropdown.js" asp-append-version="true"></script>
     <script src="~/js/currency-switch.js" asp-append-version="true"></script>
-    <script src="~/js/lang-switch-dropdown.js" asp-append-version="true"></script>
     <script src="~/js/header-search.js" asp-append-version="true"></script>
     <script src="~/js/sticky-header.js" asp-append-version="true"></script>
     @if (showChatWidget)

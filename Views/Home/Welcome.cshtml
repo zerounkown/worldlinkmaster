@@ -82,9 +82,6 @@
 
 <section class="hero">
     <div class="container">
-        <div class="hero-logo">
-            <img src="~/images/logo.png" alt="World Link Masters" />
-        </div>
         <span class="hero-eyebrow">@Localizer["Welcome to World Link Master"]</span>
         <h1>@Localizer["Gear Built for the"] <span class="accent">@Localizer["Long Haul"]</span></h1>
         <p>
@@ -126,7 +123,7 @@
 
 @if (welcomeBrands.Count > 0)
 {
-    <div class="container-listing">
+    <div class="container-listing" id="shop-by-brand">
         <h2 class="collections-title">@Localizer["Shop by Brand"]</h2>
         <div class="product-carousel brand-carousel" aria-label="@Localizer["Shop by Brand"]">
             <button type="button" class="product-carousel-arrow product-carousel-prev" aria-label="@Localizer["Previous"]"><i class="bi bi-chevron-left"></i></button>

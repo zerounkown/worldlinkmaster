@@ -166,6 +166,23 @@ a:hover {
   margin-right: 4px;
 }
 
+.topbar-left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.topbar-link {
+  color: rgba(255, 255, 255, 0.75);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.topbar-link:hover,
+.topbar-link.active {
+  color: var(--wlm-sand);
+}
+
 .topbar-right {
   display: flex;
   align-items: center;
@@ -180,11 +197,17 @@ a:hover {
 
 .header-inner {
   display: grid;
-  grid-template-columns: 1fr auto 1fr;
+  grid-template-columns: auto 1fr auto;
   align-items: center;
   gap: 24px;
   padding: 14px 0;
   min-height: 60px;
+}
+
+.header-branding {
+  display: flex;
+  align-items: center;
+  gap: 16px;
 }
 
 .header-col {
@@ -193,18 +216,33 @@ a:hover {
   gap: 20px;
 }
 
-.header-col-start {
-  justify-self: start;
-}
-
 .header-col-end {
   justify-self: end;
 }
 
 @media (max-width: 767.98px) {
   .header-inner {
-    grid-template-columns: auto auto 1fr;
     gap: 12px;
+  }
+
+  /* Icon-only on mobile (matching .account-label, already icon-only at all widths) — the text
+     labels plus counts for 4 icons plus the lang/currency switches don't fit a narrow header. */
+  .cart-label,
+  .favorites-label {
+    display: none;
+  }
+
+  .header-actions {
+    gap: 14px;
+  }
+
+  /* Even icon-only, the search icon + lang switch + currency dropdown + 4 icons don't reliably
+     fit one line next to the hamburger/logo on the narrowest phones — wrap to a second row
+     within the header rather than clipping anything off-screen. */
+  .header-actions {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    row-gap: 8px;
   }
 }
 
@@ -305,22 +343,14 @@ a:hover {
   background: var(--wlm-sand-light);
 }
 
-/* Mega-menu variant of the dropdown panel — black/yellow, matching the rest of the
-   tactical-brand nav. All 5 categories sit in a single row (matching the reference layout)
-   instead of wrapping to a second row, so every category header is visible at a glance with
-   no vertical scroll needed just to see that a category exists. Each column still shows its
-   complete subcategory list — no per-column clipping.
-
-   Gear & Accessories alone has 29 items (~950px tall), and since every column in a single
-   CSS Grid row shares that row's height, the whole row — and so the whole panel — is that
-   tall regardless of column count. A typical browser viewport can't fit that, so the panel
-   keeps its own max-height + scrollbar: reaching the bottom of Gear & Accessories' list
-   still takes a scroll, but that's a consequence of one category having far more items than
-   the others, not a layout bug — every category and its first several items are visible
-   immediately, and the panel scrolls independently of the page behind it either way. */
+/* Mega-menu variant of the dropdown panel — black/gold, one per top-level category nav item.
+   Each panel shows only its own category's subcategories (2-column grid) plus a promo image, so
+   it's much narrower than the old combined "Shop" panel that laid out all 5 categories side by
+   side. Gear & Accessories alone still has ~29 subcategories, so the panel keeps its own
+   max-height + scrollbar as a safety net regardless of category size. */
 .main-nav-dropdown-panel-mega {
-  min-width: 900px;
-  max-width: min(1080px, 94vw);
+  min-width: 560px;
+  max-width: min(760px, 92vw);
   max-height: min(75vh, 640px);
   overflow-y: auto;
   padding: 22px;
@@ -354,33 +384,6 @@ a:hover {
   border-bottom: 2px solid rgba(255, 255, 255, 0.15);
 }
 
-.main-nav-mega-columns {
-  display: grid;
-  grid-template-columns: repeat(5, minmax(150px, 1fr));
-  gap: 22px 20px;
-}
-
-.main-nav-mega-col {
-  display: flex;
-  flex-direction: column;
-}
-
-.main-nav-mega-header {
-  font-family: var(--font-heading);
-  font-weight: 700 !important;
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-  font-size: 0.82rem;
-  padding: 0 0 8px !important;
-  margin-bottom: 6px;
-  color: var(--wlm-sand) !important;
-  border-bottom: 2px solid rgba(255, 255, 255, 0.15);
-}
-
-.main-nav-mega-header:hover {
-  color: #ffffff !important;
-}
-
 .main-nav-mega-subitem {
   padding: 5px 4px !important;
   color: rgba(255, 255, 255, 0.85) !important;
@@ -391,39 +394,9 @@ a:hover {
   color: var(--wlm-forest-dark) !important;
 }
 
-/* Shop mega-menu — light/minimal skin + promo image panel, scoped to .main-nav-dropdown-panel-shop
-   only (combined with the existing .main-nav-dropdown-panel-mega class) so New Arrivals' dropdown,
-   which shares that base class for its sizing/scroll mechanics, keeps its current dark theme
-   untouched — its own content (.main-nav-preview-name etc.) is hardcoded white-on-dark and would
-   break if the shared class's background changed globally. */
-.main-nav-dropdown-panel-mega.main-nav-dropdown-panel-shop {
-  background: white;
-  scrollbar-color: var(--wlm-gold-bronze) var(--wlm-sand-light);
-  /* min-width/max-width intentionally left at the base .main-nav-dropdown-panel-mega values
-     (900px / min(1080px, 94vw)) here — proven to fit real laptop widths (measured: fits cleanly
-     at 1366px). Only widened, and the promo panel only shown, above 1600px where there's
-     confirmed room (measured: 1600px viewport leaves ~160px margin) — the "Shop" nav item's own
-     position varies with viewport width, so this couldn't be computed purely from the panel's
-     own width; see the 1600px media query below. */
-}
-
-.main-nav-dropdown-panel-shop::-webkit-scrollbar-track {
-  background: var(--wlm-sand-light);
-}
-
-.main-nav-dropdown-panel-shop::-webkit-scrollbar-thumb {
-  background: var(--wlm-gold-bronze);
-  border-radius: 4px;
-}
-
-.main-nav-dropdown-panel-shop .main-nav-mega-viewall {
-  color: var(--wlm-gold-bronze) !important;
-  border-bottom-color: var(--wlm-sand-light);
-}
-
 .main-nav-mega-body {
   display: flex;
-  gap: 28px;
+  gap: 24px;
 }
 
 .main-nav-mega-main {
@@ -431,58 +404,23 @@ a:hover {
   min-width: 0;
 }
 
-.main-nav-dropdown-panel-shop .main-nav-mega-header {
-  color: var(--wlm-ink) !important;
-  border-bottom-color: #e5e0d8;
+/* Each category's subcategories in a responsive 2-column grid — Gear & Accessories alone has
+   ~29 items, so a single column would run very tall; the panel's existing max-height + scroll
+   (see .main-nav-dropdown-panel-mega above) still applies as a safety net either way. */
+.main-nav-mega-subitems-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(140px, 1fr));
+  gap: 2px 16px;
 }
 
-.main-nav-dropdown-panel-shop .main-nav-mega-header:hover {
-  color: var(--wlm-gold-bronze) !important;
-}
-
-.main-nav-dropdown-panel-shop .main-nav-mega-subitem {
-  color: var(--wlm-forest-mid) !important;
-  border-radius: 3px;
-}
-
-.main-nav-dropdown-panel-shop .main-nav-mega-subitem:hover {
-  background: #f5f0e8 !important;
-  color: var(--wlm-ink) !important;
-}
-
-.main-nav-dropdown-panel-shop .main-nav-mega-col + .main-nav-mega-col {
-  border-inline-start: 1px solid #ece7de;
-  padding-inline-start: 20px;
-}
-
-/* Promotional image panel — swapped per hovered/focused category column by a small listener in
-   site.js (mirrors the Featured Products "View All" link swap pattern). Rendered server-side
-   already populated with the first category's data so it's never empty on open.
-
-   Hidden below 1600px (see media query further down): the "Shop" nav item's horizontal position
-   shifts with viewport width, so a fixed cutoff couldn't be computed purely from the promo
-   panel's own size — measured directly instead. At 1366px (a common laptop width) the panel with
-   the promo column added ran ~45px past the right edge of the screen; at 1600px it comfortably
-   fits with ~160px to spare. Below 1600px the category columns alone (already proven to fit at
-   1366px before this redesign) render without the promo column, rather than risk part of the
-   menu landing off-screen. */
+/* Promo image/caption/CTA for the same single category the panel belongs to — static, no swap
+   needed now that each nav item is its own category (unlike the old combined "Shop" menu). */
 .main-nav-mega-promo {
-  display: none;
+  display: flex;
   flex-direction: column;
-  flex: 0 0 230px;
-  border-inline-start: 1px solid #ece7de;
-  padding-inline-start: 24px;
-}
-
-@media (min-width: 1600px) {
-  .main-nav-dropdown-panel-mega.main-nav-dropdown-panel-shop {
-    min-width: 1150px;
-    max-width: min(1300px, 94vw);
-  }
-
-  .main-nav-mega-promo {
-    display: flex;
-  }
+  flex: 0 0 200px;
+  border-inline-start: 1px solid rgba(255, 255, 255, 0.15);
+  padding-inline-start: 20px;
 }
 
 .main-nav-mega-promo img {
@@ -490,22 +428,22 @@ a:hover {
   aspect-ratio: 3 / 4;
   object-fit: cover;
   border-radius: 8px;
-  background: var(--wlm-sand-light);
+  background: var(--wlm-forest-mid);
   margin-bottom: 12px;
 }
 
 .main-nav-mega-promo p {
   font-size: 0.82rem;
   line-height: 1.4;
-  color: var(--wlm-forest-mid);
+  color: rgba(255, 255, 255, 0.75);
   margin-bottom: 14px;
 }
 
 .main-nav-mega-promo-cta {
   display: block;
   text-align: center;
-  background: var(--wlm-ink);
-  color: white !important;
+  background: var(--wlm-sand);
+  color: var(--wlm-forest-dark) !important;
   font-family: var(--font-heading);
   font-weight: 600;
   text-transform: uppercase;
@@ -517,91 +455,15 @@ a:hover {
 }
 
 .main-nav-mega-promo-cta:hover {
-  background: var(--wlm-gold-bronze) !important;
+  background: white !important;
 }
 
-
-/* "New Arrivals" preview panel — a couple of real products per section instead of a plain
-   link list, so clicking the nav item previews what's new before going to the full page. */
-.main-nav-preview-columns {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-  gap: 28px;
-}
-
-.main-nav-preview-header {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  margin-bottom: 12px;
-  padding-bottom: 8px;
-  border-bottom: 2px solid rgba(255, 255, 255, 0.15);
-}
-
-.main-nav-preview-header span:first-child {
-  font-family: var(--font-heading);
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-  font-size: 0.82rem;
-  color: var(--wlm-sand);
-}
-
-.main-nav-preview-header a {
-  font-size: 0.78rem;
-  color: rgba(255, 255, 255, 0.7);
-  text-decoration: none;
-}
-
-.main-nav-preview-header a:hover {
-  color: var(--wlm-sand);
-}
-
-.main-nav-preview-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 12px;
-}
-
-.main-nav-preview-tile {
-  display: flex;
-  flex-direction: column;
-  text-decoration: none;
-  padding: 0 !important;
-}
-
-.main-nav-preview-tile img {
-  width: 100%;
-  aspect-ratio: 1 / 1;
-  object-fit: contain;
-  background: var(--wlm-sand-light);
-  border-radius: 4px;
-  margin-bottom: 6px;
-}
-
-.main-nav-preview-name {
-  color: white;
-  font-size: 0.78rem;
-  font-weight: 600;
-  line-height: 1.25;
-  margin-bottom: 3px;
-}
-
-.main-nav-preview-price {
-  color: var(--wlm-sand);
-  font-size: 0.8rem;
-  font-weight: 600;
-}
-
-.main-nav-preview-price-was {
-  color: rgba(255, 255, 255, 0.5);
-  text-decoration: line-through;
-  font-size: 0.75rem;
-  font-weight: 400;
-}
-
-.main-nav-preview-tile:hover .main-nav-preview-name {
-  color: var(--wlm-sand);
+/* Nav items further right in the row (Gear & Accessories, Outdoor Equipment) would push a
+   left-anchored panel past the right edge of the viewport, so the last two of the five category
+   dropdowns open right-aligned (growing left from the trigger) instead. */
+.main-nav-item.main-nav-dropdown:nth-last-of-type(-n+2) .main-nav-dropdown-panel {
+  left: auto;
+  right: 0;
 }
 
 @media (max-width: 767.98px) {
@@ -626,9 +488,6 @@ a:hover {
 .brand-logo {
   display: flex;
   align-items: center;
-  background: white;
-  padding: 6px 16px;
-  border-radius: 10px;
 }
 
 .brand-logo img {
@@ -641,8 +500,50 @@ a:hover {
   color: var(--wlm-forest-dark);
 }
 
-.search-toggle {
+/* Persistent centered search bar (desktop) vs. the click-to-open icon + slide-down panel
+   (mobile, where a permanently-visible bar wouldn't fit in the header row) — same GET search to
+   Products/Index either way, just two responsive presentations of the same functionality. */
+.header-search-inline {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  max-width: 480px;
+  margin: 0 auto;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 4px;
+}
+
+.header-search-inline input {
+  flex: 1;
+  min-width: 0;
+  background: none;
+  border: none;
+  padding: 9px 14px;
+  color: white;
+  font-size: 0.85rem;
+  letter-spacing: 0.02em;
+  outline: none;
+}
+
+.header-search-inline input::placeholder {
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.header-search-inline button {
   display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  border: none;
+  background: none;
+  color: var(--wlm-sand);
+  font-size: 1rem;
+  cursor: pointer;
+}
+
+.search-toggle {
+  display: none;
   align-items: center;
   justify-content: center;
   width: 40px;
@@ -656,6 +557,16 @@ a:hover {
 
 .search-toggle:hover {
   color: var(--wlm-sand);
+}
+
+@media (max-width: 767.98px) {
+  .header-search-inline {
+    display: none;
+  }
+
+  .search-toggle {
+    display: inline-flex;
+  }
 }
 
 .header-search-panel {
@@ -803,6 +714,43 @@ a:hover {
   color: white;
 }
 
+/* Plain-text EN | AR toggle — each is a real form submit (Localization/SetLanguage), no
+   open/close panel step like the currency switcher below. */
+.lang-switch {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.lang-switch form {
+  margin: 0;
+}
+
+.lang-switch-option {
+  background: none;
+  border: none;
+  padding: 0;
+  font-family: var(--font-heading);
+  font-weight: 600;
+  font-size: 0.85rem;
+  letter-spacing: 0.03em;
+  color: rgba(255, 255, 255, 0.6);
+  cursor: pointer;
+}
+
+.lang-switch-option:hover {
+  color: var(--wlm-sand);
+}
+
+.lang-switch-option.active {
+  color: white;
+}
+
+.lang-switch-divider {
+  color: var(--wlm-sand);
+  font-size: 0.85rem;
+}
+
 /* Header currency switcher (AED/USD) — click to open, matching the same pattern as the
    main-nav dropdown (JS-toggled "open" class rather than hover/focus). */
 .currency-switch {
@@ -870,15 +818,6 @@ a:hover {
 .currency-switch-panel button.active {
   font-weight: 700;
   color: var(--wlm-forest-dark);
-}
-
-.currency-flag {
-  width: 18px;
-  height: 13px;
-  vertical-align: middle;
-  border-radius: 2px;
-  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.1);
-  flex-shrink: 0;
 }
 
 .cart-count,
@@ -1384,22 +1323,6 @@ a:hover {
   color: var(--wlm-cream);
   padding: 110px 0;
   margin-bottom: 40px;
-}
-
-.hero-logo {
-  display: block;
-  width: fit-content;
-  background-color: white;
-  padding: 14px 22px;
-  border-radius: 10px;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
-  margin: 0 auto 22px;
-}
-
-.hero-logo img {
-  height: 60px;
-  width: auto;
-  display: block;
 }
 
 .hero-eyebrow {
@@ -1994,16 +1917,23 @@ a:hover {
 .featured-product-card {
   background: var(--wlm-cream);
   border-radius: 10px;
-  overflow: hidden;
   display: flex;
   flex-direction: column;
+  border: 1px solid transparent;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.featured-product-card:hover {
+  border-color: var(--wlm-sand);
+  box-shadow: 0 4px 16px color-mix(in srgb, var(--wlm-sand) 35%, transparent), 0 2px 8px rgba(0, 0, 0, 0.05);
 }
 
 .featured-product-card-media {
   display: block;
   aspect-ratio: 1 / 1;
   overflow: hidden;
+  border-radius: 9px 9px 0 0;
 }
 
 .featured-product-card-media img {
@@ -2014,6 +1944,9 @@ a:hover {
 
 .featured-product-card-body {
   padding: 14px;
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
 }
 
 .featured-product-swatches {
@@ -2045,6 +1978,7 @@ a:hover {
 }
 
 .featured-product-price-row {
+  margin-top: auto;
   margin-bottom: 12px;
 }
 
@@ -5240,6 +5174,7 @@ a:hover {
     font-size: 0.72rem;
   }
 
+  .topbar-left,
   .topbar-right {
     flex-wrap: wrap;
     justify-content: center;
@@ -5267,15 +5202,6 @@ a:hover {
 
   .hero {
     padding: 40px 0;
-  }
-
-  .hero-logo {
-    padding: 10px 16px;
-    margin-bottom: 16px;
-  }
-
-  .hero-logo img {
-    height: 40px;
   }
 
   .hero h1 {
