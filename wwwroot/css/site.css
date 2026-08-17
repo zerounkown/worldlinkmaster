@@ -100,55 +100,6 @@ a:hover {
   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.15);
 }
 
-/* Sitewide sale strip: shown above the topbar whenever a UAE sale event is live */
-.sale-strip {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  background: var(--wlm-sand);
-  color: red;
-  text-align: center;
-  padding: 9px 16px;
-  font-size: 0.85rem;
-  font-family: var(--font-heading);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  font-weight: 600;
-}
-
-.sale-strip:hover {
-  color: red;
-}
-
-.sale-strip.welcome-strip {
-  background: var(--wlm-sand);
-  color: red;
-}
-
-.sale-strip.welcome-strip strong {
-  color: red;
-}
-
-.sale-strip.welcome-strip .sale-strip-cta {
-  background: rgba(10, 10, 10, 0.15);
-}
-
-.sale-strip-icon {
-  font-size: 1.1rem;
-}
-
-.sale-strip-cta {
-  font-family: var(--font-heading);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  font-size: 0.78rem;
-  background: rgba(0, 0, 0, 0.12);
-  padding: 3px 10px;
-  border-radius: 20px;
-  white-space: nowrap;
-}
-
 /* Top utility bar */
 .topbar {
   background-color: var(--wlm-forest-dark);
@@ -320,6 +271,27 @@ a:hover {
 }
 
 .main-nav-link-sale::after {
+  display: none;
+}
+
+/* "My Coupon" tab — same full-height treatment as "Special Sales" right next to it, but a
+   deliberately darker, cooler maroon (no orange) so the two red tabs read as distinct at a
+   glance rather than duplicates. Only rendered when the visitor actually has an active welcome
+   coupon (see newWelcomeCoupon in _Layout.cshtml). */
+.main-nav-link-coupon {
+  background: linear-gradient(120deg, #9c1c3f, #641026);
+  color: white !important;
+  font-weight: 700;
+  padding: 17px 20px;
+  margin: -14px 0;
+}
+
+.main-nav-link-coupon:hover {
+  background: linear-gradient(120deg, #641026, #9c1c3f);
+  color: white !important;
+}
+
+.main-nav-link-coupon::after {
   display: none;
 }
 
@@ -1095,6 +1067,19 @@ a:hover {
 
 .side-nav-links a.side-nav-link-sale:hover {
   background: linear-gradient(120deg, #c8342f, #e0592f);
+  color: white;
+}
+
+/* "My Coupon" — same darker maroon as the desktop nav tab, distinct from the orange-red of
+   Special Sales right below it. */
+.side-nav-links a.side-nav-link-coupon {
+  background: linear-gradient(120deg, #9c1c3f, #641026);
+  color: white;
+  font-weight: 700;
+}
+
+.side-nav-links a.side-nav-link-coupon:hover {
+  background: linear-gradient(120deg, #641026, #9c1c3f);
   color: white;
 }
 
@@ -5223,12 +5208,6 @@ a:hover {
   .section-title {
     flex-wrap: wrap;
     gap: 6px;
-  }
-
-  .sale-strip {
-    flex-wrap: wrap;
-    padding: 8px 10px;
-    font-size: 0.75rem;
   }
 
   .promo-event-row {

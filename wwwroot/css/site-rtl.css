@@ -89,7 +89,6 @@
    read next — leftward in RTL — but browser back/forward/scroll controls are
    tied to real navigation direction, not reading direction, so they're left
    untouched. */
-.sale-strip-cta i,
 .category-preview-viewall i,
 .promo-event-cta i,
 .category-cta-banner a i {
