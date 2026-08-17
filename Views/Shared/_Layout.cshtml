@@ -97,14 +97,6 @@
 </head>
 <body>
     <div class="site-header-sticky">
-    @if (newWelcomeCoupon != null)
-    {
-        <a class="sale-strip welcome-strip" asp-area="" asp-controller="Coupons" asp-action="Index">
-            <span class="sale-strip-icon">🎁</span>
-            <span>@Localizer["Welcome to World Link Master! Enjoy"] <strong>@newWelcomeCoupon.DiscountPercent.ToString("0.##")%</strong> @Localizer["your first order with code"] <strong>@newWelcomeCoupon.Code</strong></span>
-            <span class="sale-strip-cta">@Localizer["View My Coupons"] <i class="bi bi-arrow-right"></i></span>
-        </a>
-    }
     <div class="topbar">
         <div class="container topbar-inner">
             <div class="topbar-left">
@@ -259,6 +251,10 @@
             }
             <a class="main-nav-link" asp-area="" asp-controller="Home" asp-action="Welcome" asp-fragment="shop-by-brand">@Localizer["Brands"]</a>
             <a class="main-nav-link @(isNewArrivalsActive ? "active" : "")" asp-area="" asp-controller="Products" asp-action="NewArrivals">@Localizer["New Arrival"]</a>
+            @if (newWelcomeCoupon != null)
+            {
+                <a class="main-nav-link main-nav-link-coupon" asp-area="" asp-controller="Coupons" asp-action="Index">@Localizer["My Coupon"]</a>
+            }
             <a class="main-nav-link main-nav-link-sale" asp-area="" asp-controller="Products" asp-action="Sales">@Localizer["Special Sales"]</a>
         </div>
     </nav>
@@ -271,6 +267,10 @@
             <button type="button" class="side-nav-close" id="sideNavClose" aria-label="@Localizer["Close menu"]">&times;</button>
         </div>
         <nav class="side-nav-links">
+            @if (newWelcomeCoupon != null)
+            {
+                <a class="side-nav-link-coupon" asp-area="" asp-controller="Coupons" asp-action="Index"><i class="bi bi-gift"></i> @Localizer["My Coupon"]</a>
+            }
             <a class="side-nav-link-sale" asp-area="" asp-controller="Products" asp-action="Sales"><i class="bi bi-fire"></i> @Localizer["Special Sales"]</a>
             <a asp-area="" asp-controller="Products" asp-action="Index"><i class="bi bi-grid"></i> @Localizer["All Products"]</a>
             @foreach (var category in navCategories)
