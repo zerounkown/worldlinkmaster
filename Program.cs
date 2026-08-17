@@ -275,6 +275,49 @@ if (app.Environment.IsDevelopment())
 }
 else
 {
+    // TEMP-DEBUG-REMOVE: one-shot SMTP connectivity diagnostic, secret-gated, no email actually
+    // sent — just tests connect+auth against the configured Email:* settings and reports the
+    // failure reason. Removed immediately after use.
+    app.MapGet("/diag-16fe10a773264567a3ad28ed6de870b3", async (IConfiguration config) =>
+    {
+        var host = config["Email:SmtpHost"] ?? "";
+        var port = int.TryParse(config["Email:SmtpPort"], out var p) ? p : 587;
+        var username = config["Email:Username"];
+        var password = config["Email:Password"];
+        try
+        {
+            using var client = new MailKit.Net.Smtp.SmtpClient();
+            await client.ConnectAsync(host, port, MailKit.Security.SecureSocketOptions.Auto);
+            var connected = client.IsConnected;
+            if (!string.IsNullOrEmpty(username))
+            {
+                await client.AuthenticateAsync(username, password ?? "");
+            }
+            var authed = client.IsAuthenticated;
+            await client.DisconnectAsync(true);
+            return Results.Ok(new
+            {
+                host,
+                port,
+                usernameSet = !string.IsNullOrEmpty(username),
+                passwordSet = !string.IsNullOrEmpty(password),
+                connected,
+                authed
+            });
+        }
+        catch (Exception ex)
+        {
+            return Results.Ok(new
+            {
+                host,
+                port,
+                usernameSet = !string.IsNullOrEmpty(username),
+                passwordSet = !string.IsNullOrEmpty(password),
+                error = $"{ex.GetType().Name}: {ex.Message}"
+            });
+        }
+    });
+
     app.UseExceptionHandler("/Home/Error");
     // HSTS: instruct browsers to use HTTPS only. Safe behind a TLS-terminating proxy
     // because UseForwardedHeaders surfaces the original HTTPS scheme.
