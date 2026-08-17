@@ -15,6 +15,11 @@ secrets.json
 # ASP.NET user secrets (stored outside the repo, but ignore any stray copies)
 **/UserSecrets/
 
+# Azure publish profiles — contain plaintext deployment credentials
+*.PublishSettings
+*.pubxml
+*.pubxml.user
+
 # Data Protection keys (never commit — invalidate all cookies/tokens if leaked)
 keys/
 DataProtection-Keys/
