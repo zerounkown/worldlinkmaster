@@ -301,6 +301,28 @@ a:hover {
   transform: scaleX(1);
 }
 
+/* "Special Sales" tab — a solid highlighted block filling the full height of the nav bar, same
+   red used elsewhere on the site for sale badges/ribbons (.sale-badge, .sale-ribbon), rather than
+   the thin gold-underline treatment every other nav item gets. The negative vertical margin
+   cancels out .main-nav-inner's own 14px padding so the red background actually touches the top
+   and bottom edges of the bar instead of floating as a smaller pill inside it. */
+.main-nav-link-sale {
+  background: linear-gradient(120deg, #e0592f, #c8342f);
+  color: white !important;
+  font-weight: 700;
+  padding: 17px 20px;
+  margin: -14px 0;
+}
+
+.main-nav-link-sale:hover {
+  background: linear-gradient(120deg, #c8342f, #e0592f);
+  color: white !important;
+}
+
+.main-nav-link-sale::after {
+  display: none;
+}
+
 .main-nav-dropdown {
   position: relative;
 }
@@ -1060,6 +1082,19 @@ a:hover {
 
 .side-nav-links a:hover {
   background-color: var(--wlm-forest-mid);
+  color: white;
+}
+
+/* "Special Sales" — same red used for the desktop nav tab and the site's other sale badges,
+   kept as a distinct highlighted row rather than blending into the plain drawer link list. */
+.side-nav-links a.side-nav-link-sale {
+  background: linear-gradient(120deg, #e0592f, #c8342f);
+  color: white;
+  font-weight: 700;
+}
+
+.side-nav-links a.side-nav-link-sale:hover {
+  background: linear-gradient(120deg, #c8342f, #e0592f);
   color: white;
 }
 
