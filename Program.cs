@@ -46,6 +46,11 @@ builder.Services.AddDatabaseDeveloperPageExceptionFilter();
 // ---------------------------------------------------------------------------
 // ASP.NET Identity — production security posture.
 // ---------------------------------------------------------------------------
+// Registered before AddDefaultIdentity() so its internal TryAddTransient<IEmailSender, ...>
+// finds one already present and skips installing its built-in no-op sender — see
+// IdentityEmailSenderAdapter for why that matters.
+builder.Services.AddTransient<Microsoft.AspNetCore.Identity.UI.Services.IEmailSender, IdentityEmailSenderAdapter>();
+
 builder.Services.AddDefaultIdentity<ApplicationUser>(options =>
     {
         // Require confirmed email in production (real SMTP delivers the link). In Development
