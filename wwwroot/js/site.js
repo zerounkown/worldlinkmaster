@@ -545,3 +545,91 @@ enable3dTilt(".category-preview-card", 12, -6);
         });
     });
 })();
+
+// Mega-menu subcategory preview: hovering (or keyboard-focusing) a subcategory link crossfades
+// that category's own promo image/caption/CTA to a preview representative of the specific
+// subcategory, via data-promo-* attributes rendered server-side. Each of the 5 category
+// dropdowns has its own independent promo panel, so everything here is scoped per-dropdown
+// (via closest()) rather than using a single global selector, which would only ever find the
+// first panel in the DOM regardless of which dropdown is actually open.
+(function () {
+    "use strict";
+
+    var dropdowns = document.querySelectorAll(".main-nav-dropdown");
+    if (dropdowns.length === 0) {
+        return;
+    }
+
+    var preloadedDropdowns = new WeakSet();
+
+    function preloadImages(dropdown) {
+        if (preloadedDropdowns.has(dropdown)) {
+            return;
+        }
+        preloadedDropdowns.add(dropdown);
+        dropdown.querySelectorAll(".main-nav-mega-subitem[data-promo-image]").forEach(function (item) {
+            var url = item.getAttribute("data-promo-image");
+            if (url) {
+                // Assigning to a throwaway Image's src starts the browser fetching/caching it in
+                // the background — by the time the user actually hovers that subitem, the real
+                // <img> swap below reads from cache instead of triggering a fresh network request.
+                var preloadImg = new Image();
+                preloadImg.src = url;
+            }
+        });
+    }
+
+    function activatePromo(promoPanel, item) {
+        var image = item.getAttribute("data-promo-image");
+        var caption = item.getAttribute("data-promo-caption");
+        var ctaHref = item.getAttribute("data-promo-cta-href");
+        var ctaText = item.getAttribute("data-promo-cta-text");
+
+        var layers = promoPanel.querySelectorAll(".js-mega-promo-image");
+        if (image && layers.length === 2) {
+            var activeLayer = promoPanel.querySelector(".js-mega-promo-image.active") || layers[0];
+            var nextLayer = activeLayer === layers[0] ? layers[1] : layers[0];
+            if (activeLayer.getAttribute("src") !== image) {
+                nextLayer.setAttribute("src", image);
+                nextLayer.classList.add("active");
+                activeLayer.classList.remove("active");
+            }
+        }
+
+        var captionEl = promoPanel.querySelector(".js-mega-promo-caption");
+        if (caption && captionEl) {
+            captionEl.textContent = caption;
+        }
+
+        var ctaEl = promoPanel.querySelector(".js-mega-promo-cta");
+        if (ctaHref && ctaEl) {
+            ctaEl.setAttribute("href", ctaHref);
+        }
+
+        var ctaTextEl = promoPanel.querySelector(".js-mega-promo-cta-text");
+        if (ctaText && ctaTextEl) {
+            ctaTextEl.textContent = ctaText;
+        }
+    }
+
+    dropdowns.forEach(function (dropdown) {
+        var promoPanel = dropdown.querySelector(".main-nav-mega-promo");
+        var subitems = dropdown.querySelectorAll(".main-nav-mega-subitem[data-promo-image]");
+        if (!promoPanel || subitems.length === 0) {
+            return;
+        }
+
+        dropdown.addEventListener("mouseenter", function () {
+            preloadImages(dropdown);
+        });
+
+        subitems.forEach(function (item) {
+            item.addEventListener("mouseenter", function () {
+                activatePromo(promoPanel, item);
+            });
+            item.addEventListener("focusin", function () {
+                activatePromo(promoPanel, item);
+            });
+        });
+    });
+})();

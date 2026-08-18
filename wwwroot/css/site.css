@@ -407,8 +407,9 @@ a:hover {
   gap: 2px 16px;
 }
 
-/* Promo image/caption/CTA for the same single category the panel belongs to — static, no swap
-   needed now that each nav item is its own category (unlike the old combined "Shop" menu). */
+/* Promo image/caption/CTA for the category the panel belongs to. Swaps per hovered/focused
+   subcategory (site.js) — starts out showing the category's own default image/caption so it's
+   never empty on open, before any subitem has been hovered. */
 .main-nav-mega-promo {
   display: flex;
   flex-direction: column;
@@ -417,13 +418,30 @@ a:hover {
   padding-inline-start: 20px;
 }
 
-.main-nav-mega-promo img {
+/* Two stacked <img> layers crossfade between each other (site.js toggles which has .active) —
+   smoother than swapping a single <img>'s src, which can't transition natively. */
+.main-nav-mega-promo-image-stack {
+  position: relative;
   width: 100%;
   aspect-ratio: 3 / 4;
-  object-fit: cover;
   border-radius: 8px;
+  overflow: hidden;
   background: var(--wlm-forest-mid);
   margin-bottom: 12px;
+}
+
+.main-nav-mega-promo-image-stack img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0;
+  transition: opacity 0.35s ease;
+}
+
+.main-nav-mega-promo-image-stack img.active {
+  opacity: 1;
 }
 
 .main-nav-mega-promo p {
@@ -431,6 +449,7 @@ a:hover {
   line-height: 1.4;
   color: rgba(255, 255, 255, 0.75);
   margin-bottom: 14px;
+  transition: opacity 0.2s ease;
 }
 
 .main-nav-mega-promo-cta {
