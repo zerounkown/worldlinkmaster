@@ -87,9 +87,11 @@
         <p>
             @Localizer["World Link Master was founded on a simple idea: gear should work as hard as the people who rely on it. We're a tactical and outdoor gear retailer, working directly with manufacturers to bring you field-tested apparel, footwear, packs, and equipment — cutting out the markup so operators, adventurers, and everyday professionals get real durability at a fair price."]
         </p>
-        <a class="btn-wlm" asp-controller="Products" asp-action="Index">@Localizer["Start Shopping With Us"]</a>
-        <a class="btn-wlm-outline ms-2" asp-controller="QuoteRequests" asp-action="Create">@Localizer["Request Price List"]</a>
-        <a class="btn-wlm-outline ms-2" asp-controller="Home" asp-action="About">@Localizer["Our Story"]</a>
+        <div class="hero-cta-row">
+            <a class="btn-wlm" asp-controller="Products" asp-action="Index">@Localizer["Start Shopping With Us"]</a>
+            <a class="btn-wlm-outline" asp-controller="QuoteRequests" asp-action="Create">@Localizer["Request Price List"]</a>
+            <a class="btn-wlm-outline" asp-controller="Home" asp-action="About">@Localizer["Our Story"]</a>
+        </div>
     </div>
 </section>
 
