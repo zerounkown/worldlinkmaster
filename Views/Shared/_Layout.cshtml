@@ -234,15 +234,26 @@
                                 <div class="main-nav-mega-subitems-grid">
                                     @foreach (var subcategory in category.Subcategories)
                                     {
-                                        <a class="main-nav-mega-subitem" asp-area="" asp-controller="Products" asp-action="Index" asp-route-categoryId="@category.Id" asp-route-subcategoryId="@subcategory.Id">@subcategory.LocalizedName()</a>
+                                        var subImage = string.IsNullOrWhiteSpace(subcategory.ImageUrl) ? category.ImageUrl : subcategory.ImageUrl;
+                                        var subCaption = subcategory.LocalizedDescription();
+                                        if (string.IsNullOrWhiteSpace(subCaption)) { subCaption = subcategory.LocalizedName(); }
+                                        var subHref = Url.Action("Index", "Products", new { categoryId = category.Id, subcategoryId = subcategory.Id });
+                                        <a class="main-nav-mega-subitem" asp-area="" asp-controller="Products" asp-action="Index" asp-route-categoryId="@category.Id" asp-route-subcategoryId="@subcategory.Id"
+                                           data-promo-image="@subImage"
+                                           data-promo-caption="@subCaption"
+                                           data-promo-cta-text="@Localizer["Shop {0}", subcategory.LocalizedName()]"
+                                           data-promo-cta-href="@subHref">@subcategory.LocalizedName()</a>
                                     }
                                 </div>
                             </div>
                             <div class="main-nav-mega-promo">
-                                <img src="@category.ImageUrl" alt="" />
-                                <p>@promoCaption</p>
-                                <a class="main-nav-mega-promo-cta" href="@promoHref">
-                                    <span>@Localizer["Shop {0}", navLabel]</span>
+                                <div class="main-nav-mega-promo-image-stack">
+                                    <img class="js-mega-promo-image active" src="@category.ImageUrl" alt="" />
+                                    <img class="js-mega-promo-image" src="@category.ImageUrl" alt="" />
+                                </div>
+                                <p class="js-mega-promo-caption">@promoCaption</p>
+                                <a class="main-nav-mega-promo-cta js-mega-promo-cta" href="@promoHref">
+                                    <span class="js-mega-promo-cta-text">@Localizer["Shop {0}", navLabel]</span>
                                 </a>
                             </div>
                         </div>
