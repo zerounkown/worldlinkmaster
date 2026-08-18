@@ -275,55 +275,6 @@ if (app.Environment.IsDevelopment())
 }
 else
 {
-    // TEMP-DEBUG-REMOVE: one-shot SMTP diagnostic, secret-gated. Connect+auth already confirmed
-    // working; this attempts an actual send (to a query-string-supplied test address) and
-    // reports From/Username domains (not the credentials) plus the exact SMTP response/exception,
-    // to check for a Gmail sender-alias mismatch. Removed immediately after use.
-    app.MapGet("/diag-16fe10a773264567a3ad28ed6de870b3", async (IConfiguration config, string to) =>
-    {
-        var host = config["Email:SmtpHost"] ?? "";
-        var port = int.TryParse(config["Email:SmtpPort"], out var p) ? p : 587;
-        var username = config["Email:Username"];
-        var password = config["Email:Password"];
-        var fromAddress = config["Email:FromAddress"] ?? username ?? "no-reply@worldlinkmaster.com";
-        var fromName = config["Email:FromName"] ?? "World Link Master";
-
-        var message = new MimeKit.MimeMessage();
-        message.From.Add(new MimeKit.MailboxAddress(fromName, fromAddress));
-        message.To.Add(MimeKit.MailboxAddress.Parse(to));
-        message.Subject = "WLM diagnostic test";
-        message.Body = new MimeKit.BodyBuilder { HtmlBody = "<p>diagnostic test</p>" }.ToMessageBody();
-
-        try
-        {
-            using var client = new MailKit.Net.Smtp.SmtpClient();
-            await client.ConnectAsync(host, port, MailKit.Security.SecureSocketOptions.Auto);
-            if (!string.IsNullOrEmpty(username))
-            {
-                await client.AuthenticateAsync(username, password ?? "");
-            }
-            var response = await client.SendAsync(message);
-            await client.DisconnectAsync(true);
-            return Results.Ok(new
-            {
-                fromAddress,
-                usernameDomain = username?.Split('@').ElementAtOrDefault(1),
-                to,
-                serverResponse = response
-            });
-        }
-        catch (Exception ex)
-        {
-            return Results.Ok(new
-            {
-                fromAddress,
-                usernameDomain = username?.Split('@').ElementAtOrDefault(1),
-                to,
-                error = $"{ex.GetType().Name}: {ex.Message}"
-            });
-        }
-    });
-
     app.UseExceptionHandler("/Home/Error");
     // HSTS: instruct browsers to use HTTPS only. Safe behind a TLS-terminating proxy
     // because UseForwardedHeaders surfaces the original HTTPS scheme.
