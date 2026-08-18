@@ -1901,6 +1901,21 @@ a:hover {
   color: var(--wlm-sand-light);
 }
 
+.featured-tab-link:hover {
+  cursor: pointer;
+}
+
+/* Hover uses the muted bronze token (distinct from the bright gold reserved for the active tab)
+   so pointing at a tab is clearly visible without being mistaken for "this is now selected". */
+.featured-tab-link:hover:not(.active) {
+  color: var(--wlm-ink);
+  border-bottom-color: var(--wlm-gold-bronze);
+}
+
+.featured-tab-link:hover:not(.active) i {
+  color: var(--wlm-gold-bronze);
+}
+
 .featured-tab-link.active {
   color: var(--wlm-ink);
   border-bottom-color: var(--wlm-sand);
