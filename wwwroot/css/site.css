@@ -1378,6 +1378,13 @@ a:hover {
   text-shadow: 0 2px 10px rgba(0, 0, 0, 0.4);
 }
 
+.hero-cta-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 14px;
+}
+
 .btn-wlm {
   display: inline-block;
   background-color: var(--wlm-sand);
@@ -5229,18 +5236,64 @@ a:hover {
     grid-template-columns: 1fr;
   }
 
+  /* Extra bottom padding reserves clearance below the CTA buttons so the last button doesn't
+     render underneath the fixed WhatsApp/chat bubbles in the bottom-left corner — those are
+     position: fixed to the viewport, so whatever page content lands in that same screen region
+     on initial load (no scroll) sits directly behind them otherwise. */
   .hero {
-    padding: 40px 0;
+    padding: 28px 0 110px;
+  }
+
+  .hero-eyebrow {
+    margin-bottom: 8px;
   }
 
   .hero h1 {
-    font-size: 1.9rem;
+    font-size: 1.7rem;
     max-width: 100%;
   }
 
   .hero p {
-    font-size: 1rem;
+    font-size: 0.95rem;
     max-width: 100%;
+    margin: 14px 0 22px;
+  }
+
+  .hero-cta-row .btn-wlm,
+  .hero-cta-row .btn-wlm-outline {
+    padding: 11px 20px;
+    font-size: 0.88rem;
+  }
+}
+
+/* Shorter phones (e.g. iPhone SE at 375x667) don't have enough vertical room for the hero's
+   text + CTA buttons to clear the fixed WhatsApp bubble — compact further specifically when
+   viewport height is tight, leaving taller phones (iPhone 12/13/14, 11/XR class and up) at the
+   roomier sizing above. */
+@media (max-width: 575.98px) and (max-height: 700px) {
+  .hero {
+    padding: 16px 0 100px;
+  }
+
+  .hero-eyebrow {
+    margin-bottom: 4px;
+    font-size: 0.75rem;
+  }
+
+  .hero h1 {
+    font-size: 1.35rem;
+  }
+
+  .hero p {
+    font-size: 0.85rem;
+    line-height: 1.45;
+    margin: 8px 0 14px;
+  }
+
+  .hero-cta-row .btn-wlm,
+  .hero-cta-row .btn-wlm-outline {
+    padding: 9px 16px;
+    font-size: 0.8rem;
   }
 
   .search-input {
@@ -5941,8 +5994,16 @@ a:hover {
 
 @media (max-width: 575.98px) {
   .whatsapp-widget {
-    left: 14px;
-    bottom: 84px;
+    left: 12px;
+    bottom: 78px;
+  }
+
+  /* Smaller footprint on mobile — less surface area for the fixed bubble to cover whatever
+     happens to be underneath it. */
+  .whatsapp-widget-toggle {
+    width: 48px;
+    height: 48px;
+    font-size: 1.4rem;
   }
 }
 
