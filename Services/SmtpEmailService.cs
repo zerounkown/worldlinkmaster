@@ -1,5 +1,6 @@
 using System.Net;
 using System.Text;
+using System.Text.RegularExpressions;
 using MailKit.Net.Smtp;
 using MailKit.Security;
 using MimeKit;
@@ -41,7 +42,9 @@ public class SmtpEmailService : IEmailService
         message.From.Add(new MailboxAddress(fromName, fromAddress));
         message.To.Add(MailboxAddress.Parse(toEmail));
         message.Subject = subject;
-        message.Body = new BodyBuilder { HtmlBody = htmlBody }.ToMessageBody();
+        // A plain-text alternative alongside the HTML body — HTML-only messages are a common
+        // spam-filter signal, and a proper multipart/alternative is cheap to generate.
+        message.Body = new BodyBuilder { HtmlBody = htmlBody, TextBody = HtmlToPlainText(htmlBody) }.ToMessageBody();
 
         try
         {
@@ -63,6 +66,17 @@ public class SmtpEmailService : IEmailService
             // Never log credentials or body — only the recipient and subject.
             _logger.LogError(ex, "Failed to send email to {ToEmail}: {Subject}", toEmail, subject);
         }
+    }
+
+    private static string HtmlToPlainText(string html)
+    {
+        var text = Regex.Replace(html, "<br\\s*/?>", "\n", RegexOptions.IgnoreCase);
+        text = Regex.Replace(text, "</p>|</div>|</h[1-6]>|</li>|</tr>", "\n\n", RegexOptions.IgnoreCase);
+        text = Regex.Replace(text, "<[^>]+>", string.Empty);
+        text = WebUtility.HtmlDecode(text);
+        text = Regex.Replace(text, "[ \t]+", " ");
+        text = Regex.Replace(text, "\n{3,}", "\n\n");
+        return text.Trim();
     }
 
     public Task SendOtpAsync(string toEmail, string otpCode)
