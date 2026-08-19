@@ -86,7 +86,7 @@ public class WholesaleController : Controller
     {
         var products = await _context.Products
             .Include(p => p.Category)
-            .Where(p => p.WholesalePrice != null)
+            .Where(p => p.IsPublished && p.WholesalePrice != null)
             .OrderBy(p => p.Name)
             .ToListAsync();
 

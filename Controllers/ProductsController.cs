@@ -67,6 +67,7 @@ public class ProductsController : Controller
             .ToDictionary(g => g.Key, g => g.Select(f => f.Value).ToList());
 
         var baseQuery = _context.Products
+            .Where(p => p.IsPublished)
             .Include(p => p.Category)
             .Include(p => p.Brand)
             .Include(p => p.Variants).ThenInclude(v => v.Color)
@@ -298,6 +299,7 @@ public class ProductsController : Controller
         ViewBag.ActiveEvent = await _promoService.GetTopActiveEventAsync();
 
         ViewBag.NewArrivals = await _context.Products
+            .Where(p => p.IsPublished)
             .Include(p => p.Variants).ThenInclude(v => v.Color)
             .Include(p => p.Variants).ThenInclude(v => v.Size)
             .Include(p => p.Variants).ThenInclude(v => v.ProductColor)
@@ -310,6 +312,7 @@ public class ProductsController : Controller
 
         // "Specials" — the featured lineup, shown at the active promo event's discount when one is running.
         ViewBag.Specials = await _context.Products
+            .Where(p => p.IsPublished)
             .Include(p => p.Variants).ThenInclude(v => v.Color)
             .Include(p => p.Variants).ThenInclude(v => v.Size)
             .Include(p => p.Variants).ThenInclude(v => v.ProductColor)
@@ -338,6 +341,7 @@ public class ProductsController : Controller
         }
 
         var query = _context.Products
+            .Where(p => p.IsPublished)
             .Include(p => p.Variants).ThenInclude(v => v.Color)
             .Include(p => p.Variants).ThenInclude(v => v.Size)
             .Include(p => p.Variants).ThenInclude(v => v.ProductColor)
@@ -367,6 +371,7 @@ public class ProductsController : Controller
     public async Task<IActionResult> Details(string slug)
     {
         var product = await _context.Products
+            .Where(p => p.IsPublished)
             .Include(p => p.Category)
             .Include(p => p.Subcategory)
             .Include(p => p.Brand)
@@ -388,6 +393,7 @@ public class ProductsController : Controller
         }
 
         var related = await _context.Products
+            .Where(p => p.IsPublished)
             .Include(p => p.Category)
             .Include(p => p.Variants).ThenInclude(v => v.Color)
             .Include(p => p.Variants).ThenInclude(v => v.Size)

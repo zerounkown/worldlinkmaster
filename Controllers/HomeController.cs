@@ -35,6 +35,7 @@ public class HomeController : Controller
         // Feeds the auto-scrolling "What We Sell" product strip — featured items first, topped
         // up with the newest arrivals so the strip always has enough items for a smooth loop.
         var scrollProducts = await _context.Products
+            .Where(p => p.IsPublished)
             .OrderByDescending(p => p.IsFeatured)
             .ThenByDescending(p => p.CreatedAt)
             .Take(16)
@@ -55,6 +56,7 @@ public class HomeController : Controller
 
         // "Best sellers" — approximated by review volume/rating since there's no sales-count field yet.
         ViewBag.BestSellers = await _context.Products
+            .Where(p => p.IsPublished)
             .Include(p => p.Variants).ThenInclude(v => v.Color)
             .Include(p => p.Variants).ThenInclude(v => v.Size)
             .Include(p => p.Variants).ThenInclude(v => v.ProductColor)
@@ -67,6 +69,7 @@ public class HomeController : Controller
             .ToListAsync();
 
         ViewBag.NewArrivals = await _context.Products
+            .Where(p => p.IsPublished)
             .Include(p => p.Variants).ThenInclude(v => v.Color)
             .Include(p => p.Variants).ThenInclude(v => v.Size)
             .Include(p => p.Variants).ThenInclude(v => v.ProductColor)
