@@ -272,6 +272,33 @@ app.UseForwardedHeaders();
 if (app.Environment.IsDevelopment())
 {
     app.UseMigrationsEndPoint();
+
+    // Deliberately mutating, Development-only, and behind an explicit confirm flag — these run
+    // WorldLinkMaster.Web.Scripts.MockApparelAttributeSeeder against whatever database this
+    // instance is pointed at. Since this app has no separate staging database, that is normally
+    // the same shared database production reads from — running /seed makes placeholder brand and
+    // attribute values visible to real shoppers until /remove (or the real Excel import) replaces
+    // them. Nothing calls these automatically; see the seeder's own file header for the full
+    // reasoning on what it changes and how it's reversed.
+    app.MapPost("/dev/mock-apparel-attrs/seed", async (WorldLinkMaster.Web.Data.ApplicationDbContext db, string? confirm) =>
+    {
+        if (confirm != "yes")
+        {
+            return Results.BadRequest(new { message = "Pass ?confirm=yes to run this against the connected database." });
+        }
+        var result = await WorldLinkMaster.Web.Scripts.MockApparelAttributeSeeder.SeedAsync(db);
+        return Results.Json(result);
+    });
+
+    app.MapPost("/dev/mock-apparel-attrs/remove", async (WorldLinkMaster.Web.Data.ApplicationDbContext db, string? confirm) =>
+    {
+        if (confirm != "yes")
+        {
+            return Results.BadRequest(new { message = "Pass ?confirm=yes to run this against the connected database." });
+        }
+        var result = await WorldLinkMaster.Web.Scripts.MockApparelAttributeSeeder.RemoveAsync(db);
+        return Results.Json(result);
+    });
 }
 else
 {
