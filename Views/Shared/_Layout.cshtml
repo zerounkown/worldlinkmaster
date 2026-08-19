@@ -144,9 +144,9 @@
         .ToDictionary(g => g.Key, g => new
         {
             Brands = g.Where(p => p.Brand != null).Select(p => p.Brand!).DistinctBy(b => b.Id).OrderBy(b => b.Name).Take(QuickFilterCapPerGroup).ToList(),
-            NeckTypes = g.SelectMany(p => p.AttributeValues.Where(a => a.AttributeDefinition?.Code == "NECK_TYPE")).Select(a => a.ValueEn).Distinct().OrderBy(v => v).Take(QuickFilterCapPerGroup).ToList(),
-            SleeveLengths = g.SelectMany(p => p.AttributeValues.Where(a => a.AttributeDefinition?.Code == "SLEEVE_LENGTH")).Select(a => a.ValueEn).Distinct().OrderBy(v => v).Take(QuickFilterCapPerGroup).ToList(),
-            PantsTypes = g.SelectMany(p => p.AttributeValues.Where(a => a.AttributeDefinition?.Code == "PANTS_TYPE")).Select(a => a.ValueEn).Distinct().OrderBy(v => v).Take(QuickFilterCapPerGroup).ToList()
+            NeckTypes = g.SelectMany(p => p.AttributeValues.Where(a => a.AttributeDefinition?.Code == "NECK-TYPE")).Select(a => a.ValueEn).Distinct().OrderBy(v => v).Take(QuickFilterCapPerGroup).ToList(),
+            SleeveLengths = g.SelectMany(p => p.AttributeValues.Where(a => a.AttributeDefinition?.Code == "SLEEVE-LENGTH")).Select(a => a.ValueEn).Distinct().OrderBy(v => v).Take(QuickFilterCapPerGroup).ToList(),
+            Patterns = g.SelectMany(p => p.AttributeValues.Where(a => a.AttributeDefinition?.Code == "PATTERN")).Select(a => a.ValueEn).Distinct().OrderBy(v => v).Take(QuickFilterCapPerGroup).ToList()
         });
 
     // Renders as a flat (label, href, isBrand) list so the view doesn't need to know brand vs.
@@ -175,9 +175,9 @@
             }
         }
 
-        AddAttrChips(qf.NeckTypes, "NECK_TYPE");
-        AddAttrChips(qf.SleeveLengths, "SLEEVE_LENGTH");
-        AddAttrChips(qf.PantsTypes, "PANTS_TYPE");
+        AddAttrChips(qf.NeckTypes, "NECK-TYPE");
+        AddAttrChips(qf.SleeveLengths, "SLEEVE-LENGTH");
+        AddAttrChips(qf.Patterns, "PATTERN");
 
         return result;
     }

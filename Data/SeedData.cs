@@ -25,7 +25,7 @@ public static class SeedData
         await SeedSubcategoryPlaceholderProductsAsync(context, defaultMerchant.Id, colorCache, sizeCache);
         await SeedMissingVariantsAsync(context, colorCache, sizeCache);
         await SeedFeaturesAsync(context);
-        await SeedApparelAttributeDefinitionsAsync(context);
+        await SeedInternalAttributeDefinitionsAsync(context);
         await SeedPromoEventsAsync(context);
         await SeedPromoCouponsAsync(context);
         await SeedStoresAsync(context);
@@ -233,34 +233,24 @@ public static class SeedData
         await context.SaveChangesAsync();
     }
 
-    // Definition-only (no per-product values) — just the attribute *types* the mega-menu's
-    // apparel sub-filters read from (see BuildQuickFilters in _Layout.cshtml), so the storefront
-    // is ready for real per-product values whenever the Excel import lands them. Adding empty
-    // AttributeDefinition rows is harmless: the mega-menu simply renders no chips until values
-    // exist for a given attribute. Actual mock/sample VALUES live in
-    // Scripts/MockApparelAttributeSeeder.cs instead, deliberately kept out of this automatic
-    // startup seed so they never land on the shared database without someone explicitly running
-    // that script.
-    private static async Task SeedApparelAttributeDefinitionsAsync(ApplicationDbContext context)
+    // The mega-menu's apparel sub-filters (see BuildQuickFilters in _Layout.cshtml) read
+    // NECK-TYPE/SLEEVE-LENGTH/PATTERN from the AttributeDefinition table — those are now owned by
+    // the real Attribute Dictionary sheet in the Master Data Importer (Areas/Admin/Controllers/
+    // MasterDataController.cs), not seeded here. This method only ensures the one internal,
+    // never-customer-facing marker MockApparelAttributeSeeder.cs needs for its own bookkeeping.
+    private static async Task SeedInternalAttributeDefinitionsAsync(ApplicationDbContext context)
     {
-        var existingCodes = await context.AttributeDefinitions.Select(a => a.Code).ToListAsync();
-        var toAdd = new[]
-        {
-            new AttributeDefinition { Code = "NECK_TYPE", NameEn = "Neck Type", Filterable = true },
-            new AttributeDefinition { Code = "SLEEVE_LENGTH", NameEn = "Sleeve Length", Filterable = true },
-            new AttributeDefinition { Code = "PANTS_TYPE", NameEn = "Pants Type", Filterable = true },
-            // Internal bookkeeping for Scripts/MockApparelAttributeSeeder.cs — never shown as a
-            // filter (Filterable = false), holds each product's pre-seed BrandId so the mock data
-            // can be precisely reverted without guessing.
-            new AttributeDefinition { Code = "MOCK_BRAND_ORIGINAL", NameEn = "Mock Brand Original (internal)", Filterable = false }
-        }.Where(a => !existingCodes.Contains(a.Code)).ToList();
-
-        if (toAdd.Count == 0)
+        if (await context.AttributeDefinitions.AnyAsync(a => a.Code == "MOCK_BRAND_ORIGINAL"))
         {
             return;
         }
 
-        context.AttributeDefinitions.AddRange(toAdd);
+        context.AttributeDefinitions.Add(new AttributeDefinition
+        {
+            Code = "MOCK_BRAND_ORIGINAL",
+            NameEn = "Mock Brand Original (internal)",
+            Filterable = false
+        });
         await context.SaveChangesAsync();
     }
 

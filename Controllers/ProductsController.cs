@@ -56,8 +56,8 @@ public class ProductsController : Controller
         var selectedFeatureIds = (featureIds ?? Array.Empty<int>()).ToList();
         var selectedAvailability = (availability ?? Array.Empty<string>()).ToList();
 
-        // Generic attribute filter (mega-menu quick filters — neck type, sleeve length, pants
-        // type, etc.): each entry is "Code:Value", e.g. "NECK_TYPE:Crew Neck". Grouped by code so
+        // Generic attribute filter (mega-menu quick filters — neck type, sleeve length, pattern,
+        // etc.): each entry is "Code:Value", e.g. "NECK-TYPE:Crew Neck". Grouped by code so
         // multiple values for the same attribute OR together, same as every other facet dimension.
         var selectedAttributeFilters = (attr ?? Array.Empty<string>())
             .Select(a => a.Split(':', 2))
