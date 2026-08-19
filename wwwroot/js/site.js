@@ -54,14 +54,20 @@ enable3dTilt(".product-card-tilt", 8, 0);
 // Category preview cards (inside the side nav) tilt on hover, same 3D treatment.
 enable3dTilt(".category-preview-card", 12, -6);
 
-// Side nav category previews: hovering a category (or tapping its chevron on
-// touch devices) reveals a handful of its products so customers get a peek
-// before clicking in. Only one preview stays open at a time.
+// Side nav category previews: hovering a category (mouse) or tapping its chevron (touch)
+// reveals its product preview + subcategory groups. Only one preview stays open at a time.
 (function () {
     var items = document.querySelectorAll(".side-nav-item");
     if (items.length === 0) {
         return;
     }
+
+    // Real hover devices get the mouseenter/mouseleave convenience below; touch devices skip it
+    // entirely and rely only on the click/tap toggle. Without this guard, most touch browsers
+    // fire a synthetic mouseenter right before the tap's click event — that mouseenter opens the
+    // panel, then the click handler reads the now-already-open state and immediately toggles it
+    // back closed, making the chevron effectively untappable on real phones.
+    var supportsHover = window.matchMedia && window.matchMedia("(hover: hover)").matches;
 
     function closeAll(except) {
         items.forEach(function (item) {
@@ -82,16 +88,18 @@ enable3dTilt(".category-preview-card", 12, -6);
             return;
         }
 
-        item.addEventListener("mouseenter", function () {
-            closeAll(item);
-            item.classList.add("preview-open");
-            toggle.setAttribute("aria-expanded", "true");
-        });
+        if (supportsHover) {
+            item.addEventListener("mouseenter", function () {
+                closeAll(item);
+                item.classList.add("preview-open");
+                toggle.setAttribute("aria-expanded", "true");
+            });
 
-        item.addEventListener("mouseleave", function () {
-            item.classList.remove("preview-open");
-            toggle.setAttribute("aria-expanded", "false");
-        });
+            item.addEventListener("mouseleave", function () {
+                item.classList.remove("preview-open");
+                toggle.setAttribute("aria-expanded", "false");
+            });
+        }
 
         toggle.addEventListener("click", function (e) {
             e.preventDefault();

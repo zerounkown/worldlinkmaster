@@ -50,6 +50,76 @@
         .OrderBy(c => { var i = navDisplayOrder.IndexOf(c.Slug); return i < 0 ? int.MaxValue : i; })
         .ThenBy(c => c.Name)
         .ToList();
+
+    // Full-width mega-menu column groupings — hand-curated per category (there's no "column"
+    // field on Subcategory) since the real taxonomy doesn't come pre-grouped. Keyed by
+    // subcategory slug rather than name so it stays stable across localization. Any subcategory
+    // not listed here (a future addition nobody updated this map for) lands in an automatic
+    // "More" column instead of silently vanishing from the nav.
+    var megaMenuColumnsBySlug = new Dictionary<string, (string Header, string[] Slugs)[]>
+    {
+        ["tactical-apparel"] = new (string Header, string[] Slugs)[]
+        {
+            ("Tops", new[] { "t-shirts", "combat-shirts", "combat-shirt", "short-sleeve-t-shirt", "long-sleeve-t-shirt", "short-sleeve-crew-neck-t-shirt", "long-sleeve-crew-neck-t-shirt", "general-apparel" }),
+            ("Bottoms", new[] { "tactical-pants", "tactical-shorts", "tactical-trousers" }),
+            ("Outerwear", new[] { "tactical-jackets", "tactical-vests-plate-carriers" }),
+            ("Base Layers", new[] { "thermal-base-layers", "base-layer-underwear" })
+        },
+        ["footwear"] = new (string Header, string[] Slugs)[]
+        {
+            ("Boots", new[] { "tactical-boots", "black-tactical-boots", "low-cut-black-tactical-boots", "desert-tactical-boots-beige", "low-cut-desert-tactical-boots-beige" }),
+            ("Work & Safety", new[] { "safety-shoes", "formal-duty-shoes" }),
+            ("Active & Outdoor", new[] { "sports-shoes", "hiking-shoes" }),
+            ("All Footwear", new[] { "footwear", "general-footwear" })
+        },
+        ["bags-and-packs"] = new (string Header, string[] Slugs)[]
+        {
+            ("Everyday Carry", new[] { "backpacks", "shoulder-bags", "waist-packs" }),
+            ("Travel", new[] { "trolley-bags", "duffel-bags" }),
+            ("Specialty", new[] { "laptop-bags", "weapon-bags" }),
+            ("All Bags", new[] { "bags-packs", "general-bags" })
+        },
+        ["gear-and-accessories"] = new (string Header, string[] Slugs)[]
+        {
+            ("Wearables", new[] { "tactical-gloves", "tactical-socks", "tactical-caps", "tactical-belts", "tactical-watches", "accessories", "general-gear" }),
+            ("Protection", new[] { "tactical-helmets", "tactical-eyewear", "face-masks-balaclavas", "first-aid-kits" }),
+            ("Tools & Blades", new[] { "tactical-knives", "multi-tools-leatherman-tools", "tactical-baton", "entrenching-tools", "military-folding-shovel" }),
+            ("Optics & Comms", new[] { "optics-binoculars", "tactical-flashlights", "tactical-compass" }),
+            ("Carry & Storage", new[] { "holsters", "magazines", "weapon-cases", "tool-bags", "weapon-cleaning-kits" }),
+            ("Field Essentials", new[] { "morale-patches", "national-service-gear", "towels-towelettes", "camouflage-tape", "military-canteen" })
+        }
+    };
+
+    List<(string Header, List<Subcategory> Items)> BuildMegaColumns(Category category)
+    {
+        var spec = megaMenuColumnsBySlug.GetValueOrDefault(category.Slug) ?? Array.Empty<(string Header, string[] Slugs)>();
+        var bySlug = category.Subcategories.ToDictionary(s => s.Slug);
+        var used = new HashSet<int>();
+        var columns = new List<(string, List<Subcategory>)>();
+        foreach (var (header, slugs) in spec)
+        {
+            var items = new List<Subcategory>();
+            foreach (var slug in slugs)
+            {
+                if (bySlug.TryGetValue(slug, out var sub))
+                {
+                    items.Add(sub);
+                    used.Add(sub.Id);
+                }
+            }
+            if (items.Count > 0)
+            {
+                columns.Add((header, items));
+            }
+        }
+        var leftovers = category.Subcategories.Where(s => !used.Contains(s.Id)).ToList();
+        if (leftovers.Count > 0)
+        {
+            columns.Add(("More", leftovers));
+        }
+        return columns;
+    }
+
     var categoryPreviews = new Dictionary<int, List<Product>>();
     foreach (var navCategory in navCategories)
     {
@@ -225,36 +295,45 @@
                 var navLabel = navLabelBySlug.GetValueOrDefault(category.Slug, category.LocalizedName());
                 var promoCaption = megaMenuPromoCaptionBySlug.GetValueOrDefault(category.Slug, category.LocalizedName());
                 var promoHref = Url.Action("Index", "Products", new { categoryId = category.Id });
+                var megaColumns = BuildMegaColumns(category);
                 <div class="main-nav-item main-nav-dropdown">
                     <a class="main-nav-link @(isCategoryActive ? "active" : "")" asp-area="" asp-controller="Products" asp-action="Index" asp-route-categoryId="@category.Id">@navLabel <i class="bi bi-chevron-down"></i></a>
                     <div class="main-nav-dropdown-panel main-nav-dropdown-panel-mega">
-                        <div class="main-nav-mega-body">
-                            <div class="main-nav-mega-main">
+                        <div class="container main-nav-mega-inner">
+                            <div class="main-nav-mega-top">
                                 <a class="main-nav-mega-viewall" asp-area="" asp-controller="Products" asp-action="Index" asp-route-categoryId="@category.Id">@Localizer["View All {0}", navLabel]</a>
-                                <div class="main-nav-mega-subitems-grid">
-                                    @foreach (var subcategory in category.Subcategories)
+                            </div>
+                            <div class="main-nav-mega-body">
+                                <div class="main-nav-mega-columns">
+                                    @foreach (var column in megaColumns)
                                     {
-                                        var subImage = string.IsNullOrWhiteSpace(subcategory.ImageUrl) ? category.ImageUrl : subcategory.ImageUrl;
-                                        var subCaption = subcategory.LocalizedDescription();
-                                        if (string.IsNullOrWhiteSpace(subCaption)) { subCaption = subcategory.LocalizedName(); }
-                                        var subHref = Url.Action("Index", "Products", new { categoryId = category.Id, subcategoryId = subcategory.Id });
-                                        <a class="main-nav-mega-subitem" asp-area="" asp-controller="Products" asp-action="Index" asp-route-categoryId="@category.Id" asp-route-subcategoryId="@subcategory.Id"
-                                           data-promo-image="@subImage"
-                                           data-promo-caption="@subCaption"
-                                           data-promo-cta-text="@Localizer["Shop {0}", subcategory.LocalizedName()]"
-                                           data-promo-cta-href="@subHref">@subcategory.LocalizedName()</a>
+                                        <div class="main-nav-mega-column">
+                                            <h6 class="main-nav-mega-column-header">@column.Header</h6>
+                                            @foreach (var subcategory in column.Items)
+                                            {
+                                                var subImage = string.IsNullOrWhiteSpace(subcategory.ImageUrl) ? category.ImageUrl : subcategory.ImageUrl;
+                                                var subCaption = subcategory.LocalizedDescription();
+                                                if (string.IsNullOrWhiteSpace(subCaption)) { subCaption = subcategory.LocalizedName(); }
+                                                var subHref = Url.Action("Index", "Products", new { categoryId = category.Id, subcategoryId = subcategory.Id });
+                                                <a class="main-nav-mega-subitem" asp-area="" asp-controller="Products" asp-action="Index" asp-route-categoryId="@category.Id" asp-route-subcategoryId="@subcategory.Id"
+                                                   data-promo-image="@subImage"
+                                                   data-promo-caption="@subCaption"
+                                                   data-promo-cta-text="@Localizer["Shop {0}", subcategory.LocalizedName()]"
+                                                   data-promo-cta-href="@subHref">@subcategory.LocalizedName()</a>
+                                            }
+                                        </div>
                                     }
                                 </div>
-                            </div>
-                            <div class="main-nav-mega-promo">
-                                <div class="main-nav-mega-promo-image-stack">
-                                    <img class="js-mega-promo-image active" src="@category.ImageUrl" alt="" />
-                                    <img class="js-mega-promo-image" src="@category.ImageUrl" alt="" />
+                                <div class="main-nav-mega-promo">
+                                    <div class="main-nav-mega-promo-image-stack">
+                                        <img class="js-mega-promo-image active" src="@category.ImageUrl" alt="" />
+                                        <img class="js-mega-promo-image" src="@category.ImageUrl" alt="" />
+                                    </div>
+                                    <p class="js-mega-promo-caption">@promoCaption</p>
+                                    <a class="main-nav-mega-promo-cta js-mega-promo-cta" href="@promoHref">
+                                        <span class="js-mega-promo-cta-text">@Localizer["Shop {0}", navLabel]</span>
+                                    </a>
                                 </div>
-                                <p class="js-mega-promo-caption">@promoCaption</p>
-                                <a class="main-nav-mega-promo-cta js-mega-promo-cta" href="@promoHref">
-                                    <span class="js-mega-promo-cta-text">@Localizer["Shop {0}", navLabel]</span>
-                                </a>
                             </div>
                         </div>
                     </div>
@@ -269,6 +348,7 @@
             <a class="main-nav-link main-nav-link-sale" asp-area="" asp-controller="Products" asp-action="Sales">@Localizer["Special Sales"]</a>
         </div>
     </nav>
+    <div class="main-nav-mega-overlay" id="mainNavMegaOverlay"></div>
     </div>
 
     <div class="side-nav-overlay" id="sideNavOverlay"></div>
@@ -287,26 +367,48 @@
             @foreach (var category in navCategories)
             {
                 var previewProducts = categoryPreviews.TryGetValue(category.Id, out var cp) ? cp : new List<Product>();
+                var sideNavColumns = BuildMegaColumns(category);
+                var hasSideNavPanel = previewProducts.Count > 0 || sideNavColumns.Count > 0;
                 <div class="side-nav-item">
                     <a class="side-nav-link" asp-area="" asp-controller="Products" asp-action="Index" asp-route-categoryId="@category.Id">@category.LocalizedName()</a>
-                    @if (previewProducts.Count > 0)
+                    @if (hasSideNavPanel)
                     {
-                        <button type="button" class="side-nav-preview-toggle" aria-label="@Localizer["Preview {0} products", category.LocalizedName()]" aria-expanded="false">
+                        <button type="button" class="side-nav-preview-toggle" aria-label="@Localizer["Browse {0}", category.LocalizedName()]" aria-expanded="false">
                             <i class="bi bi-chevron-down"></i>
                         </button>
                         <div class="category-preview-panel">
-                            <div class="category-preview-row">
-                                @foreach (var product in previewProducts)
-                                {
-                                    <a class="category-preview-card" asp-area="" asp-controller="Products" asp-action="Details" asp-route-slug="@product.Slug">
-                                        <span class="category-preview-image-wrap">
-                                            <img src="@product.ImageUrl" alt="@product.LocalizedName()" />
-                                        </span>
-                                        <span class="category-preview-name">@product.LocalizedName()</span>
-                                        <span class="category-preview-price">@product.Price.ToDisplayCurrency()</span>
-                                    </a>
-                                }
-                            </div>
+                            @if (sideNavColumns.Count > 0)
+                            {
+                                <div class="side-nav-subgroups">
+                                    @foreach (var column in sideNavColumns)
+                                    {
+                                        <div class="side-nav-subgroup">
+                                            <span class="side-nav-subgroup-header">@column.Header</span>
+                                            <div class="side-nav-subgroup-links">
+                                                @foreach (var subcategory in column.Items)
+                                                {
+                                                    <a asp-area="" asp-controller="Products" asp-action="Index" asp-route-categoryId="@category.Id" asp-route-subcategoryId="@subcategory.Id">@subcategory.LocalizedName()</a>
+                                                }
+                                            </div>
+                                        </div>
+                                    }
+                                </div>
+                            }
+                            @if (previewProducts.Count > 0)
+                            {
+                                <div class="category-preview-row">
+                                    @foreach (var product in previewProducts)
+                                    {
+                                        <a class="category-preview-card" asp-area="" asp-controller="Products" asp-action="Details" asp-route-slug="@product.Slug">
+                                            <span class="category-preview-image-wrap">
+                                                <img src="@product.ImageUrl" alt="@product.LocalizedName()" />
+                                            </span>
+                                            <span class="category-preview-name">@product.LocalizedName()</span>
+                                            <span class="category-preview-price">@product.Price.ToDisplayCurrency()</span>
+                                        </a>
+                                    }
+                                </div>
+                            }
                             <a class="category-preview-viewall" asp-area="" asp-controller="Products" asp-action="Index" asp-route-categoryId="@category.Id">
                                 @Localizer["View all in {0}", category.LocalizedName()] <i class="bi bi-arrow-right"></i>
                             </a>

@@ -200,6 +200,7 @@ a:hover {
 /* Secondary black nav bar under the header — desktop only; the mobile side-nav drawer
    already covers category browsing on small screens. */
 .main-nav {
+  position: relative;
   background-color: var(--wlm-forest-dark);
 }
 
@@ -296,7 +297,7 @@ a:hover {
 }
 
 .main-nav-dropdown {
-  position: relative;
+  position: static;
 }
 
 .main-nav-dropdown-panel {
@@ -337,32 +338,58 @@ a:hover {
   background: var(--wlm-sand-light);
 }
 
-/* Mega-menu variant of the dropdown panel — black/gold, one per top-level category nav item.
-   Each panel shows only its own category's subcategories (2-column grid) plus a promo image, so
-   it's much narrower than the old combined "Shop" panel that laid out all 5 categories side by
-   side. Gear & Accessories alone still has ~29 subcategories, so the panel keeps its own
-   max-height + scrollbar as a safety net regardless of category size. */
+/* Full-width mega-menu variant — a "curtain" that drops down covering the full viewport width,
+   anchored to .main-nav (position: relative) rather than to the individual trigger, so it's the
+   same width no matter which category opened it. .main-nav-dropdown itself is position: static
+   for this reason (see above). A CSS @keyframes animation (not a transition) plays each time
+   `display` flips to `block`, since transitions can't animate a display:none -> block change. */
 .main-nav-dropdown-panel-mega {
-  min-width: 560px;
-  max-width: min(760px, 92vw);
-  max-height: min(75vh, 640px);
-  overflow-y: auto;
-  padding: 22px;
+  left: 0;
+  right: 0;
+  margin-top: 0;
+  top: 100%;
+  border-radius: 0;
+  padding: 0;
   background: var(--wlm-forest-dark);
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.35);
+  animation: mainNavMegaCurtain 0.22s ease;
+}
+
+@keyframes mainNavMegaCurtain {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.main-nav-mega-inner {
+  max-height: min(82vh, 720px);
+  overflow-y: auto;
+  padding: 26px 0 30px;
   scrollbar-color: var(--wlm-sand) var(--wlm-forest-mid);
 }
 
-.main-nav-dropdown-panel-mega::-webkit-scrollbar {
+.main-nav-mega-inner::-webkit-scrollbar {
   width: 8px;
 }
 
-.main-nav-dropdown-panel-mega::-webkit-scrollbar-track {
+.main-nav-mega-inner::-webkit-scrollbar-track {
   background: var(--wlm-forest-mid);
 }
 
-.main-nav-dropdown-panel-mega::-webkit-scrollbar-thumb {
+.main-nav-mega-inner::-webkit-scrollbar-thumb {
   background: var(--wlm-sand);
   border-radius: 4px;
+}
+
+.main-nav-mega-top {
+  padding-bottom: 14px;
+  margin-bottom: 20px;
+  border-bottom: 2px solid rgba(255, 255, 255, 0.15);
 }
 
 .main-nav-mega-viewall {
@@ -373,14 +400,13 @@ a:hover {
   letter-spacing: 0.03em;
   font-size: 0.95rem;
   color: var(--wlm-sand) !important;
-  padding-bottom: 12px;
-  margin-bottom: 16px;
-  border-bottom: 2px solid rgba(255, 255, 255, 0.15);
+  padding: 0 !important;
 }
 
 .main-nav-mega-subitem {
-  padding: 5px 4px !important;
+  padding: 6px 4px !important;
   color: rgba(255, 255, 255, 0.85) !important;
+  font-size: 0.88rem;
 }
 
 .main-nav-mega-subitem:hover {
@@ -390,21 +416,36 @@ a:hover {
 
 .main-nav-mega-body {
   display: flex;
-  gap: 24px;
+  gap: 36px;
 }
 
-.main-nav-mega-main {
+/* One column per group (Tops/Bottoms/etc. — see BuildMegaColumns in _Layout.cshtml). auto-fit +
+   minmax lets the grid reflow to fewer columns per row on narrower desktop/tablet widths without
+   any extra breakpoint rules, and to more on wide monitors; Gear & Accessories alone renders 6. */
+.main-nav-mega-columns {
   flex: 1 1 0;
   min-width: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 20px 24px;
+  align-content: start;
 }
 
-/* Each category's subcategories in a responsive 2-column grid — Gear & Accessories alone has
-   ~29 items, so a single column would run very tall; the panel's existing max-height + scroll
-   (see .main-nav-dropdown-panel-mega above) still applies as a safety net either way. */
-.main-nav-mega-subitems-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(140px, 1fr));
-  gap: 2px 16px;
+.main-nav-mega-column {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.main-nav-mega-column-header {
+  font-family: var(--font-heading);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-size: 0.75rem;
+  color: var(--wlm-sand);
+  opacity: 0.75;
+  margin: 0 0 8px;
 }
 
 /* Promo image/caption/CTA for the category the panel belongs to. Swaps per hovered/focused
@@ -413,9 +454,9 @@ a:hover {
 .main-nav-mega-promo {
   display: flex;
   flex-direction: column;
-  flex: 0 0 200px;
+  flex: 0 0 220px;
   border-inline-start: 1px solid rgba(255, 255, 255, 0.15);
-  padding-inline-start: 20px;
+  padding-inline-start: 24px;
 }
 
 /* Two stacked <img> layers crossfade between each other (site.js toggles which has .active) —
@@ -471,16 +512,36 @@ a:hover {
   background: white !important;
 }
 
-/* Nav items further right in the row (Gear & Accessories, Outdoor Equipment) would push a
-   left-anchored panel past the right edge of the viewport, so the last two of the five category
-   dropdowns open right-aligned (growing left from the trigger) instead. */
-.main-nav-item.main-nav-dropdown:nth-last-of-type(-n+2) .main-nav-dropdown-panel {
-  left: auto;
+/* Dims the page content below the curtain menu while any category dropdown is open, similar in
+   spirit to .side-nav-overlay. Lives as the last child of .site-header-sticky (see
+   _Layout.cshtml), right after <nav class="main-nav">, so "top: 100%" resolves against that
+   sticky wrapper's own box — which ends exactly at the nav bar's bottom edge since nav is its
+   last child — placing the overlay right below the header/topbar without covering them, then
+   extending a full viewport height down. Toggled by main-nav-dropdown.js alongside .open. */
+.main-nav-mega-overlay {
+  position: absolute;
+  top: 100%;
+  left: 0;
   right: 0;
+  height: 100vh;
+  background: rgba(10, 10, 10, 0.45);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+  z-index: 55;
+}
+
+.main-nav-mega-overlay.open {
+  opacity: 1;
+  pointer-events: auto;
 }
 
 @media (max-width: 767.98px) {
   .main-nav {
+    display: none;
+  }
+
+  .main-nav-mega-overlay {
     display: none;
   }
 }
@@ -1146,8 +1207,57 @@ a:hover {
   transition: max-height 0.35s ease;
 }
 
+/* Tall enough for a category's subcategory groups (up to 6 for Gear & Accessories) plus the
+   product-preview row below them; overflow-y handles anything still taller than that on short
+   phone viewports rather than pushing the rest of the drawer off-screen. */
 .side-nav-item.preview-open .category-preview-panel {
-  max-height: 280px;
+  max-height: min(70vh, 620px);
+  overflow-y: auto;
+}
+
+/* Mobile accordion equivalent of the desktop mega-menu's column groups — same headers/grouping
+   (BuildMegaColumns in _Layout.cshtml), stacked instead of laid out side by side since the drawer
+   is much narrower than the full-width curtain. */
+.side-nav-subgroups {
+  padding: 14px 22px 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.side-nav-subgroup-header {
+  display: block;
+  font-family: var(--font-heading);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-size: 0.72rem;
+  color: var(--wlm-sand);
+  opacity: 0.75;
+  margin-bottom: 6px;
+}
+
+.side-nav-subgroup-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+}
+
+.side-nav-subgroup-links a {
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--wlm-sand-light);
+  font-family: var(--font-body);
+  text-transform: none;
+  letter-spacing: normal;
+  font-size: 0.82rem;
+  font-weight: 400;
+}
+
+.side-nav-subgroup-links a:hover {
+  background: var(--wlm-sand);
+  color: var(--wlm-forest-dark);
 }
 
 .category-preview-row {

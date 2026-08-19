@@ -14,6 +14,11 @@
         return;
     }
 
+    // Dims the page below the full-width curtain panel while any dropdown is open (see
+    // .main-nav-mega-overlay in site.css) — mirrors the .side-nav-overlay pattern used by the
+    // mobile drawer. Optional: older markup without the overlay element still works fine.
+    var overlay = document.getElementById("mainNavMegaOverlay");
+
     var CLOSE_DELAY_MS = 200;
     var closeTimer = null;
 
@@ -27,6 +32,9 @@
                 document.activeElement.blur();
             }
         });
+        if (overlay) {
+            overlay.classList.remove("open");
+        }
     }
 
     function scheduleClose() {
@@ -39,6 +47,9 @@
         dropdowns.forEach(function (d) {
             d.classList.toggle("open", d === dropdown);
         });
+        if (overlay) {
+            overlay.classList.add("open");
+        }
     }
 
     dropdowns.forEach(function (dropdown) {
@@ -47,6 +58,11 @@
         });
         dropdown.addEventListener("mouseleave", scheduleClose);
     });
+
+    if (overlay) {
+        overlay.addEventListener("click", closeAll);
+        overlay.addEventListener("mouseenter", scheduleClose);
+    }
 
     document.addEventListener("click", function (e) {
         if (!e.target.closest(".main-nav-dropdown")) {
