@@ -130,7 +130,7 @@
     var quickFilterSlugs = tShirtFamilySlugs.Concat(pantsFamilySlugs).ToArray();
 
     var quickFilterProducts = await DbContext.Products
-        .Where(p => p.Subcategory != null && quickFilterSlugs.Contains(p.Subcategory.Slug))
+        .Where(p => p.IsPublished && p.Subcategory != null && quickFilterSlugs.Contains(p.Subcategory.Slug))
         .Include(p => p.Subcategory)
         .Include(p => p.Brand)
         .Include(p => p.AttributeValues.Where(a => a.Active)).ThenInclude(a => a.AttributeDefinition)
@@ -186,7 +186,7 @@
     foreach (var navCategory in navCategories)
     {
         categoryPreviews[navCategory.Id] = await DbContext.Products
-            .Where(p => p.CategoryId == navCategory.Id && p.StockQuantity > 0)
+            .Where(p => p.IsPublished && p.CategoryId == navCategory.Id && p.StockQuantity > 0)
             .OrderByDescending(p => p.IsFeatured)
             .ThenByDescending(p => p.Id)
             .Take(4)
