@@ -414,6 +414,39 @@ a:hover {
   color: var(--wlm-forest-dark) !important;
 }
 
+/* Brand/attribute quick-filter chips under a subcategory link (e.g. under "T-Shirts": Sentinel ·
+   Talon · Crew Neck · Short Sleeve) — see BuildQuickFilters in _Layout.cshtml. Only rendered when
+   real values exist for that subcategory, so this silently stays empty until data is populated. */
+.main-nav-mega-subfilters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 6px;
+  padding: 0 4px 8px;
+}
+
+.main-nav-mega-subfilter-chip {
+  padding: 2px 9px !important;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08) !important;
+  color: rgba(255, 255, 255, 0.6) !important;
+  font-size: 0.72rem !important;
+  text-transform: none;
+  letter-spacing: normal;
+}
+
+.main-nav-mega-subfilter-chip:hover {
+  background: var(--wlm-sand) !important;
+  color: var(--wlm-forest-dark) !important;
+}
+
+/* Brand chips get a touch more visual weight than spec chips (neck type, sleeve length, ...) so a
+   dense row still reads as two distinct kinds of information at a glance. */
+.main-nav-mega-subfilter-chip-brand {
+  background: rgba(255, 255, 255, 0.14) !important;
+  color: rgba(255, 255, 255, 0.85) !important;
+  font-weight: 600;
+}
+
 .main-nav-mega-body {
   display: flex;
   gap: 36px;
@@ -1258,6 +1291,29 @@ a:hover {
 .side-nav-subgroup-links a:hover {
   background: var(--wlm-sand);
   color: var(--wlm-forest-dark);
+}
+
+/* Brand/attribute quick-filter chip (Sentinel, Crew Neck, Short Sleeve, ...) sitting right after
+   its subcategory's own pill in the same wrapping row — deliberately smaller/dimmer so the
+   subcategory itself still reads as the primary link. Only rendered when real values exist. */
+.side-nav-subfilter-chip {
+  padding: 3px 9px !important;
+  background: transparent !important;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  color: rgba(255, 255, 255, 0.55) !important;
+  font-size: 0.72rem !important;
+}
+
+.side-nav-subfilter-chip:hover {
+  background: var(--wlm-sand) !important;
+  border-color: var(--wlm-sand);
+  color: var(--wlm-forest-dark) !important;
+}
+
+.side-nav-subfilter-chip-brand {
+  border-color: rgba(255, 255, 255, 0.4);
+  color: rgba(255, 255, 255, 0.8) !important;
+  font-weight: 600;
 }
 
 .category-preview-row {

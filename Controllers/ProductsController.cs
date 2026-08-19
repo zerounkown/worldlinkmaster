@@ -32,6 +32,7 @@ public class ProductsController : Controller
         string[]? colors,
         string[]? sizes,
         int[]? featureIds,
+        string[]? attr,
         string[]? availability,
         int? minRating,
         string? search, decimal? minPrice, decimal? maxPrice, string? sort, int page = 1)
@@ -54,6 +55,16 @@ public class ProductsController : Controller
         var selectedSizes = (sizes ?? Array.Empty<string>()).ToList();
         var selectedFeatureIds = (featureIds ?? Array.Empty<int>()).ToList();
         var selectedAvailability = (availability ?? Array.Empty<string>()).ToList();
+
+        // Generic attribute filter (mega-menu quick filters — neck type, sleeve length, pants
+        // type, etc.): each entry is "Code:Value", e.g. "NECK_TYPE:Crew Neck". Grouped by code so
+        // multiple values for the same attribute OR together, same as every other facet dimension.
+        var selectedAttributeFilters = (attr ?? Array.Empty<string>())
+            .Select(a => a.Split(':', 2))
+            .Where(parts => parts.Length == 2 && !string.IsNullOrWhiteSpace(parts[0]) && !string.IsNullOrWhiteSpace(parts[1]))
+            .Select(parts => (Code: parts[0], Value: parts[1]))
+            .GroupBy(f => f.Code)
+            .ToDictionary(g => g.Key, g => g.Select(f => f.Value).ToList());
 
         var baseQuery = _context.Products
             .Include(p => p.Category)
@@ -113,6 +124,11 @@ public class ProductsController : Controller
             if (!skipFeature && selectedFeatureIds.Count > 0)
             {
                 q = q.Where(p => p.Features.Any(f => selectedFeatureIds.Contains(f.Id)));
+            }
+
+            foreach (var (code, values) in selectedAttributeFilters)
+            {
+                q = q.Where(p => p.AttributeValues.Any(av => av.Active && av.AttributeDefinition!.Code == code && values.Contains(av.ValueEn)));
             }
 
             // Min/max are typed in whichever currency the shopper is currently viewing the

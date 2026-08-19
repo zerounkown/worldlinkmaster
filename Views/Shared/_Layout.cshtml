@@ -120,6 +120,68 @@
         return columns;
     }
 
+    // Mega-menu sub-filter chips (brand / neck type / sleeve length / pants type) — one query for
+    // every subcategory that carries them, grouped in memory below, rather than a query per
+    // subcategory. Reads whatever real values exist; with none seeded yet (see
+    // Scripts/MockApparelAttributeSeeder.cs) every group below comes back empty and no chips
+    // render at all — this is intentionally safe to ship before real data exists.
+    var tShirtFamilySlugs = new HashSet<string> { "t-shirts", "combat-shirts", "combat-shirt", "short-sleeve-t-shirt", "long-sleeve-t-shirt", "short-sleeve-crew-neck-t-shirt", "long-sleeve-crew-neck-t-shirt" };
+    var pantsFamilySlugs = new HashSet<string> { "tactical-pants", "tactical-shorts", "tactical-trousers" };
+    var quickFilterSlugs = tShirtFamilySlugs.Concat(pantsFamilySlugs).ToArray();
+
+    var quickFilterProducts = await DbContext.Products
+        .Where(p => p.Subcategory != null && quickFilterSlugs.Contains(p.Subcategory.Slug))
+        .Include(p => p.Subcategory)
+        .Include(p => p.Brand)
+        .Include(p => p.AttributeValues.Where(a => a.Active)).ThenInclude(a => a.AttributeDefinition)
+        .AsSplitQuery()
+        .ToListAsync();
+
+    const int QuickFilterCapPerGroup = 3;
+
+    var quickFiltersBySubSlug = quickFilterProducts
+        .GroupBy(p => p.Subcategory!.Slug)
+        .ToDictionary(g => g.Key, g => new
+        {
+            Brands = g.Where(p => p.Brand != null).Select(p => p.Brand!).DistinctBy(b => b.Id).OrderBy(b => b.Name).Take(QuickFilterCapPerGroup).ToList(),
+            NeckTypes = g.SelectMany(p => p.AttributeValues.Where(a => a.AttributeDefinition?.Code == "NECK_TYPE")).Select(a => a.ValueEn).Distinct().OrderBy(v => v).Take(QuickFilterCapPerGroup).ToList(),
+            SleeveLengths = g.SelectMany(p => p.AttributeValues.Where(a => a.AttributeDefinition?.Code == "SLEEVE_LENGTH")).Select(a => a.ValueEn).Distinct().OrderBy(v => v).Take(QuickFilterCapPerGroup).ToList(),
+            PantsTypes = g.SelectMany(p => p.AttributeValues.Where(a => a.AttributeDefinition?.Code == "PANTS_TYPE")).Select(a => a.ValueEn).Distinct().OrderBy(v => v).Take(QuickFilterCapPerGroup).ToList()
+        });
+
+    // Renders as a flat (label, href, isBrand) list so the view doesn't need to know brand vs.
+    // attribute shape — brand chips route through the real brandIds facet, attribute chips
+    // through the generic attr=Code:Value one added to ProductsController.Index. IsBrand drives a
+    // small visual distinction (see .main-nav-mega-subfilter-chip-brand) so a dense row of chips
+    // still reads as "these are brands, these are specs" rather than one undifferentiated wall.
+    List<(string Label, string Href, bool IsBrand)> BuildQuickFilters(Category category, Subcategory subcategory)
+    {
+        var result = new List<(string, string, bool)>();
+        if (!quickFiltersBySubSlug.TryGetValue(subcategory.Slug, out var qf))
+        {
+            return result;
+        }
+
+        foreach (var brand in qf.Brands)
+        {
+            result.Add((brand.Name, Url.Action("Index", "Products", new { categoryId = category.Id, subcategoryId = subcategory.Id, brandIds = brand.Id })!, true));
+        }
+
+        void AddAttrChips(IEnumerable<string> values, string code)
+        {
+            foreach (var value in values)
+            {
+                result.Add((value, Url.Action("Index", "Products", new { categoryId = category.Id, subcategoryId = subcategory.Id, attr = $"{code}:{value}" })!, false));
+            }
+        }
+
+        AddAttrChips(qf.NeckTypes, "NECK_TYPE");
+        AddAttrChips(qf.SleeveLengths, "SLEEVE_LENGTH");
+        AddAttrChips(qf.PantsTypes, "PANTS_TYPE");
+
+        return result;
+    }
+
     var categoryPreviews = new Dictionary<int, List<Product>>();
     foreach (var navCategory in navCategories)
     {
@@ -315,11 +377,21 @@
                                                 var subCaption = subcategory.LocalizedDescription();
                                                 if (string.IsNullOrWhiteSpace(subCaption)) { subCaption = subcategory.LocalizedName(); }
                                                 var subHref = Url.Action("Index", "Products", new { categoryId = category.Id, subcategoryId = subcategory.Id });
+                                                var subQuickFilters = BuildQuickFilters(category, subcategory);
                                                 <a class="main-nav-mega-subitem" asp-area="" asp-controller="Products" asp-action="Index" asp-route-categoryId="@category.Id" asp-route-subcategoryId="@subcategory.Id"
                                                    data-promo-image="@subImage"
                                                    data-promo-caption="@subCaption"
                                                    data-promo-cta-text="@Localizer["Shop {0}", subcategory.LocalizedName()]"
                                                    data-promo-cta-href="@subHref">@subcategory.LocalizedName()</a>
+                                                @if (subQuickFilters.Count > 0)
+                                                {
+                                                    <div class="main-nav-mega-subfilters">
+                                                        @foreach (var chip in subQuickFilters)
+                                                        {
+                                                            <a class="main-nav-mega-subfilter-chip @(chip.IsBrand ? "main-nav-mega-subfilter-chip-brand" : "")" href="@chip.Href">@chip.Label</a>
+                                                        }
+                                                    </div>
+                                                }
                                             }
                                         </div>
                                     }
@@ -388,6 +460,10 @@
                                                 @foreach (var subcategory in column.Items)
                                                 {
                                                     <a asp-area="" asp-controller="Products" asp-action="Index" asp-route-categoryId="@category.Id" asp-route-subcategoryId="@subcategory.Id">@subcategory.LocalizedName()</a>
+                                                    @foreach (var chip in BuildQuickFilters(category, subcategory))
+                                                    {
+                                                        <a class="side-nav-subfilter-chip @(chip.IsBrand ? "side-nav-subfilter-chip-brand" : "")" href="@chip.Href">@chip.Label</a>
+                                                    }
                                                 }
                                             </div>
                                         </div>
