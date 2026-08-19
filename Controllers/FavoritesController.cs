@@ -32,6 +32,9 @@ public class FavoritesController : Controller
             .Include(f => f.Product!).ThenInclude(p => p.Variants).ThenInclude(v => v.Color)
             .Include(f => f.Product!).ThenInclude(p => p.Variants).ThenInclude(v => v.Size)
             .Include(f => f.Product!).ThenInclude(p => p.Variants).ThenInclude(v => v.ProductColor)
+            .Include(f => f.Product!).ThenInclude(p => p.ProductColors.Where(pc => pc.Active).OrderBy(pc => pc.DisplayOrder))
+            .Include(f => f.Product!).ThenInclude(p => p.Media.Where(m => m.Active).OrderBy(m => m.DisplayOrder))
+            .AsSplitQuery()
             .Select(f => f.Product!)
             .ToListAsync();
 
