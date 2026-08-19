@@ -62,6 +62,9 @@ public class ProductsController : Controller
             .Include(p => p.Variants).ThenInclude(v => v.Size)
             .Include(p => p.Variants).ThenInclude(v => v.ProductColor)
             .Include(p => p.Features)
+            .Include(p => p.ProductColors.Where(pc => pc.Active).OrderBy(pc => pc.DisplayOrder))
+            .Include(p => p.Media.Where(m => m.Active).OrderBy(m => m.DisplayOrder))
+            .AsSplitQuery()
             .AsQueryable();
 
         if (categoryId.HasValue)
@@ -282,6 +285,9 @@ public class ProductsController : Controller
             .Include(p => p.Variants).ThenInclude(v => v.Color)
             .Include(p => p.Variants).ThenInclude(v => v.Size)
             .Include(p => p.Variants).ThenInclude(v => v.ProductColor)
+            .Include(p => p.ProductColors.Where(pc => pc.Active).OrderBy(pc => pc.DisplayOrder))
+            .Include(p => p.Media.Where(m => m.Active).OrderBy(m => m.DisplayOrder))
+            .AsSplitQuery()
             .OrderByDescending(p => p.CreatedAt)
             .Take(6)
             .ToListAsync();
@@ -291,6 +297,9 @@ public class ProductsController : Controller
             .Include(p => p.Variants).ThenInclude(v => v.Color)
             .Include(p => p.Variants).ThenInclude(v => v.Size)
             .Include(p => p.Variants).ThenInclude(v => v.ProductColor)
+            .Include(p => p.ProductColors.Where(pc => pc.Active).OrderBy(pc => pc.DisplayOrder))
+            .Include(p => p.Media.Where(m => m.Active).OrderBy(m => m.DisplayOrder))
+            .AsSplitQuery()
             .Where(p => p.IsFeatured)
             .OrderByDescending(p => p.Rating)
             .Take(6)
@@ -316,6 +325,9 @@ public class ProductsController : Controller
             .Include(p => p.Variants).ThenInclude(v => v.Color)
             .Include(p => p.Variants).ThenInclude(v => v.Size)
             .Include(p => p.Variants).ThenInclude(v => v.ProductColor)
+            .Include(p => p.ProductColors.Where(pc => pc.Active).OrderBy(pc => pc.DisplayOrder))
+            .Include(p => p.Media.Where(m => m.Active).OrderBy(m => m.DisplayOrder))
+            .AsSplitQuery()
             .Where(p => p.IsFeatured);
 
         var totalCount = await query.CountAsync();
@@ -364,6 +376,9 @@ public class ProductsController : Controller
             .Include(p => p.Variants).ThenInclude(v => v.Color)
             .Include(p => p.Variants).ThenInclude(v => v.Size)
             .Include(p => p.Variants).ThenInclude(v => v.ProductColor)
+            .Include(p => p.ProductColors.Where(pc => pc.Active).OrderBy(pc => pc.DisplayOrder))
+            .Include(p => p.Media.Where(m => m.Active).OrderBy(m => m.DisplayOrder))
+            .AsSplitQuery()
             .Where(p => p.CategoryId == product.CategoryId && p.Id != product.Id)
             .Take(4)
             .ToListAsync();

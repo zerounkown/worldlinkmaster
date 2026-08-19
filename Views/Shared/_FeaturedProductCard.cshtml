@@ -8,6 +8,7 @@
     var salePrice = activeEvent != null ? Model.Price * (1 - activeEvent.DiscountPercent / 100m) : (decimal?)null;
     var hasVariants = Model.Variants.Count > 0;
     var cardImageUrl = string.IsNullOrEmpty(Model.ImageUrl) ? ImagePlaceholder.DataUri : Model.ImageUrl;
+    var hoverImageUrl = Model.GetHoverImageUrl(cardImageUrl);
 
     // Same color-swatch data every card already carries for the quick-add modal — read-only dots
     // here, not interactive, just a visual "this comes in N colors" cue.
@@ -76,8 +77,12 @@
 }
 
 <div class="featured-product-card">
-    <a class="featured-product-card-media" asp-area="" asp-controller="Products" asp-action="Details" asp-route-slug="@Model.Slug">
-        <img src="@cardImageUrl" alt="@Model.LocalizedName()" />
+    <a class="featured-product-card-media @(hoverImageUrl != null ? "has-hover-image" : "")" asp-area="" asp-controller="Products" asp-action="Details" asp-route-slug="@Model.Slug">
+        <img src="@cardImageUrl" alt="@Model.LocalizedName()" class="card-product-image" />
+        @if (hoverImageUrl != null)
+        {
+            <img src="@hoverImageUrl" alt="" class="card-product-image card-product-image-hover" aria-hidden="true" loading="lazy" />
+        }
     </a>
     <div class="featured-product-card-body">
         @if (swatchColors.Count > 0)

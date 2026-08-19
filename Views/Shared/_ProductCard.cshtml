@@ -10,6 +10,7 @@
     var hasVariants = Model.Variants.Count > 0;
     var isFavorite = User.Identity?.IsAuthenticated == true && await FavoriteService.IsFavoriteAsync(Model.Id);
     var cardImageUrl = string.IsNullOrEmpty(Model.ImageUrl) ? ImagePlaceholder.DataUri : Model.ImageUrl;
+    var hoverImageUrl = Model.GetHoverImageUrl(cardImageUrl);
 
     string quickAddJson = "null";
     if (hasVariants)
@@ -94,8 +95,12 @@
                 <i class="bi bi-heart"></i>
             </a>
         }
-        <a class="product-card-tilt" asp-area="" asp-controller="Products" asp-action="Details" asp-route-slug="@Model.Slug">
+        <a class="product-card-tilt @(hoverImageUrl != null ? "has-hover-image" : "")" asp-area="" asp-controller="Products" asp-action="Details" asp-route-slug="@Model.Slug">
             <img src="@cardImageUrl" alt="@Model.LocalizedName()" class="card-product-image" data-default-image="@cardImageUrl" />
+            @if (hoverImageUrl != null)
+            {
+                <img src="@hoverImageUrl" alt="" class="card-product-image card-product-image-hover" aria-hidden="true" loading="lazy" />
+            }
         </a>
     </div>
     <div class="product-card-body">

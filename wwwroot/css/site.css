@@ -1991,6 +1991,7 @@ a:hover {
 }
 
 .featured-product-card-media {
+  position: relative;
   display: block;
   aspect-ratio: 1 / 1;
   overflow: hidden;
@@ -2795,6 +2796,29 @@ a:hover {
   object-position: center;
   display: block;
   transition: opacity 0.1s ease, transform 0.3s ease;
+}
+
+/* Second-image crossfade on hover (product-card grids, related products, featured products) —
+   only wired up when a product has a genuinely different image to swap to; see
+   ProductCardImageExtensions.GetHoverImageUrl. Guarded by (hover: hover) so touch devices, which
+   have no real hover state, always just show the default image. */
+.card-product-image-hover {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  transition: opacity 0.4s ease, transform 0.3s ease;
+}
+
+@media (hover: hover) {
+  .has-hover-image:hover .card-product-image-hover {
+    opacity: 1;
+  }
+
+  /* Featured Products cards have no existing zoom effect, so give products without a second
+     image the same subtle scale fallback the catalog grid's .product-card-tilt already has. */
+  .featured-product-card-media:not(.has-hover-image):hover .card-product-image {
+    transform: scale(1.05);
+  }
 }
 
 .featured-badge {
