@@ -22,6 +22,14 @@
   right: 0;
 }
 
+/* The full-width curtain mega-menu (.main-nav-dropdown-panel-mega) must stay edge-to-edge in
+   both directions, unlike the (now unused) narrow single-side dropdown the rule above targets —
+   same specificity, so source order after it is what makes this win. */
+.main-nav-dropdown-panel-mega {
+  left: 0;
+  right: 0;
+}
+
 .currency-switch-panel {
   right: auto;
   left: 0;
