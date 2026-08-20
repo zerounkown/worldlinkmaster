@@ -481,6 +481,26 @@ a:hover {
   margin: 0 0 8px;
 }
 
+/* Sub-label inside a curated mega-menu column (e.g. "Alpha Sizes" / "Waist Sizes" under the
+   Apparel dropdown's Shop by Size column — see BuildApparelMenuAsync in _Layout.cshtml). Sits one
+   step down from .main-nav-mega-column-header: same uppercase treatment, smaller and dimmer since
+   it's a sub-grouping rather than the column's own title. A later sub-header in the same column
+   gets breathing room from the group above it via margin-top. */
+.main-nav-mega-subgroup-header {
+  display: block;
+  font-family: var(--font-heading);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-size: 0.68rem;
+  color: rgba(255, 255, 255, 0.55);
+  margin: 10px 0 2px;
+}
+
+.main-nav-mega-subgroup-header:first-child {
+  margin-top: 0;
+}
+
 /* Promo image/caption/CTA for the category the panel belongs to. Swaps per hovered/focused
    subcategory (site.js) — starts out showing the category's own default image/caption so it's
    never empty on open, before any subitem has been hovered. */
@@ -1268,6 +1288,20 @@ a:hover {
   color: var(--wlm-sand);
   opacity: 0.75;
   margin-bottom: 6px;
+}
+
+/* Sub-label within an Apparel side-nav subgroup (e.g. "Alpha Sizes" / "Waist Sizes") — same role
+   as .main-nav-mega-subgroup-header's desktop counterpart, sized down for the mobile pill rows. */
+.side-nav-subgroup-subheader {
+  display: block;
+  width: 100%;
+  font-family: var(--font-heading);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-size: 0.65rem;
+  color: rgba(255, 255, 255, 0.55);
+  margin-bottom: 2px;
 }
 
 .side-nav-subgroup-links {

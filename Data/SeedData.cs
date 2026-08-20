@@ -26,6 +26,8 @@ public static class SeedData
         await SeedMissingVariantsAsync(context, colorCache, sizeCache);
         await SeedFeaturesAsync(context);
         await SeedInternalAttributeDefinitionsAsync(context);
+        await SeedApparelUseCaseAttributeDefinitionAsync(context);
+        await SeedApparelSubTypeAttributeDefinitionsAsync(context);
         await SeedPromoEventsAsync(context);
         await SeedPromoCouponsAsync(context);
         await SeedStoresAsync(context);
@@ -252,6 +254,62 @@ public static class SeedData
             Filterable = false
         });
         await context.SaveChangesAsync();
+    }
+
+    // Dictionary entry only — no product carries a USE-CASE value yet. The Apparel mega-menu's
+    // "Shop by Use" column (see BuildApparelMenuAsync in _Layout.cshtml) links through
+    // attr=USE-CASE:{value} for Military/Tactical/Security/Outdoor/Training/Casual Duty; those
+    // links resolve to zero products until a real Master Data/Product import assigns this
+    // attribute to products, same as NECK-TYPE/SLEEVE-LENGTH/PATTERN before their first import.
+    private static async Task SeedApparelUseCaseAttributeDefinitionAsync(ApplicationDbContext context)
+    {
+        if (await context.AttributeDefinitions.AnyAsync(a => a.Code == "USE-CASE"))
+        {
+            return;
+        }
+
+        context.AttributeDefinitions.Add(new AttributeDefinition
+        {
+            Code = "USE-CASE",
+            NameEn = "Use Case",
+            DataType = "text",
+            Filterable = true
+        });
+        await context.SaveChangesAsync();
+    }
+
+    // Dictionary entries only — no product carries a value yet. The Apparel mega-menu's expanded
+    // "Shop by Type" column (see BuildApparelMenuAsync in _Layout.cshtml) links Pants sub-types
+    // (Cargo/Combat/Chino) through PANTS-TYPE and Jacket sub-types (Bomber/Field Jacket/
+    // Windbreaker/Parka) through JACKET-TYPE. T-Shirt sub-types reuse the existing NECK-TYPE and
+    // SLEEVE-LENGTH attributes instead of a new one — Crew Neck/V-Neck/Polo Collar and Long/Short
+    // Sleeve are already exactly what those two attributes represent, and real product data
+    // already exists for most of those values. These two links resolve to zero products until a
+    // real Master Data/Product import assigns them, same as USE-CASE before its first import.
+    private static async Task SeedApparelSubTypeAttributeDefinitionsAsync(ApplicationDbContext context)
+    {
+        var codes = new[] { "PANTS-TYPE", "JACKET-TYPE" };
+        var existing = await context.AttributeDefinitions
+            .Where(a => codes.Contains(a.Code))
+            .Select(a => a.Code)
+            .ToListAsync();
+
+        var toAdd = codes.Except(existing).ToList();
+        foreach (var code in toAdd)
+        {
+            context.AttributeDefinitions.Add(new AttributeDefinition
+            {
+                Code = code,
+                NameEn = code == "PANTS-TYPE" ? "Pants Type" : "Jacket Type",
+                DataType = "text",
+                Filterable = true
+            });
+        }
+
+        if (toAdd.Count > 0)
+        {
+            await context.SaveChangesAsync();
+        }
     }
 
     // Seeds the two showrooms that used to be hardcoded in Views/Home/Locations.cshtml
