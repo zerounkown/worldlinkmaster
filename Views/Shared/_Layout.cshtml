@@ -203,16 +203,14 @@
     var isLocationsActive = currentController == "Home" && currentAction == "Locations";
     var isTradeProgramActive = currentController == "Wholesale";
 
-    // Apparel (tactical-apparel) mega-menu: a hand-curated 5-column panel (Featured / Shop by Type
-    // / Shop by Use / Shop by Size / Colors & Brands) that replaces the generic subcategory-driven
-    // BuildMegaColumns for this one category only — every other category keeps the automatic
-    // per-subcategory columns. Content came from an explicit spec cross-checked against real
-    // master-data codes; anything with no real code behind it (Combat Uniforms, Tactical Shirts,
-    // Polo Shirts, Hoodies & Sweatshirts, 3XL — none exist as a real subcategory/size) was dropped
-    // rather than invented. "Shop by Use" and the Featured column's Military/Tactical Apparel links
-    // route through the USE-CASE attribute (seeded as a dictionary entry only in SeedData.cs) — so
-    // those links resolve to zero products until a real Master Data/Product import assigns USE-CASE
-    // values, same as NECK-TYPE/SLEEVE-LENGTH/PATTERN before their first import.
+    // Apparel (tactical-apparel) mega-menu: a hand-curated 5-column panel (Featured / T-Shirts /
+    // Pants / Jackets & Outerwear / Uniforms & Shirts) matching a reference image exactly, that
+    // replaces the generic subcategory-driven BuildMegaColumns for this one category only — every
+    // other category keeps the automatic per-subcategory columns. Real subcategories are linked
+    // directly; everything else routes through an attribute filter (NECK-TYPE/SLEEVE-LENGTH reused
+    // as-is; PANTS-TYPE/JACKET-TYPE/UNIFORM-TYPE/MATERIAL/WATER_RES values seeded as dictionary
+    // entries only in SeedData.cs) — those links resolve to zero products until a real Master
+    // Data/Product import assigns them, same as USE-CASE before its first import.
     async Task<List<(string Header, List<(string? SubHeader, List<(string Label, string Href)> Items)> Groups)>> BuildApparelMenuAsync(Category apparelCategory)
     {
         var bySlug = apparelCategory.Subcategories.ToDictionary(s => s.Slug);
@@ -228,76 +226,102 @@
             ("Tactical Apparel", ProductsUrl(new { categoryId = apparelCategory.Id, attr = "USE-CASE:Tactical" }))
         });
 
-        // Combat Uniforms, Tactical Shirts, Polo Shirts, and Hoodies & Sweatshirts were dropped —
-        // no matching real subcategory exists for any of them.
-        var typeSlugs = new (string Label, string Slug)[]
-        {
-            ("Tactical Pants", "tactical-pants"),
-            ("Jackets & Outerwear", "tactical-jackets"),
-            ("T-Shirts", "t-shirts"),
-            ("Base Layers", "thermal-base-layers")
-        };
-        var shopByTypeParentItems = typeSlugs
-            .Where(t => bySlug.ContainsKey(t.Slug))
-            .Select(t => (t.Label, ProductsUrl(new { categoryId = apparelCategory.Id, subcategoryId = bySlug[t.Slug].Id })))
-            .ToList();
-
-        // T-Shirt sub-types reuse the existing NECK-TYPE/SLEEVE-LENGTH attributes rather than a new
-        // one — Crew Neck/V-Neck/Long Sleeve/Short Sleeve are exactly those attributes' own values,
-        // and "Polo" is exactly the real NECK-TYPE value "Polo Collar" already in use. Scoped to the
-        // whole T-shirt family (tShirtFamilySlugs, defined above) so e.g. "Crew Neck" isn't limited
-        // to just the generic "T-Shirts" subcategory. Crew Neck/Polo Collar/Mock Neck (Zip) do have
-        // real ProductAttributeValue rows today, but only on the 4 still-Draft products from the
-        // earlier import — so every one of these links returns zero results until either those
-        // products are published or a real import adds published products with these values.
+        // T-Shirts: reuses the existing NECK-TYPE/SLEEVE-LENGTH attributes rather than new ones —
+        // Round Neck/V-Neck/Polo/Long Sleeve are exactly those attributes' own values ("Round Neck"
+        // is the reference's label for the real value "Crew Neck"; "Polo" for "Polo Collar").
+        // "Performance" reuses the existing MATERIAL attribute instead of inventing a new one.
+        // Scoped to the whole T-shirt family (tShirtFamilySlugs, defined above), not just the
+        // generic "T-Shirts" subcategory.
         var tShirtFamilyIds = tShirtFamilySlugs.Where(s => bySlug.ContainsKey(s)).Select(s => bySlug[s].Id).ToArray();
-        var tShirtTypeItems = new (string Label, string Code, string Value)[]
+        var tShirts = OneGroup(new List<(string, string)>
         {
-            ("Crew Neck", "NECK-TYPE", "Crew Neck"),
-            ("V-Neck", "NECK-TYPE", "V-Neck"),
-            ("Polo", "NECK-TYPE", "Polo Collar"),
-            ("Long Sleeve", "SLEEVE-LENGTH", "Long Sleeve"),
-            ("Short Sleeve", "SLEEVE-LENGTH", "Short Sleeve")
-        }
-            .Select(t => (t.Label, ProductsUrl(new { categoryId = apparelCategory.Id, subcategoryIds = tShirtFamilyIds, attr = $"{t.Code}:{t.Value}" })))
-            .ToList();
+            ("View All", ProductsUrl(new { categoryId = apparelCategory.Id, subcategoryIds = tShirtFamilyIds })),
+            ("Polo Shirts", ProductsUrl(new { categoryId = apparelCategory.Id, subcategoryIds = tShirtFamilyIds, attr = "NECK-TYPE:Polo Collar" })),
+            ("Round Neck T-Shirts", ProductsUrl(new { categoryId = apparelCategory.Id, subcategoryIds = tShirtFamilyIds, attr = "NECK-TYPE:Crew Neck" })),
+            ("V-Neck T-Shirts", ProductsUrl(new { categoryId = apparelCategory.Id, subcategoryIds = tShirtFamilyIds, attr = "NECK-TYPE:V-Neck" })),
+            ("Long Sleeve T-Shirts", ProductsUrl(new { categoryId = apparelCategory.Id, subcategoryIds = tShirtFamilyIds, attr = "SLEEVE-LENGTH:Long Sleeve" })),
+            ("Performance T-Shirts", ProductsUrl(new { categoryId = apparelCategory.Id, subcategoryIds = tShirtFamilyIds, attr = "MATERIAL:Performance" }))
+        });
 
-        // Pants sub-types: Cargo/Combat/Chino are new PANTS-TYPE attribute values (zero results
-        // until imported). "Tactical Trousers" was NOT added as a fourth PANTS-TYPE value — it's
-        // already a real, distinct subcategory (id 57, alongside "Tactical Pants"), so it links
-        // straight there instead of duplicating that subcategory as a fake attribute value.
+        // Pants: Tactical Pants and Shorts link to their real subcategories (1 and 2). Cargo/Combat
+        // were already PANTS-TYPE values from an earlier round; BDU and Training are new values
+        // under that same attribute — all zero-result until a real import, same as each other.
         var pantsFamilyIds = pantsFamilySlugs.Where(s => bySlug.ContainsKey(s)).Select(s => bySlug[s].Id).ToArray();
-        var pantsTypeItems = new[] { "Cargo", "Combat", "Chino" }
-            .Select(v => (v, ProductsUrl(new { categoryId = apparelCategory.Id, subcategoryIds = pantsFamilyIds, attr = $"PANTS-TYPE:{v}" })))
-            .ToList();
-        if (bySlug.TryGetValue("tactical-trousers", out var tacticalTrousers))
+        var pantsItems = new List<(string, string)>
         {
-            pantsTypeItems.Add(("Tactical Trousers", ProductsUrl(new { categoryId = apparelCategory.Id, subcategoryId = tacticalTrousers.Id })));
+            ("View All", ProductsUrl(new { categoryId = apparelCategory.Id, subcategoryIds = pantsFamilyIds })),
+        };
+        if (bySlug.TryGetValue("tactical-pants", out var tacticalPantsSub))
+        {
+            pantsItems.Add(("Tactical Pants", ProductsUrl(new { categoryId = apparelCategory.Id, subcategoryId = tacticalPantsSub.Id })));
         }
-
-        // Jacket sub-types: all four (Bomber, Field Jacket, Windbreaker, Parka) are new JACKET-TYPE
-        // values — no existing subcategory or attribute covers any of them, unlike T-Shirts/Pants.
-        var jacketTypeItems = new List<(string, string)>();
-        if (bySlug.TryGetValue("tactical-jackets", out var tacticalJackets))
+        pantsItems.Add(("Cargo Pants", ProductsUrl(new { categoryId = apparelCategory.Id, subcategoryIds = pantsFamilyIds, attr = "PANTS-TYPE:Cargo" })));
+        pantsItems.Add(("Combat Pants", ProductsUrl(new { categoryId = apparelCategory.Id, subcategoryIds = pantsFamilyIds, attr = "PANTS-TYPE:Combat" })));
+        pantsItems.Add(("BDU Pants", ProductsUrl(new { categoryId = apparelCategory.Id, subcategoryIds = pantsFamilyIds, attr = "PANTS-TYPE:BDU" })));
+        pantsItems.Add(("Training Pants", ProductsUrl(new { categoryId = apparelCategory.Id, subcategoryIds = pantsFamilyIds, attr = "PANTS-TYPE:Training" })));
+        if (bySlug.TryGetValue("tactical-shorts", out var tacticalShortsSub))
         {
-            jacketTypeItems = new[] { "Bomber", "Field Jacket", "Windbreaker", "Parka" }
-                .Select(v => (v, ProductsUrl(new { categoryId = apparelCategory.Id, subcategoryId = tacticalJackets.Id, attr = $"JACKET-TYPE:{v}" })))
-                .ToList();
+            pantsItems.Add(("Shorts", ProductsUrl(new { categoryId = apparelCategory.Id, subcategoryId = tacticalShortsSub.Id })));
         }
+        var pants = OneGroup(pantsItems);
 
-        var shopByType = new List<(string? SubHeader, List<(string Label, string Href)> Items)>
+        // Jackets & Outerwear: "View All" and Base Layers link to their real subcategories.
+        // Softshell/Fleece/Field Jacket/Hoodies & Sweatshirts are JACKET-TYPE values (Field Jacket
+        // already existed from an earlier round); Waterproof deliberately uses the existing
+        // WATER_RES attribute instead — water resistance is its own real attribute, not really a
+        // "jacket type," and this way it'll also apply if water-resistance data ever lands on
+        // non-jacket products (bags, boots). None of these are scoped to the Tactical Jackets
+        // subcategory specifically (unlike T-Shirts/Pants, there's no equivalent multi-subcategory
+        // "jacket family" yet) — scoping to it now would wrongly exclude e.g. a future hoodie
+        // product that isn't filed under Tactical Jackets.
+        var jacketsItems = new List<(string, string)>();
+        if (bySlug.TryGetValue("tactical-jackets", out var tacticalJacketsSub))
         {
-            (null, shopByTypeParentItems),
-            ("T-Shirt Types", tShirtTypeItems),
-            ("Pants Types", pantsTypeItems),
-            ("Jacket Types", jacketTypeItems)
-        }.Where(g => g.Items.Count > 0).ToList();
+            jacketsItems.Add(("View All", ProductsUrl(new { categoryId = apparelCategory.Id, subcategoryId = tacticalJacketsSub.Id })));
+        }
+        jacketsItems.Add(("Softshell Jackets", ProductsUrl(new { categoryId = apparelCategory.Id, attr = "JACKET-TYPE:Softshell" })));
+        jacketsItems.Add(("Fleece Jackets", ProductsUrl(new { categoryId = apparelCategory.Id, attr = "JACKET-TYPE:Fleece" })));
+        jacketsItems.Add(("Waterproof Jackets", ProductsUrl(new { categoryId = apparelCategory.Id, attr = "WATER_RES:Waterproof" })));
+        jacketsItems.Add(("Field Jackets", ProductsUrl(new { categoryId = apparelCategory.Id, attr = "JACKET-TYPE:Field Jacket" })));
+        jacketsItems.Add(("Hoodies & Sweatshirts", ProductsUrl(new { categoryId = apparelCategory.Id, attr = "JACKET-TYPE:Hoodie & Sweatshirt" })));
+        if (bySlug.TryGetValue("thermal-base-layers", out var baseLayersSub))
+        {
+            jacketsItems.Add(("Base Layers", ProductsUrl(new { categoryId = apparelCategory.Id, subcategoryId = baseLayersSub.Id })));
+        }
+        var jackets = OneGroup(jacketsItems);
 
+        // Uniforms & Shirts: "Combat Shirts" is the only item with real subcategories behind it —
+        // both "Combat Shirt" (id 5) and "Combat Shirts" (id 58) exist as separate real
+        // subcategories, so it links to both rather than silently missing whichever one real
+        // products happen to be filed under. Everything else (Tactical Shirts, Field Shirts, Combat
+        // Uniforms, Uniform Sets) is a new UNIFORM-TYPE value — no real subcategory or attribute
+        // covers any of them today. "Outerwear" intentionally reuses the same Tactical Jackets link
+        // as this column's counterpart in Jackets & Outerwear, rather than inventing a separate
+        // concept for it.
+        var combatShirtIds = new[] { "combat-shirt", "combat-shirts" }.Where(s => bySlug.ContainsKey(s)).Select(s => bySlug[s].Id).ToArray();
+        var uniformsAndShirtsItems = new List<(string, string)>
+        {
+            ("View All", ProductsUrl(new { categoryId = apparelCategory.Id })),
+            ("Tactical Shirts", ProductsUrl(new { categoryId = apparelCategory.Id, attr = "UNIFORM-TYPE:Tactical Shirts" })),
+            ("Combat Shirts", ProductsUrl(new { categoryId = apparelCategory.Id, subcategoryIds = combatShirtIds })),
+            ("Field Shirts", ProductsUrl(new { categoryId = apparelCategory.Id, attr = "UNIFORM-TYPE:Field Shirts" })),
+            ("Combat Uniforms", ProductsUrl(new { categoryId = apparelCategory.Id, attr = "UNIFORM-TYPE:Combat Uniforms" })),
+            ("Uniform Sets", ProductsUrl(new { categoryId = apparelCategory.Id, attr = "UNIFORM-TYPE:Uniform Sets" }))
+        };
+        if (tacticalJacketsSub != null)
+        {
+            uniformsAndShirtsItems.Add(("Outerwear", ProductsUrl(new { categoryId = apparelCategory.Id, subcategoryId = tacticalJacketsSub.Id })));
+        }
+        var uniformsAndShirts = OneGroup(uniformsAndShirtsItems);
+
+        // Shop by Use: brought back alongside the 5 garment-type columns above, per the site
+        // owner's explicit request to keep both sets rather than choosing one. Same USE-CASE
+        // attribute as the Featured column's Military/Tactical Apparel links.
         var shopByUse = OneGroup(new[] { "Military", "Tactical", "Security", "Outdoor", "Training", "Casual Duty" }
             .Select(use => (use, ProductsUrl(new { categoryId = apparelCategory.Id, attr = $"USE-CASE:{use}" })))
             .ToList());
 
-        // 3XL was dropped — the real Alpha size group tops out at 2XL.
+        // Shop by Size — 3XL was dropped, the real Alpha size group tops out at 2XL.
         var shopBySize = new List<(string? SubHeader, List<(string Label, string Href)> Items)>
         {
             ("Alpha Sizes", new[] { "S", "M", "L", "XL", "2XL" }
@@ -325,10 +349,16 @@
                 .ToList())
         };
 
+        // Returned in a fixed order the caller relies on to split into two visual rows: the first
+        // 5 (garment-type browsing) render as row 1, the last 3 (attribute filtering) as row 2 —
+        // see the Take(5)/Skip(5) split in the desktop panel markup below.
         return new()
         {
             ("Featured", featured),
-            ("Shop by Type", shopByType),
+            ("T-Shirts", tShirts),
+            ("Pants", pants),
+            ("Jackets & Outerwear", jackets),
+            ("Uniforms & Shirts", uniformsAndShirts),
             ("Shop by Use", shopByUse),
             ("Shop by Size", shopBySize),
             ("Colors & Brands", colorsAndBrands)
@@ -499,29 +529,52 @@
                                 <a class="main-nav-mega-viewall" asp-area="" asp-controller="Products" asp-action="Index" asp-route-categoryId="@category.Id">@Localizer["View All {0}", navLabel]</a>
                             </div>
                             <div class="main-nav-mega-body">
-                                <div class="main-nav-mega-columns">
-                                    @if (isApparelCategory)
-                                    {
-                                        @foreach (var column in apparelMenuColumns)
-                                        {
-                                            <div class="main-nav-mega-column">
-                                                <h6 class="main-nav-mega-column-header">@column.Header</h6>
-                                                @foreach (var group in column.Groups)
-                                                {
-                                                    if (group.SubHeader != null)
+                                @if (isApparelCategory)
+                                {
+                                    <div class="main-nav-mega-columns-wrap">
+                                        <div class="main-nav-mega-columns">
+                                            @foreach (var column in apparelMenuColumns.Take(5))
+                                            {
+                                                <div class="main-nav-mega-column">
+                                                    <h6 class="main-nav-mega-column-header">@column.Header</h6>
+                                                    @foreach (var group in column.Groups)
                                                     {
-                                                        <span class="main-nav-mega-subgroup-header">@group.SubHeader</span>
+                                                        if (group.SubHeader != null)
+                                                        {
+                                                            <span class="main-nav-mega-subgroup-header">@group.SubHeader</span>
+                                                        }
+                                                        @foreach (var item in group.Items)
+                                                        {
+                                                            <a class="main-nav-mega-subitem" href="@item.Href">@item.Label</a>
+                                                        }
                                                     }
-                                                    @foreach (var item in group.Items)
+                                                </div>
+                                            }
+                                        </div>
+                                        <div class="main-nav-mega-columns main-nav-mega-columns-secondary">
+                                            @foreach (var column in apparelMenuColumns.Skip(5))
+                                            {
+                                                <div class="main-nav-mega-column">
+                                                    <h6 class="main-nav-mega-column-header">@column.Header</h6>
+                                                    @foreach (var group in column.Groups)
                                                     {
-                                                        <a class="main-nav-mega-subitem" href="@item.Href">@item.Label</a>
+                                                        if (group.SubHeader != null)
+                                                        {
+                                                            <span class="main-nav-mega-subgroup-header">@group.SubHeader</span>
+                                                        }
+                                                        @foreach (var item in group.Items)
+                                                        {
+                                                            <a class="main-nav-mega-subitem" href="@item.Href">@item.Label</a>
+                                                        }
                                                     }
-                                                }
-                                            </div>
-                                        }
-                                    }
-                                    else
-                                    {
+                                                </div>
+                                            }
+                                        </div>
+                                    </div>
+                                }
+                                else
+                                {
+                                    <div class="main-nav-mega-columns">
                                         @foreach (var column in megaColumns)
                                         {
                                             <div class="main-nav-mega-column">
@@ -550,8 +603,8 @@
                                                 }
                                             </div>
                                         }
-                                    }
-                                </div>
+                                    </div>
+                                }
                                 <div class="main-nav-mega-promo">
                                     <div class="main-nav-mega-promo-image-stack">
                                         <img class="js-mega-promo-image active" src="@category.ImageUrl" alt="" />

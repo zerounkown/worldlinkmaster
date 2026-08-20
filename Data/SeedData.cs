@@ -278,17 +278,23 @@ public static class SeedData
         await context.SaveChangesAsync();
     }
 
-    // Dictionary entries only — no product carries a value yet. The Apparel mega-menu's expanded
-    // "Shop by Type" column (see BuildApparelMenuAsync in _Layout.cshtml) links Pants sub-types
-    // (Cargo/Combat/Chino) through PANTS-TYPE and Jacket sub-types (Bomber/Field Jacket/
-    // Windbreaker/Parka) through JACKET-TYPE. T-Shirt sub-types reuse the existing NECK-TYPE and
-    // SLEEVE-LENGTH attributes instead of a new one — Crew Neck/V-Neck/Polo Collar and Long/Short
-    // Sleeve are already exactly what those two attributes represent, and real product data
-    // already exists for most of those values. These two links resolve to zero products until a
-    // real Master Data/Product import assigns them, same as USE-CASE before its first import.
+    // Dictionary entries only — no product carries a value yet. The Apparel mega-menu's Pants,
+    // Jackets & Outerwear, and Uniforms & Shirts columns (see BuildApparelMenuAsync in
+    // _Layout.cshtml) link their sub-type items through PANTS-TYPE, JACKET-TYPE, and UNIFORM-TYPE
+    // respectively. T-Shirt sub-types instead reuse the existing NECK-TYPE and SLEEVE-LENGTH
+    // attributes — Crew Neck/V-Neck/Polo Collar and Long Sleeve are already exactly what those two
+    // attributes represent, and real product data already exists for most of those values. These
+    // links resolve to zero products until a real Master Data/Product import assigns them, same as
+    // USE-CASE before its first import.
     private static async Task SeedApparelSubTypeAttributeDefinitionsAsync(ApplicationDbContext context)
     {
-        var codes = new[] { "PANTS-TYPE", "JACKET-TYPE" };
+        var codes = new[] { "PANTS-TYPE", "JACKET-TYPE", "UNIFORM-TYPE" };
+        var names = new Dictionary<string, string>
+        {
+            ["PANTS-TYPE"] = "Pants Type",
+            ["JACKET-TYPE"] = "Jacket Type",
+            ["UNIFORM-TYPE"] = "Uniform Type"
+        };
         var existing = await context.AttributeDefinitions
             .Where(a => codes.Contains(a.Code))
             .Select(a => a.Code)
@@ -300,7 +306,7 @@ public static class SeedData
             context.AttributeDefinitions.Add(new AttributeDefinition
             {
                 Code = code,
-                NameEn = code == "PANTS-TYPE" ? "Pants Type" : "Jacket Type",
+                NameEn = names[code],
                 DataType = "text",
                 Filterable = true
             });
