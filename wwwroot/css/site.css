@@ -479,6 +479,29 @@ a:hover {
   align-content: start;
 }
 
+/* Apparel-only: 8 columns (5 garment-type + 3 attribute-filter — see BuildApparelMenuAsync in
+   _Layout.cshtml) don't fit one row cleanly, so they're split into two stacked grids instead of
+   relying on the shared auto-fit grid to wrap unpredictably wherever it runs out of room. Each row
+   keeps its own auto-fit reflow (more columns per row on wide monitors, fewer on narrower desktop
+   widths), just grouped deliberately: row 1 is "browse by garment type," row 2 is "filter by
+   attribute," rather than an arbitrary 5/3 split forced by viewport width. */
+.main-nav-mega-columns-wrap {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+
+.main-nav-mega-columns-wrap .main-nav-mega-columns {
+  flex: 0 0 auto;
+}
+
+.main-nav-mega-columns-secondary {
+  padding-top: 20px;
+  border-top: 1px solid rgba(255, 255, 255, 0.14);
+}
+
 .main-nav-mega-column {
   min-width: 0;
   display: flex;
