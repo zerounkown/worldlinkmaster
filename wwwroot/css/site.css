@@ -253,6 +253,27 @@ a:hover {
   transform: scaleX(1);
 }
 
+/* Small gold diamond straddling the underline's midpoint, centered under the tab. A separate
+   ::before (not part of the ::after underline) so it can fade in/out independently — scaling it
+   with the underline's scaleX(0) would squash it instead of hiding it cleanly. */
+.main-nav-link::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: -2px;
+  width: 6px;
+  height: 6px;
+  background: var(--wlm-gold-bronze);
+  transform: translateX(-50%) rotate(45deg);
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.main-nav-link:hover::before,
+.main-nav-link.active::before {
+  opacity: 1;
+}
+
 /* "Special Sales" tab — a solid highlighted block filling the full height of the nav bar, same
    red used elsewhere on the site for sale badges/ribbons (.sale-badge, .sale-ribbon), rather than
    the thin gold-underline treatment every other nav item gets. The negative vertical margin
@@ -471,6 +492,7 @@ a:hover {
 }
 
 .main-nav-mega-column-header {
+  position: relative;
   font-family: var(--font-heading);
   font-weight: 600;
   text-transform: uppercase;
@@ -478,7 +500,32 @@ a:hover {
   font-size: 0.75rem;
   color: var(--wlm-sand);
   opacity: 0.75;
-  margin: 0 0 8px;
+  margin: 0 0 16px;
+  padding-bottom: 8px;
+}
+
+/* Gold underline + diamond marker, same motif as the active top-nav tab (.main-nav-link::after/
+   ::before) so the mega-menu column headers read as part of the same visual language. Always
+   visible here (not hover/active-gated like the nav tab's — a column header has no such state). */
+.main-nav-mega-column-header::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 2px;
+  background: var(--wlm-gold-bronze);
+}
+
+.main-nav-mega-column-header::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: -2px;
+  width: 6px;
+  height: 6px;
+  background: var(--wlm-gold-bronze);
+  transform: translateX(-50%) rotate(45deg);
 }
 
 /* Sub-label inside a curated mega-menu column (e.g. "Alpha Sizes" / "Waist Sizes" under the
@@ -1279,6 +1326,7 @@ a:hover {
 }
 
 .side-nav-subgroup-header {
+  position: relative;
   display: block;
   font-family: var(--font-heading);
   font-weight: 600;
@@ -1287,7 +1335,31 @@ a:hover {
   font-size: 0.72rem;
   color: var(--wlm-sand);
   opacity: 0.75;
-  margin-bottom: 6px;
+  margin-bottom: 14px;
+  padding-bottom: 8px;
+}
+
+/* Same gold underline + diamond motif as the desktop column header
+   (.main-nav-mega-column-header) and the active top-nav tab. */
+.side-nav-subgroup-header::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 2px;
+  background: var(--wlm-gold-bronze);
+}
+
+.side-nav-subgroup-header::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: -2px;
+  width: 6px;
+  height: 6px;
+  background: var(--wlm-gold-bronze);
+  transform: translateX(-50%) rotate(45deg);
 }
 
 /* Sub-label within an Apparel side-nav subgroup (e.g. "Alpha Sizes" / "Waist Sizes") — same role
