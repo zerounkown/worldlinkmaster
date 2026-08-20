@@ -2,9 +2,11 @@
 // for details on configuring this project to bundle and minify static web assets.
 
 // Best-selling product carousel: arrow buttons scroll the track by one card's
-// width at a time. Scroll direction is left as plain +/-step regardless of
-// language direction — modern browsers already reverse the scrollLeft axis to
-// match reading order under dir="rtl", so this works unmodified for Arabic too.
+// width at a time. Chromium/Firefox use the "negative" scrollLeft model for
+// dir="rtl" containers: scrollLeft is 0 at the RTL start and goes negative
+// toward the end, with positive values clamped back to 0. So the sign of the
+// scroll step must be flipped under RTL, or "next" tries to push scrollLeft
+// positive and gets silently clamped to a no-op.
 (function () {
     document.querySelectorAll(".product-carousel").forEach(function (carousel) {
         var track = carousel.querySelector(".product-carousel-track");
@@ -17,7 +19,9 @@
         function scrollByStep(direction) {
             var item = track.querySelector(".product-carousel-item");
             var step = item ? item.getBoundingClientRect().width + 24 : 260;
-            track.scrollBy({ left: direction * step, behavior: "smooth" });
+            var isRtl = getComputedStyle(track).direction === "rtl";
+            var signedStep = isRtl ? -direction * step : direction * step;
+            track.scrollBy({ left: signedStep, behavior: "smooth" });
         }
 
         prevBtn.addEventListener("click", function () { scrollByStep(-1); });
