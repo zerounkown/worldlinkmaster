@@ -202,6 +202,143 @@
     var isContactActive = currentController == "Home" && currentAction == "Contact";
     var isLocationsActive = currentController == "Home" && currentAction == "Locations";
     var isTradeProgramActive = currentController == "Wholesale";
+
+    // Apparel (tactical-apparel) mega-menu: a hand-curated 5-column panel (Featured / Shop by Type
+    // / Shop by Use / Shop by Size / Colors & Brands) that replaces the generic subcategory-driven
+    // BuildMegaColumns for this one category only — every other category keeps the automatic
+    // per-subcategory columns. Content came from an explicit spec cross-checked against real
+    // master-data codes; anything with no real code behind it (Combat Uniforms, Tactical Shirts,
+    // Polo Shirts, Hoodies & Sweatshirts, 3XL — none exist as a real subcategory/size) was dropped
+    // rather than invented. "Shop by Use" and the Featured column's Military/Tactical Apparel links
+    // route through the USE-CASE attribute (seeded as a dictionary entry only in SeedData.cs) — so
+    // those links resolve to zero products until a real Master Data/Product import assigns USE-CASE
+    // values, same as NECK-TYPE/SLEEVE-LENGTH/PATTERN before their first import.
+    async Task<List<(string Header, List<(string? SubHeader, List<(string Label, string Href)> Items)> Groups)>> BuildApparelMenuAsync(Category apparelCategory)
+    {
+        var bySlug = apparelCategory.Subcategories.ToDictionary(s => s.Slug);
+        string ProductsUrl(object routeValues) => Url.Action("Index", "Products", routeValues)!;
+        List<(string? SubHeader, List<(string Label, string Href)> Items)> OneGroup(List<(string, string)> items) => new() { (null, items) };
+
+        var featured = OneGroup(new List<(string, string)>
+        {
+            ("View All Apparel", ProductsUrl(new { categoryId = apparelCategory.Id })),
+            ("New Arrivals", ProductsUrl(new { categoryId = apparelCategory.Id, sort = "newest" })),
+            ("Best Sellers", ProductsUrl(new { categoryId = apparelCategory.Id, sort = "rating" })),
+            ("Military Apparel", ProductsUrl(new { categoryId = apparelCategory.Id, attr = "USE-CASE:Military" })),
+            ("Tactical Apparel", ProductsUrl(new { categoryId = apparelCategory.Id, attr = "USE-CASE:Tactical" }))
+        });
+
+        // Combat Uniforms, Tactical Shirts, Polo Shirts, and Hoodies & Sweatshirts were dropped —
+        // no matching real subcategory exists for any of them.
+        var typeSlugs = new (string Label, string Slug)[]
+        {
+            ("Tactical Pants", "tactical-pants"),
+            ("Jackets & Outerwear", "tactical-jackets"),
+            ("T-Shirts", "t-shirts"),
+            ("Base Layers", "thermal-base-layers")
+        };
+        var shopByTypeParentItems = typeSlugs
+            .Where(t => bySlug.ContainsKey(t.Slug))
+            .Select(t => (t.Label, ProductsUrl(new { categoryId = apparelCategory.Id, subcategoryId = bySlug[t.Slug].Id })))
+            .ToList();
+
+        // T-Shirt sub-types reuse the existing NECK-TYPE/SLEEVE-LENGTH attributes rather than a new
+        // one — Crew Neck/V-Neck/Long Sleeve/Short Sleeve are exactly those attributes' own values,
+        // and "Polo" is exactly the real NECK-TYPE value "Polo Collar" already in use. Scoped to the
+        // whole T-shirt family (tShirtFamilySlugs, defined above) so e.g. "Crew Neck" isn't limited
+        // to just the generic "T-Shirts" subcategory. Crew Neck/Polo Collar/Mock Neck (Zip) do have
+        // real ProductAttributeValue rows today, but only on the 4 still-Draft products from the
+        // earlier import — so every one of these links returns zero results until either those
+        // products are published or a real import adds published products with these values.
+        var tShirtFamilyIds = tShirtFamilySlugs.Where(s => bySlug.ContainsKey(s)).Select(s => bySlug[s].Id).ToArray();
+        var tShirtTypeItems = new (string Label, string Code, string Value)[]
+        {
+            ("Crew Neck", "NECK-TYPE", "Crew Neck"),
+            ("V-Neck", "NECK-TYPE", "V-Neck"),
+            ("Polo", "NECK-TYPE", "Polo Collar"),
+            ("Long Sleeve", "SLEEVE-LENGTH", "Long Sleeve"),
+            ("Short Sleeve", "SLEEVE-LENGTH", "Short Sleeve")
+        }
+            .Select(t => (t.Label, ProductsUrl(new { categoryId = apparelCategory.Id, subcategoryIds = tShirtFamilyIds, attr = $"{t.Code}:{t.Value}" })))
+            .ToList();
+
+        // Pants sub-types: Cargo/Combat/Chino are new PANTS-TYPE attribute values (zero results
+        // until imported). "Tactical Trousers" was NOT added as a fourth PANTS-TYPE value — it's
+        // already a real, distinct subcategory (id 57, alongside "Tactical Pants"), so it links
+        // straight there instead of duplicating that subcategory as a fake attribute value.
+        var pantsFamilyIds = pantsFamilySlugs.Where(s => bySlug.ContainsKey(s)).Select(s => bySlug[s].Id).ToArray();
+        var pantsTypeItems = new[] { "Cargo", "Combat", "Chino" }
+            .Select(v => (v, ProductsUrl(new { categoryId = apparelCategory.Id, subcategoryIds = pantsFamilyIds, attr = $"PANTS-TYPE:{v}" })))
+            .ToList();
+        if (bySlug.TryGetValue("tactical-trousers", out var tacticalTrousers))
+        {
+            pantsTypeItems.Add(("Tactical Trousers", ProductsUrl(new { categoryId = apparelCategory.Id, subcategoryId = tacticalTrousers.Id })));
+        }
+
+        // Jacket sub-types: all four (Bomber, Field Jacket, Windbreaker, Parka) are new JACKET-TYPE
+        // values — no existing subcategory or attribute covers any of them, unlike T-Shirts/Pants.
+        var jacketTypeItems = new List<(string, string)>();
+        if (bySlug.TryGetValue("tactical-jackets", out var tacticalJackets))
+        {
+            jacketTypeItems = new[] { "Bomber", "Field Jacket", "Windbreaker", "Parka" }
+                .Select(v => (v, ProductsUrl(new { categoryId = apparelCategory.Id, subcategoryId = tacticalJackets.Id, attr = $"JACKET-TYPE:{v}" })))
+                .ToList();
+        }
+
+        var shopByType = new List<(string? SubHeader, List<(string Label, string Href)> Items)>
+        {
+            (null, shopByTypeParentItems),
+            ("T-Shirt Types", tShirtTypeItems),
+            ("Pants Types", pantsTypeItems),
+            ("Jacket Types", jacketTypeItems)
+        }.Where(g => g.Items.Count > 0).ToList();
+
+        var shopByUse = OneGroup(new[] { "Military", "Tactical", "Security", "Outdoor", "Training", "Casual Duty" }
+            .Select(use => (use, ProductsUrl(new { categoryId = apparelCategory.Id, attr = $"USE-CASE:{use}" })))
+            .ToList());
+
+        // 3XL was dropped — the real Alpha size group tops out at 2XL.
+        var shopBySize = new List<(string? SubHeader, List<(string Label, string Href)> Items)>
+        {
+            ("Alpha Sizes", new[] { "S", "M", "L", "XL", "2XL" }
+                .Select(size => (size, ProductsUrl(new { categoryId = apparelCategory.Id, sizes = size })))
+                .ToList()),
+            ("Waist Sizes", new[] { "30", "32", "34", "36", "38", "40" }
+                .Select(size => (size, ProductsUrl(new { categoryId = apparelCategory.Id, sizes = size })))
+                .ToList())
+        };
+
+        var apparelMenuBrandCodes = new[] { "WLM", "CON", "PRO", "TRS", "ROT" };
+        var apparelMenuBrands = await DbContext.Brands
+            .Where(b => b.Code != null && apparelMenuBrandCodes.Contains(b.Code))
+            .ToDictionaryAsync(b => b.Code!);
+        var colorsAndBrands = new List<(string? SubHeader, List<(string Label, string Href)> Items)>
+        {
+            ("Shop by Color", new (string Label, string ColorName)[]
+            {
+                ("Black", "Black"), ("Olive Green", "Olive"), ("Coyote Brown", "Coyote Brown"),
+                ("Khaki", "Khaki"), ("Navy", "Navy"), ("Camouflage", "Camouflage")
+            }.Select(c => (c.Label, ProductsUrl(new { categoryId = apparelCategory.Id, colors = c.ColorName }))).ToList()),
+            ("Shop by Brand", apparelMenuBrandCodes
+                .Where(code => apparelMenuBrands.ContainsKey(code))
+                .Select(code => (apparelMenuBrands[code].Name, ProductsUrl(new { categoryId = apparelCategory.Id, brandIds = apparelMenuBrands[code].Id })))
+                .ToList())
+        };
+
+        return new()
+        {
+            ("Featured", featured),
+            ("Shop by Type", shopByType),
+            ("Shop by Use", shopByUse),
+            ("Shop by Size", shopBySize),
+            ("Colors & Brands", colorsAndBrands)
+        };
+    }
+
+    var apparelCategoryForMenu = navCategories.FirstOrDefault(c => c.Slug == "tactical-apparel");
+    var apparelMenuColumns = apparelCategoryForMenu != null
+        ? await BuildApparelMenuAsync(apparelCategoryForMenu)
+        : new List<(string Header, List<(string? SubHeader, List<(string Label, string Href)> Items)> Groups)>();
 }
 <!DOCTYPE html>
 <html lang="@currentCulture" dir="@(isRtl ? "rtl" : "ltr")">
@@ -358,6 +495,7 @@
                 var promoCaption = megaMenuPromoCaptionBySlug.GetValueOrDefault(category.Slug, category.LocalizedName());
                 var promoHref = Url.Action("Index", "Products", new { categoryId = category.Id });
                 var megaColumns = BuildMegaColumns(category);
+                var isApparelCategory = category.Slug == "tactical-apparel";
                 <div class="main-nav-item main-nav-dropdown">
                     <a class="main-nav-link @(isCategoryActive ? "active" : "")" asp-area="" asp-controller="Products" asp-action="Index" asp-route-categoryId="@category.Id">@navLabel <i class="bi bi-chevron-down"></i></a>
                     <div class="main-nav-dropdown-panel main-nav-dropdown-panel-mega">
@@ -367,33 +505,56 @@
                             </div>
                             <div class="main-nav-mega-body">
                                 <div class="main-nav-mega-columns">
-                                    @foreach (var column in megaColumns)
+                                    @if (isApparelCategory)
                                     {
-                                        <div class="main-nav-mega-column">
-                                            <h6 class="main-nav-mega-column-header">@column.Header</h6>
-                                            @foreach (var subcategory in column.Items)
-                                            {
-                                                var subImage = string.IsNullOrWhiteSpace(subcategory.ImageUrl) ? category.ImageUrl : subcategory.ImageUrl;
-                                                var subCaption = subcategory.LocalizedDescription();
-                                                if (string.IsNullOrWhiteSpace(subCaption)) { subCaption = subcategory.LocalizedName(); }
-                                                var subHref = Url.Action("Index", "Products", new { categoryId = category.Id, subcategoryId = subcategory.Id });
-                                                var subQuickFilters = BuildQuickFilters(category, subcategory);
-                                                <a class="main-nav-mega-subitem" asp-area="" asp-controller="Products" asp-action="Index" asp-route-categoryId="@category.Id" asp-route-subcategoryId="@subcategory.Id"
-                                                   data-promo-image="@subImage"
-                                                   data-promo-caption="@subCaption"
-                                                   data-promo-cta-text="@Localizer["Shop {0}", subcategory.LocalizedName()]"
-                                                   data-promo-cta-href="@subHref">@subcategory.LocalizedName()</a>
-                                                @if (subQuickFilters.Count > 0)
+                                        @foreach (var column in apparelMenuColumns)
+                                        {
+                                            <div class="main-nav-mega-column">
+                                                <h6 class="main-nav-mega-column-header">@column.Header</h6>
+                                                @foreach (var group in column.Groups)
                                                 {
-                                                    <div class="main-nav-mega-subfilters">
-                                                        @foreach (var chip in subQuickFilters)
-                                                        {
-                                                            <a class="main-nav-mega-subfilter-chip @(chip.IsBrand ? "main-nav-mega-subfilter-chip-brand" : "")" href="@chip.Href">@chip.Label</a>
-                                                        }
-                                                    </div>
+                                                    if (group.SubHeader != null)
+                                                    {
+                                                        <span class="main-nav-mega-subgroup-header">@group.SubHeader</span>
+                                                    }
+                                                    @foreach (var item in group.Items)
+                                                    {
+                                                        <a class="main-nav-mega-subitem" href="@item.Href">@item.Label</a>
+                                                    }
                                                 }
-                                            }
-                                        </div>
+                                            </div>
+                                        }
+                                    }
+                                    else
+                                    {
+                                        @foreach (var column in megaColumns)
+                                        {
+                                            <div class="main-nav-mega-column">
+                                                <h6 class="main-nav-mega-column-header">@column.Header</h6>
+                                                @foreach (var subcategory in column.Items)
+                                                {
+                                                    var subImage = string.IsNullOrWhiteSpace(subcategory.ImageUrl) ? category.ImageUrl : subcategory.ImageUrl;
+                                                    var subCaption = subcategory.LocalizedDescription();
+                                                    if (string.IsNullOrWhiteSpace(subCaption)) { subCaption = subcategory.LocalizedName(); }
+                                                    var subHref = Url.Action("Index", "Products", new { categoryId = category.Id, subcategoryId = subcategory.Id });
+                                                    var subQuickFilters = BuildQuickFilters(category, subcategory);
+                                                    <a class="main-nav-mega-subitem" asp-area="" asp-controller="Products" asp-action="Index" asp-route-categoryId="@category.Id" asp-route-subcategoryId="@subcategory.Id"
+                                                       data-promo-image="@subImage"
+                                                       data-promo-caption="@subCaption"
+                                                       data-promo-cta-text="@Localizer["Shop {0}", subcategory.LocalizedName()]"
+                                                       data-promo-cta-href="@subHref">@subcategory.LocalizedName()</a>
+                                                    @if (subQuickFilters.Count > 0)
+                                                    {
+                                                        <div class="main-nav-mega-subfilters">
+                                                            @foreach (var chip in subQuickFilters)
+                                                            {
+                                                                <a class="main-nav-mega-subfilter-chip @(chip.IsBrand ? "main-nav-mega-subfilter-chip-brand" : "")" href="@chip.Href">@chip.Label</a>
+                                                            }
+                                                        </div>
+                                                    }
+                                                }
+                                            </div>
+                                        }
                                     }
                                 </div>
                                 <div class="main-nav-mega-promo">
@@ -439,8 +600,9 @@
             @foreach (var category in navCategories)
             {
                 var previewProducts = categoryPreviews.TryGetValue(category.Id, out var cp) ? cp : new List<Product>();
-                var sideNavColumns = BuildMegaColumns(category);
-                var hasSideNavPanel = previewProducts.Count > 0 || sideNavColumns.Count > 0;
+                var isApparelSideNav = category.Slug == "tactical-apparel";
+                var sideNavColumns = isApparelSideNav ? new() : BuildMegaColumns(category);
+                var hasSideNavPanel = previewProducts.Count > 0 || sideNavColumns.Count > 0 || (isApparelSideNav && apparelMenuColumns.Count > 0);
                 <div class="side-nav-item">
                     <a class="side-nav-link" asp-area="" asp-controller="Products" asp-action="Index" asp-route-categoryId="@category.Id">@category.LocalizedName()</a>
                     @if (hasSideNavPanel)
@@ -449,7 +611,31 @@
                             <i class="bi bi-chevron-down"></i>
                         </button>
                         <div class="category-preview-panel">
-                            @if (sideNavColumns.Count > 0)
+                            @if (isApparelSideNav)
+                            {
+                                <div class="side-nav-subgroups">
+                                    @foreach (var column in apparelMenuColumns)
+                                    {
+                                        <div class="side-nav-subgroup">
+                                            <span class="side-nav-subgroup-header">@column.Header</span>
+                                            @foreach (var group in column.Groups)
+                                            {
+                                                <div class="side-nav-subgroup-links">
+                                                    @if (group.SubHeader != null)
+                                                    {
+                                                        <span class="side-nav-subgroup-subheader">@group.SubHeader</span>
+                                                    }
+                                                    @foreach (var item in group.Items)
+                                                    {
+                                                        <a href="@item.Href">@item.Label</a>
+                                                    }
+                                                </div>
+                                            }
+                                        </div>
+                                    }
+                                </div>
+                            }
+                            else if (sideNavColumns.Count > 0)
                             {
                                 <div class="side-nav-subgroups">
                                     @foreach (var column in sideNavColumns)
