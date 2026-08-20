@@ -134,12 +134,6 @@ a:hover {
   color: var(--wlm-sand);
 }
 
-.topbar-right {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-}
-
 /* Header */
 .site-header {
   background-color: var(--wlm-forest-dark);
@@ -4148,19 +4142,6 @@ a:hover {
   background-color: white;
 }
 
-/* Top bar quote/bulk pricing CTA */
-.topbar-quote-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  color: var(--wlm-sand-light);
-  font-weight: 600;
-}
-
-.topbar-quote-link:hover {
-  color: var(--wlm-sand);
-}
-
 /* Delivery / policies / contact info strip */
 .info-strip {
   display: grid;
@@ -5540,15 +5521,10 @@ a:hover {
     font-size: 0.72rem;
   }
 
-  .topbar-left,
-  .topbar-right {
+  .topbar-left {
     flex-wrap: wrap;
     justify-content: center;
     row-gap: 4px;
-  }
-
-  .topbar-quote-link span {
-    display: none;
   }
 
   .section-title {

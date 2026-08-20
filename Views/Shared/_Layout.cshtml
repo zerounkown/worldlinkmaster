@@ -369,15 +369,10 @@
     <div class="topbar">
         <div class="container topbar-inner">
             <div class="topbar-left">
-                <span><i class="bi bi-truck"></i> @Localizer["Free shipping on orders over AED 365"]</span>
                 <a class="topbar-link @(isContactActive ? "active" : "")" asp-area="" asp-controller="Home" asp-action="Contact">@Localizer["Contact Us"]</a>
                 <a class="topbar-link @(isLocationsActive ? "active" : "")" asp-area="" asp-controller="Home" asp-action="Locations">@Localizer["Find a Store"]</a>
                 <a class="topbar-link @(isTradeProgramActive ? "active" : "")" asp-area="" asp-controller="Wholesale" asp-action="Apply">@Localizer["Trade Program"]</a>
                 <a class="topbar-link" asp-area="" asp-controller="Products" asp-action="Sales">@Localizer["Sales"]</a>
-            </div>
-            <div class="topbar-right">
-                <a class="topbar-quote-link" asp-area="" asp-controller="QuoteRequests" asp-action="Create" aria-label="@Localizer["Bulk Pricing / Request a Quote"]"><i class="bi bi-file-earmark-text"></i> <span>@Localizer["Bulk Pricing / Request a Quote"]</span></a>
-                <span class="topbar-contact"><i class="bi bi-telephone"></i> 1-800-555-0199</span>
             </div>
         </div>
     </div>
