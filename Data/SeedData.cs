@@ -552,7 +552,14 @@ public static class SeedData
             }
         }
 
-        var adminEmail = configuration["SeedAdmin:Email"] ?? "admin@worldlinkmaster.com";
+        // sales@wlinkmasters.com is the one true admin account (confirmed with the site owner —
+        // a second, separately-registered admin@worldlinkmaster.com account had also picked up the
+        // Admin role at some point outside of this seeder, which is what made "the admin account's
+        // email" look unstable; that role was removed manually and this default updated so a fresh
+        // environment can never recreate that ambiguity). This lookup is find-or-create-once: if the
+        // account already exists (it does, in every real environment) nothing about it is touched —
+        // this can only ever create a NEW account, never rename or modify an existing one.
+        var adminEmail = configuration["SeedAdmin:Email"] ?? "sales@wlinkmasters.com";
         var adminUser = await userManager.FindByEmailAsync(adminEmail);
         if (adminUser != null)
         {
