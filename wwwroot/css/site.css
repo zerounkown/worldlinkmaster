@@ -1928,7 +1928,16 @@ a:hover {
   margin-bottom: 24px;
 }
 
+/* Centers the tile row as a group when it doesn't fill the track's width (the common case —
+   .container-listing has no max-width, so on a wide screen a handful of brand tiles otherwise
+   sit flush left with empty space on the right). "safe center" is what makes this behave: it
+   centers normally, but if the row is wide enough to overflow, it falls back to start-aligned
+   scrolling instead of centering — centering an overflowing flex row would otherwise clip the
+   first item(s) off the start edge with no way to scroll back to them. The plain "center" line
+   first is a harmless fallback for the rare browser that doesn't understand "safe". */
 .brand-carousel .product-carousel-track {
+  justify-content: center;
+  justify-content: safe center;
   scrollbar-width: none;
 }
 
