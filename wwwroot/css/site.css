@@ -423,6 +423,11 @@ a:hover {
   color: rgba(255, 255, 255, 0.85) !important;
   font-size: 0.83rem;
   line-height: 1.25;
+  /* !important needed: .main-nav-dropdown-panel a (class + element selector) outranks this
+     single-class selector, so a plain declaration here loses to its font-weight: 500 despite
+     coming later in the file. Items should read as clearly lighter than the column header above
+     them, not the same visual weight. */
+  font-weight: 400 !important;
 }
 
 .main-nav-mega-subitem:hover {
