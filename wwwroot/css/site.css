@@ -117,23 +117,6 @@ a:hover {
   margin-right: 4px;
 }
 
-.topbar-left {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-}
-
-.topbar-link {
-  color: rgba(255, 255, 255, 0.75);
-  text-decoration: none;
-  white-space: nowrap;
-}
-
-.topbar-link:hover,
-.topbar-link.active {
-  color: var(--wlm-sand);
-}
-
 /* Header */
 .site-header {
   background-color: var(--wlm-forest-dark);
@@ -5528,12 +5511,6 @@ a:hover {
     padding: 8px 0;
     text-align: center;
     font-size: 0.72rem;
-  }
-
-  .topbar-left {
-    flex-wrap: wrap;
-    justify-content: center;
-    row-gap: 4px;
   }
 
   .section-title {
