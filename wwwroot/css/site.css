@@ -487,14 +487,21 @@ a:hover {
   gap: 36px;
 }
 
-/* One column per group (Tops/Bottoms/etc. — see BuildMegaColumns in _Layout.cshtml). auto-fit +
+/* One column per group (Tops/Bottoms/etc. — see BuildMegaColumns in _Layout.cshtml). auto-fill +
    minmax lets the grid reflow to fewer columns per row on narrower desktop/tablet widths without
-   any extra breakpoint rules, and to more on wide monitors; Gear & Accessories alone renders 6. */
+   any extra breakpoint rules, and to more on wide monitors; Gear & Accessories alone renders 6.
+   auto-fill (not auto-fit) specifically: for the Apparel panel's two-row split below, both rows
+   sit in same-width containers, so both compute the same number of tracks at a given viewport —
+   auto-fit would then collapse whichever row has fewer actual items down to fewer, wider tracks
+   (since it removes empty tracks entirely before the remaining ones stretch to fill the row),
+   misaligning its column edges against the other row's. auto-fill keeps the unused trailing
+   tracks in place instead of collapsing them, so track widths — and left edges — stay identical
+   between the two rows regardless of how many items each one actually has. */
 .main-nav-mega-columns {
   flex: 1 1 0;
   min-width: 0;
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
   gap: 14px 24px;
   align-content: start;
 }
