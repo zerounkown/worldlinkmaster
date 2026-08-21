@@ -519,7 +519,7 @@
                 var megaColumns = BuildMegaColumns(category);
                 var isApparelCategory = category.Slug == "tactical-apparel";
                 <div class="main-nav-item main-nav-dropdown">
-                    <a class="main-nav-link @(isCategoryActive ? "active" : "")" asp-area="" asp-controller="Products" asp-action="Index" asp-route-categoryId="@category.Id">@navLabel <i class="bi bi-chevron-down"></i></a>
+                    <a class="main-nav-link @(isCategoryActive ? "active" : "")" asp-area="" asp-controller="Products" asp-action="Index" asp-route-categoryId="@category.Id">@navLabel <i class="bi bi-chevron-down"></i><span class="main-nav-dropdown-caret" aria-hidden="true"></span></a>
                     <div class="main-nav-dropdown-panel main-nav-dropdown-panel-mega">
                         <div class="container main-nav-mega-inner">
                             <div class="main-nav-mega-top">
