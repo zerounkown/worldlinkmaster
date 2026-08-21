@@ -524,26 +524,25 @@ a:hover {
 
 .main-nav-mega-column-header {
   position: relative;
-  display: inline-block;
+  display: block;
   font-family: var(--font-heading);
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.05em;
   font-size: 0.75rem;
-  color: var(--wlm-sand);
-  opacity: 0.75;
+  color: var(--wlm-cream);
   margin: 0 0 8px;
   padding-bottom: 4px;
 }
 
-/* Thin gold underline matching the header text's own width — no diamond marker. inline-block on
-   the header (above) makes it shrink to its text width instead of stretching to fill the column,
-   so this width:100% underline lines up with the text rather than spanning the whole column. */
+/* Thin gold underline at a fixed width, the same for every column regardless of how long that
+   column's own header text is — deliberately not sized to the text (a short header like
+   "Pants" and a long one like "Colors & Brands" both get the same underline). */
 .main-nav-mega-column-header::after {
   content: "";
   position: absolute;
   left: 0;
-  width: 100%;
+  width: 32px;
   bottom: 0;
   height: 2px;
   background: var(--wlm-gold-bronze);
@@ -1348,26 +1347,24 @@ a:hover {
 
 .side-nav-subgroup-header {
   position: relative;
-  display: inline-block;
+  display: block;
   font-family: var(--font-heading);
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.05em;
   font-size: 0.72rem;
-  color: var(--wlm-sand);
-  opacity: 0.75;
+  color: var(--wlm-cream);
   margin-bottom: 14px;
   padding-bottom: 8px;
 }
 
-/* Thin gold underline matching the header text's own width — no diamond marker. Same
-   inline-block-shrinks-to-text approach as the desktop column header
-   (.main-nav-mega-column-header). */
+/* Thin gold underline at a fixed width, same as the desktop column header
+   (.main-nav-mega-column-header) — not sized to the header text. */
 .side-nav-subgroup-header::after {
   content: "";
   position: absolute;
   left: 0;
-  width: 100%;
+  width: 32px;
   bottom: 0;
   height: 2px;
   background: var(--wlm-gold-bronze);
