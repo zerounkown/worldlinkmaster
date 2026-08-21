@@ -203,11 +203,9 @@ a:hover {
   padding-bottom: 6px;
 }
 
-.main-nav-link:hover {
-  color: var(--wlm-sand);
-}
-
-.main-nav-link.active {
+.main-nav-link:hover,
+.main-nav-link.active,
+.main-nav-dropdown.open > .main-nav-link {
   color: var(--wlm-sand);
 }
 
@@ -226,7 +224,8 @@ a:hover {
 }
 
 .main-nav-link:hover::after,
-.main-nav-link.active::after {
+.main-nav-link.active::after,
+.main-nav-dropdown.open > .main-nav-link::after {
   transform: scaleX(1);
 }
 
@@ -247,7 +246,33 @@ a:hover {
 }
 
 .main-nav-link:hover::before,
-.main-nav-link.active::before {
+.main-nav-link.active::before,
+.main-nav-dropdown.open > .main-nav-link::before {
+  opacity: 1;
+}
+
+/* Small gold caret bridging the nav tab to its open mega-menu panel below — a separate real
+   element (not a third pseudo-element; ::before/::after are already the diamond/underline above)
+   rendered only on dropdown triggers, shown only while that dropdown is actually open. Sits in
+   the gap created by .main-nav-dropdown-panel's margin-top so it visually points from the tab
+   down into the panel. */
+.main-nav-dropdown-caret {
+  position: absolute;
+  left: 50%;
+  bottom: -14px;
+  transform: translateX(-50%);
+  width: 0;
+  height: 0;
+  border-left: 7px solid transparent;
+  border-right: 7px solid transparent;
+  border-top: 7px solid var(--wlm-gold-bronze);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s ease;
+  z-index: 61;
+}
+
+.main-nav-dropdown.open > .main-nav-link .main-nav-dropdown-caret {
   opacity: 1;
 }
 
