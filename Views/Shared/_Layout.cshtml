@@ -199,9 +199,6 @@
     var currentAction = ViewContext.RouteData.Values["action"]?.ToString() ?? "";
     var isHomeActive = currentController == "Home" && currentAction == "Welcome";
     var isNewArrivalsActive = currentController == "Products" && currentAction == "NewArrivals";
-    var isContactActive = currentController == "Home" && currentAction == "Contact";
-    var isLocationsActive = currentController == "Home" && currentAction == "Locations";
-    var isTradeProgramActive = currentController == "Wholesale";
 
     // Apparel (tactical-apparel) mega-menu: a hand-curated 5-column panel (Featured / T-Shirts /
     // Pants / Jackets & Outerwear / Uniforms & Shirts) matching a reference image exactly, that
@@ -407,17 +404,6 @@
 </head>
 <body>
     <div class="site-header-sticky">
-    <div class="topbar">
-        <div class="container topbar-inner">
-            <div class="topbar-left">
-                <a class="topbar-link @(isContactActive ? "active" : "")" asp-area="" asp-controller="Home" asp-action="Contact">@Localizer["Contact Us"]</a>
-                <a class="topbar-link @(isLocationsActive ? "active" : "")" asp-area="" asp-controller="Home" asp-action="Locations">@Localizer["Find a Store"]</a>
-                <a class="topbar-link @(isTradeProgramActive ? "active" : "")" asp-area="" asp-controller="Wholesale" asp-action="Apply">@Localizer["Trade Program"]</a>
-                <a class="topbar-link" asp-area="" asp-controller="Products" asp-action="Sales">@Localizer["Sales"]</a>
-            </div>
-        </div>
-    </div>
-
     <header class="site-header">
         <div class="container header-inner">
             <div class="header-branding">
@@ -743,9 +729,10 @@
             }
             <hr />
             <a asp-area="" asp-controller="Home" asp-action="About"><i class="bi bi-info-circle"></i> @Localizer["About"]</a>
-            <a asp-area="" asp-controller="Home" asp-action="Contact"><i class="bi bi-envelope"></i> @Localizer["Contact"]</a>
+            <a asp-area="" asp-controller="Home" asp-action="Contact"><i class="bi bi-envelope"></i> @Localizer["Contact Us"]</a>
+            <a asp-area="" asp-controller="Home" asp-action="Locations"><i class="bi bi-geo-alt"></i> @Localizer["Find a Store"]</a>
+            <a asp-area="" asp-controller="Wholesale" asp-action="Apply"><i class="bi bi-tag"></i> @Localizer["Trade Program"]</a>
             <a asp-area="" asp-controller="MerchantOnboarding" asp-action="Apply"><i class="bi bi-shop"></i> @Localizer["Sell on World Link Master"]</a>
-            <a asp-area="" asp-controller="Wholesale" asp-action="Apply"><i class="bi bi-tag"></i> @Localizer["Trade / Wholesale Pricing"]</a>
         </nav>
     </aside>
 
