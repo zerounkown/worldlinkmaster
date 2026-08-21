@@ -564,6 +564,10 @@ enable3dTilt(".category-preview-card", 12, -6);
 // dropdowns has its own independent promo panel, so everything here is scoped per-dropdown
 // (via closest()) rather than using a single global selector, which would only ever find the
 // first panel in the DOM regardless of which dropdown is actually open.
+//
+// The Apparel dropdown additionally carries data-promo-* on whole .main-nav-mega-column
+// containers (not just subitems) — its columns group many items under one representative image,
+// unlike the generic per-subcategory dropdowns — so both selectors are queried and merged below.
 (function () {
     "use strict";
 
@@ -574,12 +578,16 @@ enable3dTilt(".category-preview-card", 12, -6);
 
     var preloadedDropdowns = new WeakSet();
 
+    function promoTriggers(dropdown) {
+        return dropdown.querySelectorAll(".main-nav-mega-subitem[data-promo-image], .main-nav-mega-column[data-promo-image]");
+    }
+
     function preloadImages(dropdown) {
         if (preloadedDropdowns.has(dropdown)) {
             return;
         }
         preloadedDropdowns.add(dropdown);
-        dropdown.querySelectorAll(".main-nav-mega-subitem[data-promo-image]").forEach(function (item) {
+        promoTriggers(dropdown).forEach(function (item) {
             var url = item.getAttribute("data-promo-image");
             if (url) {
                 // Assigning to a throwaway Image's src starts the browser fetching/caching it in
@@ -626,7 +634,7 @@ enable3dTilt(".category-preview-card", 12, -6);
 
     dropdowns.forEach(function (dropdown) {
         var promoPanel = dropdown.querySelector(".main-nav-mega-promo");
-        var subitems = dropdown.querySelectorAll(".main-nav-mega-subitem[data-promo-image]");
+        var subitems = promoTriggers(dropdown);
         if (!promoPanel || subitems.length === 0) {
             return;
         }
