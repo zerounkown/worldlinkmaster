@@ -21,6 +21,12 @@
   /* Off-white panel background for the homepage "Featured Products" panel — barely warmer than
      --wlm-cream (pure white), just enough to read as its own framed block against the page. */
   --wlm-cream-panel: #fbfaf7;
+  /* Dark charcoal, scoped to the mega-menu panel only — a step lighter than --wlm-forest-dark
+     (the near-black used site-wide for the header/nav bar), so the open panel reads as its own
+     distinct surface rather than pure black. Deliberately a separate token, not a reuse of
+     --wlm-forest (used pervasively elsewhere for buttons/badges/borders), so this stays isolated
+     to the one component it was requested for. */
+  --wlm-charcoal-panel: #1a1a1a;
   --font-heading: 'Oswald', sans-serif;
   --font-body: 'Inter', sans-serif;
 
@@ -373,7 +379,7 @@ a:hover {
   top: 100%;
   border-radius: 0;
   padding: 0;
-  background: var(--wlm-forest-dark);
+  background: var(--wlm-charcoal-panel);
   box-shadow: 0 20px 40px rgba(0, 0, 0, 0.35);
   animation: mainNavMegaCurtain 0.22s ease;
 }
