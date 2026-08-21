@@ -211,11 +211,20 @@
     // as-is; PANTS-TYPE/JACKET-TYPE/UNIFORM-TYPE/MATERIAL/WATER_RES values seeded as dictionary
     // entries only in SeedData.cs) — those links resolve to zero products until a real Master
     // Data/Product import assigns them, same as USE-CASE before its first import.
-    async Task<List<(string Header, List<(string? SubHeader, List<(string Label, string Href)> Items)> Groups)>> BuildApparelMenuAsync(Category apparelCategory)
+    async Task<List<(string Header, List<(string? SubHeader, List<(string Label, string Href)> Items)> Groups, string? PromoImage, string? PromoCaption, string? PromoCtaText, string? PromoCtaHref)>> BuildApparelMenuAsync(Category apparelCategory)
     {
         var bySlug = apparelCategory.Subcategories.ToDictionary(s => s.Slug);
         string ProductsUrl(object routeValues) => Url.Action("Index", "Products", routeValues)!;
         List<(string? SubHeader, List<(string Label, string Href)> Items)> OneGroup(List<(string, string)> items) => new() { (null, items) };
+
+        // Real Pexels photo IDs already used elsewhere in the catalog for products in each
+        // family (Sentinel/Warden/Vanguard/Bastion, etc.) — reused here rather than invented, so
+        // every URL is guaranteed to actually resolve. Temporary stand-ins only: swap these for
+        // real photography by replacing the URL string, nothing else needs to change. Featured
+        // intentionally has no override — it keeps showing the category's own default image
+        // (@apparelCategory.ImageUrl, rendered below) both before any hover and while Featured
+        // itself is hovered.
+        string PexelsPromo(int photoId) => $"https://images.pexels.com/photos/{photoId}/pexels-photo-{photoId}.jpeg?auto=compress&cs=tinysrgb&w=600&h=800&dpr=1";
 
         var featured = OneGroup(new List<(string, string)>
         {
@@ -351,24 +360,26 @@
 
         // Returned in a fixed order the caller relies on to split into two visual rows: the first
         // 5 (garment-type browsing) render as row 1, the last 3 (attribute filtering) as row 2 —
-        // see the Take(5)/Skip(5) split in the desktop panel markup below.
+        // see the Take(5)/Skip(5) split in the desktop panel markup below. Only the row-1 columns
+        // carry promo data (PromoImage etc.) — hovering a row-2 column leaves the promo panel on
+        // whatever was last shown, same as how the panel behaves for every other category today.
         return new()
         {
-            ("Featured", featured),
-            ("T-Shirts", tShirts),
-            ("Pants", pants),
-            ("Jackets & Outerwear", jackets),
-            ("Uniforms & Shirts", uniformsAndShirts),
-            ("Shop by Use", shopByUse),
-            ("Shop by Size", shopBySize),
-            ("Colors & Brands", colorsAndBrands)
+            ("Featured", featured, apparelCategory.ImageUrl, megaMenuPromoCaptionBySlug.GetValueOrDefault(apparelCategory.Slug, apparelCategory.LocalizedName()), $"Shop {navLabelBySlug.GetValueOrDefault(apparelCategory.Slug, apparelCategory.LocalizedName())}", Url.Action("Index", "Products", new { categoryId = apparelCategory.Id })),
+            ("T-Shirts", tShirts, PexelsPromo(15814566), "Breathable everyday tees built for the field.", "Shop T-Shirts", tShirts[0].Items[0].Href),
+            ("Pants", pants, PexelsPromo(10901963), "Durable tactical pants that move with you.", "Shop Pants", pants[0].Items[0].Href),
+            ("Jackets & Outerwear", jackets, PexelsPromo(6368576), "Weather-ready outerwear for every mission.", "Shop Jackets & Outerwear", jackets[0].Items[0].Href),
+            ("Uniforms & Shirts", uniformsAndShirts, PexelsPromo(6786309), "Mission-ready shirts and uniforms, field-tested.", "Shop Uniforms & Shirts", uniformsAndShirts[0].Items[0].Href),
+            ("Shop by Use", shopByUse, null, null, null, null),
+            ("Shop by Size", shopBySize, null, null, null, null),
+            ("Colors & Brands", colorsAndBrands, null, null, null, null)
         };
     }
 
     var apparelCategoryForMenu = navCategories.FirstOrDefault(c => c.Slug == "tactical-apparel");
     var apparelMenuColumns = apparelCategoryForMenu != null
         ? await BuildApparelMenuAsync(apparelCategoryForMenu)
-        : new List<(string Header, List<(string? SubHeader, List<(string Label, string Href)> Items)> Groups)>();
+        : new List<(string Header, List<(string? SubHeader, List<(string Label, string Href)> Items)> Groups, string? PromoImage, string? PromoCaption, string? PromoCtaText, string? PromoCtaHref)>();
 }
 <!DOCTYPE html>
 <html lang="@currentCulture" dir="@(isRtl ? "rtl" : "ltr")">
@@ -535,7 +546,11 @@
                                         <div class="main-nav-mega-columns">
                                             @foreach (var column in apparelMenuColumns.Take(5))
                                             {
-                                                <div class="main-nav-mega-column">
+                                                <div class="main-nav-mega-column"
+                                                     data-promo-image="@column.PromoImage"
+                                                     data-promo-caption="@column.PromoCaption"
+                                                     data-promo-cta-text="@column.PromoCtaText"
+                                                     data-promo-cta-href="@column.PromoCtaHref">
                                                     <h6 class="main-nav-mega-column-header">@column.Header</h6>
                                                     @foreach (var group in column.Groups)
                                                     {
