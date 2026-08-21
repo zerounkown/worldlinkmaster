@@ -543,7 +543,7 @@ a:hover {
   text-transform: uppercase;
   letter-spacing: 0.05em;
   font-size: 0.75rem;
-  color: var(--wlm-cream);
+  color: var(--wlm-sand);
   margin: 0 0 8px;
   padding-bottom: 4px;
 }
@@ -1366,7 +1366,7 @@ a:hover {
   text-transform: uppercase;
   letter-spacing: 0.05em;
   font-size: 0.72rem;
-  color: var(--wlm-cream);
+  color: var(--wlm-sand);
   margin-bottom: 14px;
   padding-bottom: 8px;
 }
