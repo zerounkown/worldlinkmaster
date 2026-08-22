@@ -20,7 +20,7 @@ public class PromoEventsController : AdminBaseController
 
     public async Task<IActionResult> Index()
     {
-        var events = await _context.PromoEvents.OrderBy(e => e.StartDate).ToListAsync();
+        var events = await _context.PromoEvents.AsNoTracking().OrderBy(e => e.StartDate).ToListAsync();
         return View(events);
     }
 

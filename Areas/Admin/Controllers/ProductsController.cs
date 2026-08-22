@@ -26,7 +26,7 @@ public class ProductsController : AdminBaseController
 
     public async Task<IActionResult> Index(string? search, int page = 1)
     {
-        var query = _context.Products.Include(p => p.Category).AsQueryable();
+        var query = _context.Products.AsNoTracking().Include(p => p.Category).AsQueryable();
 
         if (!string.IsNullOrWhiteSpace(search))
         {

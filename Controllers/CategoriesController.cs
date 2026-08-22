@@ -16,6 +16,7 @@ public class CategoriesController : Controller
     public async Task<IActionResult> Index()
     {
         var categories = await _context.Categories
+            .AsNoTracking()
             .Include(c => c.Products)
             .OrderBy(c => c.Name)
             .ToListAsync();

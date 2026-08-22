@@ -21,6 +21,7 @@ public class OrdersController : AdminBaseController
     public async Task<IActionResult> Index()
     {
         var orders = await _context.Orders
+            .AsNoTracking()
             .Include(o => o.User)
             .OrderByDescending(o => o.OrderDate)
             .ToListAsync();

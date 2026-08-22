@@ -22,6 +22,7 @@ public class SubcategoriesController : AdminBaseController
     public async Task<IActionResult> Index()
     {
         var subcategories = await _context.Subcategories
+            .AsNoTracking()
             .Include(s => s.Category)
             .Include(s => s.Products)
             .OrderBy(s => s.Category!.Name).ThenBy(s => s.Name)
@@ -57,6 +58,7 @@ public class SubcategoriesController : AdminBaseController
         if (subcategory == null)
         {
             return NotFound();
+            
         }
 
         ViewBag.Categories = new SelectList(await _context.Categories.OrderBy(c => c.Name).ToListAsync(), "Id", "Name", subcategory.CategoryId);
@@ -82,6 +84,7 @@ public class SubcategoriesController : AdminBaseController
         await _context.SaveChangesAsync();
         TempData["AdminMessage"] = _localizer["Subcategory '{0}' updated.", subcategory.Name].Value;
         return RedirectToAction(nameof(Index));
+
     }
 
     public async Task<IActionResult> Delete(int id)
@@ -117,3 +120,8 @@ public class SubcategoriesController : AdminBaseController
         return RedirectToAction(nameof(Index));
     }
 }
+
+
+
+
+
