@@ -153,13 +153,17 @@ public class SmtpEmailService : IEmailService
                 $"Your World Link Master order #{order.Id} has been delivered",
                 "Your order has been delivered",
                 "Your order has been marked as delivered. We hope you enjoy it!"),
+            OrderStatus.Cancelled => (
+                $"Your World Link Master order #{order.Id} has been cancelled",
+                "Your order has been cancelled",
+                "Your order has been cancelled and will not be shipped. If you've already been charged, our team will follow up separately about your refund. If you weren't expecting this, please contact us."),
             _ => (
                 $"Update on your World Link Master order #{order.Id}",
                 "Your order status has been updated",
                 $"Your order status is now: {order.Status}.")
         };
 
-        var trackingHtml = !string.IsNullOrWhiteSpace(order.TrackingNumber)
+        var trackingHtml = !string.IsNullOrWhiteSpace(order.TrackingNumber) && order.Status != OrderStatus.Cancelled
             ? $@"<p style='margin: 16px 0 0;'><strong>Carrier:</strong> {WebUtility.HtmlEncode(order.Carrier)}<br/>
                  <strong>Tracking number:</strong> {WebUtility.HtmlEncode(order.TrackingNumber)}{(order.TrackingUrl != null ? $" — <a href='{order.TrackingUrl}' style='color: #1b4332;'>Track your package</a>" : "")}</p>"
             : "";

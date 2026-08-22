@@ -73,6 +73,10 @@
             {
                 <div class="alert alert-success">@TempData["AdminMessage"]</div>
             }
+            @if (TempData["AdminError"] != null)
+            {
+                <div class="alert alert-danger">@TempData["AdminError"]</div>
+            }
             @RenderBody()
         </div>
     </div>

@@ -951,4 +951,6 @@
   <data name="Search results: {0}" xml:space="preserve"><value>نتائج البحث: {0}</value></data>
   <data name="Couldn't find that address. Please try a different search." xml:space="preserve"><value>تعذّر العثور على هذا العنوان. يرجى تجربة بحث مختلف.</value></data>
   <data name="Couldn't get your location. Please search by address instead." xml:space="preserve"><value>تعذّر تحديد موقعك. يرجى البحث بالعنوان بدلاً من ذلك.</value></data>
+  <data name="Cancelled" xml:space="preserve"><value>ملغى</value></data>
+  <data name="Order #{0} can't be cancelled — it's already {1}." xml:space="preserve"><value>لا يمكن إلغاء الطلب #{0} — حالته الحالية بالفعل {1}.</value></data>
 </root>

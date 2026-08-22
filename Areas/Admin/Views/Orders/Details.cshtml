@@ -40,9 +40,10 @@
             <form asp-action="UpdateStatus" asp-route-id="@Model.Id" method="post" class="mt-3">
                 <div class="d-flex gap-2">
                     <select name="status" class="form-select">
-                        @foreach (var status in new[] { OrderStatus.Pending, OrderStatus.Processing, OrderStatus.Shipped, OrderStatus.OutForDelivery, OrderStatus.Delivered })
+                        @foreach (var status in new[] { OrderStatus.Pending, OrderStatus.Processing, OrderStatus.Shipped, OrderStatus.OutForDelivery, OrderStatus.Delivered, OrderStatus.Cancelled })
                         {
-                            <option value="@status" selected="@(status == Model.Status)">@Localizer[status.ToString()]</option>
+                            var blocked = status == OrderStatus.Cancelled && (Model.Status == OrderStatus.Delivered || Model.Status == OrderStatus.Cancelled);
+                            <option value="@status" selected="@(status == Model.Status)" disabled="@blocked">@Localizer[status.ToString()]</option>
                         }
                     </select>
                 </div>

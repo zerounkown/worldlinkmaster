@@ -11,7 +11,8 @@ public enum OrderStatus
     Delivered = 3,
     // Added after Delivered (not inserted before it) so the existing Delivered=3 stays stable
     // for any orders already stored with that value — Status persists as a plain integer.
-    OutForDelivery = 4
+    OutForDelivery = 4,
+    Cancelled = 5
 }
 
 public class Order
