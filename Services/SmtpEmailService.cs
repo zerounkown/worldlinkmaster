@@ -133,6 +133,49 @@ public class SmtpEmailService : IEmailService
         return SendEmailAsync(toEmail, $"Your World Link Master order #{order.Id} is confirmed!", html);
     }
 
+    public Task SendOrderStatusUpdateAsync(Order order, string toEmail)
+    {
+        var (subject, headline, body) = order.Status switch
+        {
+            OrderStatus.Processing => (
+                $"Your World Link Master order #{order.Id} is being processed",
+                "Your order is being processed",
+                "We've started preparing your order for shipment. We'll email you again as soon as it's on its way."),
+            OrderStatus.Shipped => (
+                $"Your World Link Master order #{order.Id} has shipped!",
+                "Your order has shipped",
+                "Good news — your order is on its way."),
+            OrderStatus.OutForDelivery => (
+                $"Your World Link Master order #{order.Id} is out for delivery",
+                "Your order is out for delivery",
+                "Your order is out for delivery and should arrive today."),
+            OrderStatus.Delivered => (
+                $"Your World Link Master order #{order.Id} has been delivered",
+                "Your order has been delivered",
+                "Your order has been marked as delivered. We hope you enjoy it!"),
+            _ => (
+                $"Update on your World Link Master order #{order.Id}",
+                "Your order status has been updated",
+                $"Your order status is now: {order.Status}.")
+        };
+
+        var trackingHtml = !string.IsNullOrWhiteSpace(order.TrackingNumber)
+            ? $@"<p style='margin: 16px 0 0;'><strong>Carrier:</strong> {WebUtility.HtmlEncode(order.Carrier)}<br/>
+                 <strong>Tracking number:</strong> {WebUtility.HtmlEncode(order.TrackingNumber)}{(order.TrackingUrl != null ? $" — <a href='{order.TrackingUrl}' style='color: #1b4332;'>Track your package</a>" : "")}</p>"
+            : "";
+
+        var html = $@"
+            <div style='font-family: Arial, sans-serif; max-width: 520px; margin: 0 auto;'>
+                <h2 style='color: #1b4332;'>{headline}</h2>
+                <p>Order #{order.Id} is now <strong>{order.Status}</strong>.</p>
+                <p>{body}</p>
+                {trackingHtml}
+                <p style='color: #777; font-size: 12px; margin-top: 16px;'>You can review this order any time in My Orders on the World Link Master website.</p>
+            </div>";
+
+        return SendEmailAsync(toEmail, subject, html);
+    }
+
     public Task SendQuoteRequestNotificationAsync(QuoteRequest request)
     {
         var notifyAddress = _configuration["Email:NotificationAddress"];
