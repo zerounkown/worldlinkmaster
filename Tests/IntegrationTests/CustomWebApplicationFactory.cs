@@ -43,16 +43,31 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
 
         builder.ConfigureServices(services =>
         {
+            // Program.cs registers ApplicationDbContext via AddDbContextFactory + a scoped
+            // context derived from that factory (rather than a plain AddDbContext) so
+            // ProductsController.Index can fan its facet-count queries out to their own
+            // short-lived contexts. Swapping in SQLite for tests has to remove and replace both
+            // registrations the same way — removing only DbContextOptions<ApplicationDbContext>
+            // leaves the real app's singleton IDbContextFactory<ApplicationDbContext> in place,
+            // which then conflicts with whatever DbContextOptions gets registered next (the same
+            // "singleton can't depend on scoped options" error Program.cs itself had to avoid).
             var dbContextDescriptor = services.SingleOrDefault(d => d.ServiceType == typeof(DbContextOptions<ApplicationDbContext>));
             if (dbContextDescriptor != null)
             {
                 services.Remove(dbContextDescriptor);
             }
 
-            services.AddDbContext<ApplicationDbContext>(options =>
+            var dbContextFactoryDescriptor = services.SingleOrDefault(d => d.ServiceType == typeof(IDbContextFactory<ApplicationDbContext>));
+            if (dbContextFactoryDescriptor != null)
+            {
+                services.Remove(dbContextFactoryDescriptor);
+            }
+
+            services.AddDbContextFactory<ApplicationDbContext>(options =>
             {
                 options.UseSqlite(_connection);
             });
+            services.AddScoped(sp => sp.GetRequiredService<IDbContextFactory<ApplicationDbContext>>().CreateDbContext());
 
             services.AddAuthentication(TestAuthHandler.SchemeName)
                 .AddScheme<AuthenticationSchemeOptions, TestAuthHandler>(TestAuthHandler.SchemeName, _ => { });
