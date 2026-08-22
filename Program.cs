@@ -7,6 +7,8 @@ using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Localization;
 using Microsoft.AspNetCore.Mvc.Razor;
+using Microsoft.AspNetCore.ResponseCompression;
+using Microsoft.AspNetCore.StaticFiles;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using StackExchange.Redis;
@@ -87,6 +89,22 @@ builder.Services.ConfigureApplicationCookie(options =>
     options.LoginPath = "/Identity/Account/Login";
     options.AccessDeniedPath = "/Identity/Account/AccessDenied";
 });
+
+// ---------------------------------------------------------------------------
+// Response compression — text-based responses (HTML/CSS/JS/JSON/SVG) were being sent
+// uncompressed. EnableForHttps is safe here: none of these responses embed a per-user secret
+// that varies with attacker-controlled input in a way BREACH/CRIME-style attacks need, and this
+// is the standard, widely-used posture for a public storefront.
+// ---------------------------------------------------------------------------
+builder.Services.AddResponseCompression(options =>
+{
+    options.EnableForHttps = true;
+    options.Providers.Add<BrotliCompressionProvider>();
+    options.Providers.Add<GzipCompressionProvider>();
+    options.MimeTypes = ResponseCompressionDefaults.MimeTypes.Concat(["image/svg+xml"]);
+});
+builder.Services.Configure<BrotliCompressionProviderOptions>(options => options.Level = System.IO.Compression.CompressionLevel.Fastest);
+builder.Services.Configure<GzipCompressionProviderOptions>(options => options.Level = System.IO.Compression.CompressionLevel.Fastest);
 
 // No ResourcesPath configured deliberately: SharedResource.cs already lives in a folder (and
 // namespace) called "Resources", so its compiled resource name is "WorldLinkMaster.Web.Resources.
@@ -308,8 +326,24 @@ else
     app.UseHsts();
 }
 
+// Must run before UseStaticFiles/MVC so it can compress whatever they write to the response body.
+app.UseResponseCompression();
+
 app.UseHttpsRedirection();
-app.UseStaticFiles();
+
+// A 7-day Cache-Control lets repeat visits read CSS/JS/images from the browser's local cache
+// instead of revalidating every request. Not the full 1-year "immutable" some assets could take
+// (asp-append-version content-hashes CSS/JS, but plenty of <img> tags reference wwwroot files
+// directly with no cache-busting query string — e.g. the footer payment icons this same
+// performance pass just resized), so 7 days bounds how long a swapped-in-place image can look
+// stale in a returning visitor's cache to something reasonable, rather than up to a year.
+app.UseStaticFiles(new StaticFileOptions
+{
+    OnPrepareResponse = ctx =>
+    {
+        ctx.Context.Response.Headers.CacheControl = "public,max-age=604800";
+    }
+});
 
 app.UseRequestLocalization(localizationOptions);
 
