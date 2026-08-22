@@ -13,13 +13,15 @@ public class ProductsController : Controller
 {
     private const int PageSize = 9;
     private readonly ApplicationDbContext _context;
+    private readonly IDbContextFactory<ApplicationDbContext> _contextFactory;
     private readonly IPromoService _promoService;
     private readonly IProductReviewService _reviewService;
     private readonly UserManager<ApplicationUser> _userManager;
 
-    public ProductsController(ApplicationDbContext context, IPromoService promoService, IProductReviewService reviewService, UserManager<ApplicationUser> userManager)
+    public ProductsController(ApplicationDbContext context, IDbContextFactory<ApplicationDbContext> contextFactory, IPromoService promoService, IProductReviewService reviewService, UserManager<ApplicationUser> userManager)
     {
         _context = context;
+        _contextFactory = contextFactory;
         _promoService = promoService;
         _reviewService = reviewService;
         _userManager = userManager;
@@ -66,33 +68,44 @@ public class ProductsController : Controller
             .GroupBy(f => f.Code)
             .ToDictionary(g => g.Key, g => g.Select(f => f.Value).ToList());
 
-        var baseQuery = _context.Products
-            .AsNoTracking()
-            .Where(p => p.IsPublished)
-            .Include(p => p.Category)
-            .Include(p => p.Brand)
-            .Include(p => p.Variants).ThenInclude(v => v.Color)
-            .Include(p => p.Variants).ThenInclude(v => v.Size)
-            .Include(p => p.Variants).ThenInclude(v => v.ProductColor)
-            .Include(p => p.Features)
-            .Include(p => p.ProductColors.Where(pc => pc.Active).OrderBy(pc => pc.DisplayOrder))
-            .Include(p => p.Media.Where(m => m.Active).OrderBy(m => m.DisplayOrder))
-            .AsSplitQuery()
-            .AsQueryable();
-
-        if (categoryId.HasValue)
+        // Factored out (rather than a plain local variable) so the facet-count queries below can
+        // rebuild the same filtered base query against their own separate DbContext instances —
+        // needed to actually run them concurrently, since a single context can't handle more than
+        // one in-flight query at a time.
+        IQueryable<Product> BuildBaseQuery(ApplicationDbContext ctx)
         {
-            baseQuery = baseQuery.Where(p => p.CategoryId == categoryId.Value);
+            var q = ctx.Products
+                .AsNoTracking()
+                .Where(p => p.IsPublished)
+                .Include(p => p.Category)
+                .Include(p => p.Brand)
+                .Include(p => p.Variants).ThenInclude(v => v.Color)
+                .Include(p => p.Variants).ThenInclude(v => v.Size)
+                .Include(p => p.Variants).ThenInclude(v => v.ProductColor)
+                .Include(p => p.Features)
+                .Include(p => p.ProductColors.Where(pc => pc.Active).OrderBy(pc => pc.DisplayOrder))
+                .Include(p => p.Media.Where(m => m.Active).OrderBy(m => m.DisplayOrder))
+                .AsSplitQuery()
+                .AsQueryable();
+
+            if (categoryId.HasValue)
+            {
+                q = q.Where(p => p.CategoryId == categoryId.Value);
+            }
+
+            if (!string.IsNullOrWhiteSpace(search))
+            {
+                q = q.Where(p =>
+                    p.Name.Contains(search) ||
+                    (p.ShortDescription != null && p.ShortDescription.Contains(search)) ||
+                    (p.NameAr != null && p.NameAr.Contains(search)) ||
+                    (p.ShortDescriptionAr != null && p.ShortDescriptionAr.Contains(search)));
+            }
+
+            return q;
         }
 
-        if (!string.IsNullOrWhiteSpace(search))
-        {
-            baseQuery = baseQuery.Where(p =>
-                p.Name.Contains(search) ||
-                (p.ShortDescription != null && p.ShortDescription.Contains(search)) ||
-                (p.NameAr != null && p.NameAr.Contains(search)) ||
-                (p.ShortDescriptionAr != null && p.ShortDescriptionAr.Contains(search)));
-        }
+        var baseQuery = BuildBaseQuery(_context);
 
         // Applies every sidebar facet except whichever one is being counted for its own
         // options — a facet's own counts should reflect "if I also picked this", not shrink
@@ -200,55 +213,81 @@ public class ProductsController : Controller
         var allBrands = await _context.Brands.AsNoTracking().ToListAsync();
         ViewBag.ActiveEvent = await _promoService.GetTopActiveEventAsync();
 
-        // Facet counts — each one applies every filter except its own dimension. Subcategory
-        // counts only make sense once a top-level category narrows the field.
-        var subcategoryCountsById = new Dictionary<int, int>();
-        if (categoryId.HasValue)
+        // Facet counts — each one applies every filter except its own dimension. Previously 7-8
+        // separate awaits run one after another on the request's own context; run them
+        // concurrently instead, each against its own short-lived DbContext from _contextFactory
+        // (a single context can't have more than one query in flight at once, so true
+        // parallelism needs separate connections, not just separate Tasks).
+        async Task<T> WithFacetContextAsync<T>(Func<ApplicationDbContext, IQueryable<Product>, Task<T>> work)
         {
-            subcategoryCountsById = await ApplyFacets(baseQuery, skipSubcategory: true)
+            await using var facetContext = await _contextFactory.CreateDbContextAsync();
+            return await work(facetContext, BuildBaseQuery(facetContext));
+        }
+
+        // Subcategory counts only make sense once a top-level category narrows the field.
+        var subcategoryCountsTask = categoryId.HasValue
+            ? WithFacetContextAsync((_, bq) => ApplyFacets(bq, skipSubcategory: true)
                 .Where(p => p.SubcategoryId.HasValue)
                 .GroupBy(p => p.SubcategoryId!.Value)
                 .Select(g => new { Id = g.Key, Count = g.Count() })
-                .ToDictionaryAsync(x => x.Id, x => x.Count);
-        }
+                .ToDictionaryAsync(x => x.Id, x => x.Count))
+            : Task.FromResult(new Dictionary<int, int>());
 
-        var brandFacets = await ApplyFacets(baseQuery, skipBrand: true)
+        var brandFacetsTask = WithFacetContextAsync((_, bq) => ApplyFacets(bq, skipBrand: true)
             .Where(p => p.BrandId.HasValue)
             .GroupBy(p => p.BrandId!.Value)
             .Select(g => new { Id = g.Key, Count = g.Count() })
-            .ToListAsync();
+            .ToListAsync());
 
-        var colorFacets = await ApplyFacets(baseQuery, skipColor: true)
+        var colorFacetsTask = WithFacetContextAsync((_, bq) => ApplyFacets(bq, skipColor: true)
             .SelectMany(p => p.Variants.Where(v => v.Color != null), (p, v) => new { p.Id, v.Color!.Name, v.Color.HexCode })
             .GroupBy(x => new { x.Name, x.HexCode })
             .Select(g => new ColorFacetCount { Name = g.Key.Name, HexCode = g.Key.HexCode, Count = g.Select(x => x.Id).Distinct().Count() })
             .OrderByDescending(x => x.Count)
-            .ToListAsync();
+            .ToListAsync());
 
-        var sizeFacets = await ApplyFacets(baseQuery, skipSize: true)
+        var sizeFacetsTask = WithFacetContextAsync((_, bq) => ApplyFacets(bq, skipSize: true)
             .SelectMany(p => p.Variants.Where(v => v.Size != null), (p, v) => new { p.Id, v.Size!.Label })
             .GroupBy(x => x.Label)
             .Select(g => new LabelFacetCount { Label = g.Key, Count = g.Select(x => x.Id).Distinct().Count() })
             .OrderByDescending(x => x.Count)
-            .ToListAsync();
+            .ToListAsync());
 
-        var featureFacets = await ApplyFacets(baseQuery, skipFeature: true)
+        var featureFacetsTask = WithFacetContextAsync((_, bq) => ApplyFacets(bq, skipFeature: true)
             .SelectMany(p => p.Features, (p, f) => new { ProductId = p.Id, FeatureId = f.Id, f.Name, f.NameAr })
             .GroupBy(x => new { x.FeatureId, x.Name, x.NameAr })
             .Select(g => new FacetCount { Id = g.Key.FeatureId, Name = g.Key.Name, NameAr = g.Key.NameAr, Count = g.Select(x => x.ProductId).Distinct().Count() })
             .OrderByDescending(x => x.Count)
-            .ToListAsync();
+            .ToListAsync());
 
-        var availabilityBase = ApplyFacets(baseQuery, skipAvailability: true);
-        var inStockCount = await availabilityBase.CountAsync(p => p.StockQuantity > 0);
-        var outOfStockCount = await availabilityBase.CountAsync(p => p.StockQuantity == 0);
-
-        var ratingBase = ApplyFacets(baseQuery, skipRating: true);
-        var ratingCounts = new Dictionary<int, int>();
-        for (var stars = 4; stars >= 1; stars--)
+        var availabilityTask = WithFacetContextAsync(async (_, bq) =>
         {
-            ratingCounts[stars] = await ratingBase.CountAsync(p => p.Rating >= stars);
-        }
+            var availabilityBase = ApplyFacets(bq, skipAvailability: true);
+            var inStock = await availabilityBase.CountAsync(p => p.StockQuantity > 0);
+            var outOfStock = await availabilityBase.CountAsync(p => p.StockQuantity == 0);
+            return (InStock: inStock, OutOfStock: outOfStock);
+        });
+
+        var ratingTask = WithFacetContextAsync(async (_, bq) =>
+        {
+            var ratingBase = ApplyFacets(bq, skipRating: true);
+            var counts = new Dictionary<int, int>();
+            for (var stars = 4; stars >= 1; stars--)
+            {
+                counts[stars] = await ratingBase.CountAsync(p => p.Rating >= stars);
+            }
+            return counts;
+        });
+
+        await Task.WhenAll(subcategoryCountsTask, brandFacetsTask, colorFacetsTask, sizeFacetsTask, featureFacetsTask, availabilityTask, ratingTask);
+
+        var subcategoryCountsById = await subcategoryCountsTask;
+        var brandFacets = await brandFacetsTask;
+        var colorFacets = await colorFacetsTask;
+        var sizeFacets = await sizeFacetsTask;
+        var featureFacets = await featureFacetsTask;
+        var (inStockCount, outOfStockCount) = await availabilityTask;
+        var ratingCounts = await ratingTask;
 
         var subcategoryLookup = categories.SelectMany(c => c.Subcategories).ToDictionary(s => s.Id);
         var brandLookup = allBrands.ToDictionary(b => b.Id);
