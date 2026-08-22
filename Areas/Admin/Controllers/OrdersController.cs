@@ -4,6 +4,7 @@ using Microsoft.Extensions.Localization;
 using WorldLinkMaster.Web.Data;
 using WorldLinkMaster.Web.Models;
 using WorldLinkMaster.Web.Resources;
+using WorldLinkMaster.Web.Services;
 
 namespace WorldLinkMaster.Web.Areas.Admin.Controllers;
 
@@ -11,11 +12,13 @@ public class OrdersController : AdminBaseController
 {
     private readonly ApplicationDbContext _context;
     private readonly IStringLocalizer<SharedResource> _localizer;
+    private readonly IEmailService _emailService;
 
-    public OrdersController(ApplicationDbContext context, IStringLocalizer<SharedResource> localizer)
+    public OrdersController(ApplicationDbContext context, IStringLocalizer<SharedResource> localizer, IEmailService emailService)
     {
         _context = context;
         _localizer = localizer;
+        _emailService = emailService;
     }
 
     public async Task<IActionResult> Index()
@@ -48,12 +51,13 @@ public class OrdersController : AdminBaseController
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> UpdateStatus(int id, OrderStatus status, string? trackingNumber)
     {
-        var order = await _context.Orders.FindAsync(id);
+        var order = await _context.Orders.Include(o => o.User).FirstOrDefaultAsync(o => o.Id == id);
         if (order == null)
         {
             return NotFound();
         }
 
+        var statusChanged = order.Status != status;
         order.Status = status;
         order.TrackingNumber = string.IsNullOrWhiteSpace(trackingNumber) ? null : trackingNumber.Trim();
 
@@ -67,6 +71,12 @@ public class OrdersController : AdminBaseController
         }
 
         await _context.SaveChangesAsync();
+
+        if (statusChanged && !string.IsNullOrWhiteSpace(order.User?.Email))
+        {
+            await _emailService.SendOrderStatusUpdateAsync(order, order.User.Email);
+        }
+
         TempData["AdminMessage"] = _localizer["Order #{0} status updated to {1}.", order.Id, _localizer[status.ToString()].Value].Value;
 
         return RedirectToAction(nameof(Details), new { id });

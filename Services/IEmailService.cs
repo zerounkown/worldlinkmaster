@@ -12,6 +12,8 @@ public interface IEmailService
 
     Task SendOrderConfirmationAsync(Order order, string toEmail);
 
+    Task SendOrderStatusUpdateAsync(Order order, string toEmail);
+
     Task SendQuoteRequestNotificationAsync(QuoteRequest request);
 
     // Sent to the customer when an admin responds (status/price/notes) so they don't have to
