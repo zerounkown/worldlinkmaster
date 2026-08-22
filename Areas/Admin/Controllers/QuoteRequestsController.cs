@@ -23,7 +23,7 @@ public class QuoteRequestsController : AdminBaseController
 
     public async Task<IActionResult> Index(QuoteStatus? status)
     {
-        var query = _context.QuoteRequests.AsQueryable();
+        var query = _context.QuoteRequests.AsNoTracking().AsQueryable();
         if (status.HasValue)
         {
             query = query.Where(q => q.Status == status.Value);

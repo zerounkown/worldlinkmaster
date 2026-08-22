@@ -20,7 +20,7 @@ public class CategoriesController : AdminBaseController
 
     public async Task<IActionResult> Index()
     {
-        var categories = await _context.Categories.Include(c => c.Products).OrderBy(c => c.Name).ToListAsync();
+        var categories = await _context.Categories.AsNoTracking().Include(c => c.Products).OrderBy(c => c.Name).ToListAsync();
         return View(categories);
     }
 

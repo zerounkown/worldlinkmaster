@@ -20,6 +20,7 @@ public class HomeController : AdminBaseController
         ViewBag.OrderCount = await _context.Orders.CountAsync();
         ViewBag.CustomerCount = await _context.Users.CountAsync();
         ViewBag.RecentOrders = await _context.Orders
+            .AsNoTracking()
             .OrderByDescending(o => o.OrderDate)
             .Take(5)
             .ToListAsync();

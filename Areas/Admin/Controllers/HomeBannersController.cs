@@ -20,7 +20,7 @@ public class HomeBannersController : AdminBaseController
 
     public async Task<IActionResult> Index()
     {
-        var banners = await _context.HomeBanners.OrderBy(b => b.DisplayOrder).ToListAsync();
+        var banners = await _context.HomeBanners.AsNoTracking().OrderBy(b => b.DisplayOrder).ToListAsync();
         return View(banners);
     }
 

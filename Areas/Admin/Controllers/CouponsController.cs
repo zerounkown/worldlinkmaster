@@ -21,6 +21,7 @@ public class CouponsController : AdminBaseController
     public async Task<IActionResult> Index()
     {
         var coupons = await _context.Coupons
+            .AsNoTracking()
             .Where(c => c.Source == CouponSource.AdminPromo)
             .OrderByDescending(c => c.CreatedAt)
             .ToListAsync();

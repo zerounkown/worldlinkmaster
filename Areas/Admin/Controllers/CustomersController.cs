@@ -24,8 +24,9 @@ public class CustomersController : AdminBaseController
 
     public async Task<IActionResult> Index()
     {
-        var users = await _userManager.Users.OrderBy(u => u.Email).ToListAsync();
+        var users = await _userManager.Users.AsNoTracking().OrderBy(u => u.Email).ToListAsync();
         var orderCounts = await _context.Orders
+            .AsNoTracking()
             .GroupBy(o => o.UserId)
             .Select(g => new { UserId = g.Key, Count = g.Count() })
             .ToDictionaryAsync(x => x.UserId, x => x.Count);

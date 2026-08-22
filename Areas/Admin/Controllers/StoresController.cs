@@ -20,7 +20,7 @@ public class StoresController : AdminBaseController
 
     public async Task<IActionResult> Index()
     {
-        var stores = await _context.Stores.OrderBy(s => s.DisplayOrder).ToListAsync();
+        var stores = await _context.Stores.AsNoTracking().OrderBy(s => s.DisplayOrder).ToListAsync();
         return View(stores);
     }
 

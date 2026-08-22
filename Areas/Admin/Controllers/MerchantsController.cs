@@ -16,6 +16,7 @@ public class MerchantsController : AdminBaseController
     public async Task<IActionResult> Index()
     {
         var merchants = await _context.Merchants
+            .AsNoTracking()
             .Include(m => m.User)
             .Include(m => m.Products)
             .OrderBy(m => m.BusinessName)

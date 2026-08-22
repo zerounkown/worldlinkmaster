@@ -35,6 +35,7 @@ public class HomeController : Controller
         // Feeds the auto-scrolling "What We Sell" product strip — featured items first, topped
         // up with the newest arrivals so the strip always has enough items for a smooth loop.
         var scrollProducts = await _context.Products
+            .AsNoTracking()
             .Where(p => p.IsPublished)
             .OrderByDescending(p => p.IsFeatured)
             .ThenByDescending(p => p.CreatedAt)
@@ -42,13 +43,14 @@ public class HomeController : Controller
             .ToListAsync();
         ViewBag.ScrollProducts = scrollProducts;
         ViewBag.HomeBanners = await _context.HomeBanners
+            .AsNoTracking()
             .Where(b => b.Active)
             .OrderBy(b => b.DisplayOrder)
             .ToListAsync();
-        ViewBag.Categories = await _context.Categories.OrderBy(c => c.Name).ToListAsync();
+        ViewBag.Categories = await _context.Categories.AsNoTracking().OrderBy(c => c.Name).ToListAsync();
         // Only show brands with a real logo in the "Shop by Brand" row — mixing those in
         // with plain text-wordmark placeholder tiles looked inconsistent.
-        ViewBag.Brands = await _context.Brands.Where(b => b.LogoUrl != null)
+        ViewBag.Brands = await _context.Brands.AsNoTracking().Where(b => b.LogoUrl != null)
             .OrderByDescending(b => b.Name == "WLM")
             .ThenBy(b => b.Name)
             .ToListAsync();
@@ -56,6 +58,7 @@ public class HomeController : Controller
 
         // "Best sellers" — approximated by review volume/rating since there's no sales-count field yet.
         ViewBag.BestSellers = await _context.Products
+            .AsNoTracking()
             .Where(p => p.IsPublished)
             .Include(p => p.Variants).ThenInclude(v => v.Color)
             .Include(p => p.Variants).ThenInclude(v => v.Size)
@@ -69,6 +72,7 @@ public class HomeController : Controller
             .ToListAsync();
 
         ViewBag.NewArrivals = await _context.Products
+            .AsNoTracking()
             .Where(p => p.IsPublished)
             .Include(p => p.Variants).ThenInclude(v => v.Color)
             .Include(p => p.Variants).ThenInclude(v => v.Size)
@@ -96,6 +100,7 @@ public class HomeController : Controller
     public async Task<IActionResult> Locations()
     {
         var stores = await _context.Stores
+            .AsNoTracking()
             .Where(s => s.Active)
             .OrderBy(s => s.DisplayOrder)
             .ToListAsync();
