@@ -32,7 +32,7 @@ if (string.IsNullOrWhiteSpace(connectionString))
         "Connection string 'DefaultConnection' is not configured. Set the ConnectionStrings__DefaultConnection environment variable.");
 }
 
-builder.Services.AddDbContext<ApplicationDbContext>(options =>
+void ConfigureNpgsql(DbContextOptionsBuilder options) =>
     options.UseNpgsql(connectionString, npgsql =>
     {
         npgsql.EnableRetryOnFailure(
@@ -40,7 +40,22 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
             maxRetryDelay: TimeSpan.FromSeconds(10),
             errorCodesToAdd: null);
         npgsql.CommandTimeout(60);
-    }));
+    });
+
+// A single DbContext instance can't run more than one query concurrently — anything that wants
+// to fan multiple queries out in parallel (e.g. ProductsController.Index's facet counts) needs
+// its own short-lived context per query rather than sharing the request's scoped one.
+//
+// Registering AddDbContext<T>(...) and AddDbContextFactory<T>(...) side by side (both configuring
+// their own DbContextOptions<T>) throws at startup — "Cannot consume scoped service
+// DbContextOptions<T> from singleton IDbContextFactory<T>" — because AddDbContextFactory's
+// factory is a singleton but AddDbContext registers DbContextOptions<T> as scoped, and a
+// singleton can't depend on a scoped service. The fix is to register only the factory (its own
+// DbContextOptions<T> stays internal to it, never exposed as a separate scoped registration),
+// then derive the ordinary per-request scoped ApplicationDbContext FROM that same factory instead
+// of configuring it a second, independent way.
+builder.Services.AddDbContextFactory<ApplicationDbContext>(ConfigureNpgsql);
+builder.Services.AddScoped(sp => sp.GetRequiredService<IDbContextFactory<ApplicationDbContext>>().CreateDbContext());
 builder.Services.AddDatabaseDeveloperPageExceptionFilter();
 
 // ---------------------------------------------------------------------------
