@@ -57,6 +57,12 @@ public class OrdersController : AdminBaseController
             return NotFound();
         }
 
+        if (status == OrderStatus.Cancelled && (order.Status == OrderStatus.Delivered || order.Status == OrderStatus.Cancelled))
+        {
+            TempData["AdminError"] = _localizer["Order #{0} can't be cancelled — it's already {1}.", order.Id, _localizer[order.Status.ToString()].Value].Value;
+            return RedirectToAction(nameof(Details), new { id });
+        }
+
         var statusChanged = order.Status != status;
         order.Status = status;
         order.TrackingNumber = string.IsNullOrWhiteSpace(trackingNumber) ? null : trackingNumber.Trim();
