@@ -565,9 +565,10 @@ enable3dTilt(".category-preview-card", 12, -6);
 // (via closest()) rather than using a single global selector, which would only ever find the
 // first panel in the DOM regardless of which dropdown is actually open.
 //
-// The Apparel dropdown additionally carries data-promo-* on whole .main-nav-mega-column
-// containers (not just subitems) — its columns group many items under one representative image,
-// unlike the generic per-subcategory dropdowns — so both selectors are queried and merged below.
+// The Apparel dropdown additionally carries data-promo-* on whole .main-nav-mega-group
+// containers (not just subitems) — each group (Featured, T-Shirts, ...) represents one image,
+// several of which stack inside a single physical column — so both selectors are queried and
+// merged below.
 (function () {
     "use strict";
 
@@ -579,7 +580,7 @@ enable3dTilt(".category-preview-card", 12, -6);
     var preloadedDropdowns = new WeakSet();
 
     function promoTriggers(dropdown) {
-        return dropdown.querySelectorAll(".main-nav-mega-subitem[data-promo-image], .main-nav-mega-column[data-promo-image]");
+        return dropdown.querySelectorAll(".main-nav-mega-subitem[data-promo-image], .main-nav-mega-group[data-promo-image]");
     }
 
     function preloadImages(dropdown) {

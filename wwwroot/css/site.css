@@ -487,16 +487,10 @@ a:hover {
   gap: 36px;
 }
 
-/* One column per group (Tops/Bottoms/etc. — see BuildMegaColumns in _Layout.cshtml). auto-fill +
+/* One column per group (Tops/Bottoms/etc. — see BuildMegaColumns in _Layout.cshtml), or per
+   stacked group of groups for Apparel (see apparelMenuColumnGroups in _Layout.cshtml). auto-fill +
    minmax lets the grid reflow to fewer columns per row on narrower desktop/tablet widths without
-   any extra breakpoint rules, and to more on wide monitors; Gear & Accessories alone renders 6.
-   auto-fill (not auto-fit) specifically: for the Apparel panel's two-row split below, both rows
-   sit in same-width containers, so both compute the same number of tracks at a given viewport —
-   auto-fit would then collapse whichever row has fewer actual items down to fewer, wider tracks
-   (since it removes empty tracks entirely before the remaining ones stretch to fill the row),
-   misaligning its column edges against the other row's. auto-fill keeps the unused trailing
-   tracks in place instead of collapsing them, so track widths — and left edges — stay identical
-   between the two rows regardless of how many items each one actually has. */
+   any extra breakpoint rules, and to more on wide monitors; Gear & Accessories alone renders 6. */
 .main-nav-mega-columns {
   flex: 1 1 0;
   min-width: 0;
@@ -506,30 +500,19 @@ a:hover {
   align-content: start;
 }
 
-/* Apparel-only: 8 columns (5 garment-type + 3 attribute-filter — see BuildApparelMenuAsync in
-   _Layout.cshtml) don't fit one row cleanly, so they're split into two stacked grids instead of
-   relying on the shared auto-fit grid to wrap unpredictably wherever it runs out of room. Each row
-   keeps its own auto-fit reflow (more columns per row on wide monitors, fewer on narrower desktop
-   widths), just grouped deliberately: row 1 is "browse by garment type," row 2 is "filter by
-   attribute," rather than an arbitrary 5/3 split forced by viewport width. */
-.main-nav-mega-columns-wrap {
-  flex: 1 1 0;
+/* Apparel-only: a physical column can hold more than one group stacked vertically (e.g. Featured
+   + Pants in one column — see apparelMenuColumnGroups in _Layout.cshtml) so the panel uses fewer,
+   taller columns instead of one column per group with a lot of empty space under the shorter
+   ones. The gap here is the seam between stacked groups within a column; .main-nav-mega-group is
+   each individual group's own header + items, unchanged in appearance from before. */
+.main-nav-mega-column {
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 20px;
 }
 
-.main-nav-mega-columns-wrap .main-nav-mega-columns {
-  flex: 0 0 auto;
-}
-
-.main-nav-mega-columns-secondary {
-  padding-top: 8px;
-  border-top: 1px solid rgba(255, 255, 255, 0.14);
-}
-
-.main-nav-mega-column {
+.main-nav-mega-group {
   min-width: 0;
   display: flex;
   flex-direction: column;
@@ -548,14 +531,14 @@ a:hover {
   padding-bottom: 4px;
 }
 
-/* Thin gold underline at a fixed width, the same for every column regardless of how long that
-   column's own header text is — deliberately not sized to the text (a short header like
-   "Pants" and a long one like "Colors & Brands" both get the same underline). */
+/* Gold underline at a fixed width, the same for every header regardless of how long that
+   header's own text is — deliberately not sized to the text (a short header like "Pants" and a
+   long one like "Colors & Brands" both get the same underline). */
 .main-nav-mega-column-header::after {
   content: "";
   position: absolute;
   left: 0;
-  width: 32px;
+  width: 90px;
   bottom: 0;
   height: 2px;
   background: var(--wlm-gold-bronze);
@@ -1371,13 +1354,13 @@ a:hover {
   padding-bottom: 8px;
 }
 
-/* Thin gold underline at a fixed width, same as the desktop column header
+/* Gold underline at a fixed width, same as the desktop column header
    (.main-nav-mega-column-header) — not sized to the header text. */
 .side-nav-subgroup-header::after {
   content: "";
   position: absolute;
   left: 0;
-  width: 32px;
+  width: 90px;
   bottom: 0;
   height: 2px;
   background: var(--wlm-gold-bronze);
