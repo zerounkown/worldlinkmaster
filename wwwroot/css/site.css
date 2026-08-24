@@ -537,10 +537,10 @@ a:hover {
   content: "";
   position: absolute;
   left: 0;
-  width: 90px;
+  width: 130px;
   bottom: 0;
   height: 2px;
-  background: var(--wlm-gold-bronze);
+  background: var(--wlm-sand);
 }
 
 /* Sub-label inside a curated mega-menu column (e.g. "Alpha Sizes" / "Waist Sizes" under the
@@ -1358,10 +1358,10 @@ a:hover {
   content: "";
   position: absolute;
   left: 0;
-  width: 90px;
+  width: 130px;
   bottom: 0;
   height: 2px;
-  background: var(--wlm-gold-bronze);
+  background: var(--wlm-sand);
 }
 
 /* Sub-label within an Apparel side-nav subgroup (e.g. "Alpha Sizes" / "Waist Sizes") — same role
