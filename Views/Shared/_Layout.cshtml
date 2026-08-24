@@ -377,6 +377,25 @@
     var apparelMenuColumns = apparelCategoryForMenu != null
         ? await BuildApparelMenuAsync(apparelCategoryForMenu)
         : new List<(string Header, List<(string? SubHeader, List<(string Label, string Href)> Items)> Groups, string? PromoImage, string? PromoCaption, string? PromoCtaText, string? PromoCtaHref)>();
+
+    // Which of the 8 apparelMenuColumns entries (0=Featured, 1=T-Shirts, 2=Pants,
+    // 3=Jackets & Outerwear, 4=Uniforms & Shirts, 5=Shop by Use, 6=Shop by Size,
+    // 7=Colors & Brands) stack into each physical desktop column — replaces the old fixed
+    // 5-then-3 two-row split with fewer, taller columns sized by content, so shorter groups
+    // share a column instead of each getting its own mostly-empty one. Shop by Size and Colors
+    // & Brands stay alone since each is already a substantial two-subgroup column on its own;
+    // the five garment-type/use groups pair up by rendered length (Pants/Jackets/Uniforms each
+    // run longer than Featured/T-Shirts/Shop by Use, so each tall one is paired with a short
+    // one). Mobile's side-nav panel is unaffected — it already renders all 8 as one flat
+    // stacked list regardless of this grouping (see apparelMenuColumns.Take/foreach below).
+    var apparelMenuColumnGroups = new[]
+    {
+        new[] { 0, 2 }, // Featured + Pants
+        new[] { 1, 4 }, // T-Shirts + Uniforms & Shirts
+        new[] { 3, 5 }, // Jackets & Outerwear + Shop by Use
+        new[] { 6 },    // Shop by Size
+        new[] { 7 }     // Colors & Brands
+    };
 }
 <!DOCTYPE html>
 <html lang="@currentCulture" dir="@(isRtl ? "rtl" : "ltr")">
@@ -528,49 +547,34 @@
                             <div class="main-nav-mega-body">
                                 @if (isApparelCategory)
                                 {
-                                    <div class="main-nav-mega-columns-wrap">
-                                        <div class="main-nav-mega-columns">
-                                            @foreach (var column in apparelMenuColumns.Take(5))
-                                            {
-                                                <div class="main-nav-mega-column"
-                                                     data-promo-image="@column.PromoImage"
-                                                     data-promo-caption="@column.PromoCaption"
-                                                     data-promo-cta-text="@column.PromoCtaText"
-                                                     data-promo-cta-href="@column.PromoCtaHref">
-                                                    <h6 class="main-nav-mega-column-header">@column.Header</h6>
-                                                    @foreach (var group in column.Groups)
-                                                    {
-                                                        if (group.SubHeader != null)
+                                    <div class="main-nav-mega-columns">
+                                        @foreach (var groupIndices in apparelMenuColumnGroups)
+                                        {
+                                            <div class="main-nav-mega-column">
+                                                @foreach (var idx in groupIndices)
+                                                {
+                                                    var column = apparelMenuColumns[idx];
+                                                    <div class="main-nav-mega-group"
+                                                         data-promo-image="@column.PromoImage"
+                                                         data-promo-caption="@column.PromoCaption"
+                                                         data-promo-cta-text="@column.PromoCtaText"
+                                                         data-promo-cta-href="@column.PromoCtaHref">
+                                                        <h6 class="main-nav-mega-column-header">@column.Header</h6>
+                                                        @foreach (var group in column.Groups)
                                                         {
-                                                            <span class="main-nav-mega-subgroup-header">@group.SubHeader</span>
+                                                            if (group.SubHeader != null)
+                                                            {
+                                                                <span class="main-nav-mega-subgroup-header">@group.SubHeader</span>
+                                                            }
+                                                            @foreach (var item in group.Items)
+                                                            {
+                                                                <a class="main-nav-mega-subitem" href="@item.Href">@item.Label</a>
+                                                            }
                                                         }
-                                                        @foreach (var item in group.Items)
-                                                        {
-                                                            <a class="main-nav-mega-subitem" href="@item.Href">@item.Label</a>
-                                                        }
-                                                    }
-                                                </div>
-                                            }
-                                        </div>
-                                        <div class="main-nav-mega-columns main-nav-mega-columns-secondary">
-                                            @foreach (var column in apparelMenuColumns.Skip(5))
-                                            {
-                                                <div class="main-nav-mega-column">
-                                                    <h6 class="main-nav-mega-column-header">@column.Header</h6>
-                                                    @foreach (var group in column.Groups)
-                                                    {
-                                                        if (group.SubHeader != null)
-                                                        {
-                                                            <span class="main-nav-mega-subgroup-header">@group.SubHeader</span>
-                                                        }
-                                                        @foreach (var item in group.Items)
-                                                        {
-                                                            <a class="main-nav-mega-subitem" href="@item.Href">@item.Label</a>
-                                                        }
-                                                    }
-                                                </div>
-                                            }
-                                        </div>
+                                                    </div>
+                                                }
+                                            </div>
+                                        }
                                     </div>
                                 }
                                 else
