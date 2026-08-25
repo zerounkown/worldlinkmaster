@@ -6,8 +6,8 @@ public static class ProfilePictureExtensions
 {
     public static string? AvatarUrl(this ApplicationUser? user)
     {
-        return string.IsNullOrEmpty(user?.ProfilePictureFileName)
+        return string.IsNullOrEmpty(user?.ProfilePictureUrl)
             ? null
-            : $"/uploads/avatars/{user.ProfilePictureFileName}";
+            : user.ProfilePictureUrl;
     }
 }

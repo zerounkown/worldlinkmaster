@@ -1,3 +1,5 @@
+using Azure.Storage.Blobs;
+using Azure.Storage.Blobs.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
@@ -10,15 +12,17 @@ using WorldLinkMaster.Web.Models;
 namespace WorldLinkMaster.Web.Controllers;
 
 /// <summary>
-/// Uploads/downloads for chat file &amp; photo attachments. Files are stored outside wwwroot
-/// (never served by the static file middleware) and are only readable by someone with access
-/// to the owning conversation — the same rule <see cref="ChatHub"/> enforces for messages.
+/// Uploads/downloads for chat file &amp; photo attachments. Files are stored in a private
+/// (non-public) Azure Blob Storage container — never served directly by a public URL — and are
+/// only readable through <see cref="Download"/>, which enforces the same conversation-access
+/// rule <see cref="ChatHub"/> enforces for messages.
 /// </summary>
 [Authorize]
 [Route("chat/attachments")]
 public class ChatAttachmentsController : Controller
 {
     private const long MaxFileSizeBytes = 10 * 1024 * 1024; // 10 MB
+    private const string ContainerName = "chat-attachments";
 
     private static readonly HashSet<string> AllowedContentTypes = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -34,19 +38,22 @@ public class ChatAttachmentsController : Controller
 
     private readonly ApplicationDbContext _context;
     private readonly UserManager<ApplicationUser> _userManager;
-    private readonly IWebHostEnvironment _environment;
+    private readonly IConfiguration _configuration;
     private readonly IHubContext<ChatHub> _hubContext;
+    private readonly ILogger<ChatAttachmentsController> _logger;
 
     public ChatAttachmentsController(
         ApplicationDbContext context,
         UserManager<ApplicationUser> userManager,
-        IWebHostEnvironment environment,
-        IHubContext<ChatHub> hubContext)
+        IConfiguration configuration,
+        IHubContext<ChatHub> hubContext,
+        ILogger<ChatAttachmentsController> logger)
     {
         _context = context;
         _userManager = userManager;
-        _environment = environment;
+        _configuration = configuration;
         _hubContext = hubContext;
+        _logger = logger;
     }
 
     private bool IsSupportAgent => User.IsInRole("Admin") || User.IsInRole("Support");
@@ -76,16 +83,31 @@ public class ChatAttachmentsController : Controller
             return Forbid();
         }
 
-        var uploadsRoot = Path.Combine(_environment.ContentRootPath, "ChatUploads");
-        Directory.CreateDirectory(uploadsRoot);
-
-        var extension = Path.GetExtension(file.FileName);
-        var storageFileName = $"{Guid.NewGuid():N}{extension}";
-        var fullPath = Path.Combine(uploadsRoot, storageFileName);
-
-        await using (var stream = System.IO.File.Create(fullPath))
+        var connectionString = _configuration["ProductPhotos:BlobConnectionString"];
+        if (string.IsNullOrEmpty(connectionString))
         {
-            await file.CopyToAsync(stream);
+            return StatusCode(503, "File uploads aren't available right now. Please try again later.");
+        }
+
+        var storageFileName = $"{Guid.NewGuid():N}{Path.GetExtension(file.FileName)}";
+        try
+        {
+            var containerClient = new BlobContainerClient(connectionString, ContainerName);
+            await containerClient.CreateIfNotExistsAsync(PublicAccessType.None);
+
+            var blobClient = containerClient.GetBlobClient(storageFileName);
+            await using (var stream = file.OpenReadStream())
+            {
+                await blobClient.UploadAsync(stream, new BlobUploadOptions
+                {
+                    HttpHeaders = new BlobHttpHeaders { ContentType = file.ContentType }
+                });
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to upload chat attachment for conversation {ConversationId}", conversationId);
+            return StatusCode(500, "Couldn't upload that file. Please try again.");
         }
 
         var userId = _userManager.GetUserId(User)!;
@@ -152,16 +174,31 @@ public class ChatAttachmentsController : Controller
             return Forbid();
         }
 
-        var fullPath = Path.Combine(_environment.ContentRootPath, "ChatUploads", message.AttachmentStoragePath);
-        if (!System.IO.File.Exists(fullPath))
+        var connectionString = _configuration["ProductPhotos:BlobConnectionString"];
+        if (string.IsNullOrEmpty(connectionString))
         {
-            return NotFound();
+            return StatusCode(503, "File downloads aren't available right now. Please try again later.");
         }
 
         var contentType = message.AttachmentContentType ?? "application/octet-stream";
-        return download
-            ? PhysicalFile(fullPath, contentType, message.AttachmentFileName ?? "attachment")
-            : PhysicalFile(fullPath, contentType);
+        try
+        {
+            var containerClient = new BlobContainerClient(connectionString, ContainerName);
+            var blobClient = containerClient.GetBlobClient(message.AttachmentStoragePath);
+            var blobDownload = await blobClient.DownloadStreamingAsync();
+            return download
+                ? File(blobDownload.Value.Content, contentType, message.AttachmentFileName ?? "attachment")
+                : File(blobDownload.Value.Content, contentType);
+        }
+        catch (Azure.RequestFailedException ex) when (ex.Status == 404)
+        {
+            return NotFound();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to download chat attachment for message {MessageId}", messageId);
+            return StatusCode(500, "Couldn't load that file. Please try again.");
+        }
     }
 
     private async Task<bool> CanAccessConversationAsync(int conversationId)
