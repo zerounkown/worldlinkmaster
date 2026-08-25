@@ -1,4 +1,5 @@
 using System.Text.RegularExpressions;
+using Azure.Storage.Blobs;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using WorldLinkMaster.Web.Data;
@@ -13,6 +14,10 @@ namespace WorldLinkMaster.Web.Areas.Admin.Controllers;
 /// Each file is matched to a Product by Product.VendorSku and a ProductColor by
 /// (ProductId, VendorColorCode) — both populated by the Product/Master Data importers or a
 /// one-off backfill, not by this tool. Files that don't match are reported, not guessed at.
+///
+/// Uploaded to Azure Blob Storage rather than wwwroot: this App Service runs with
+/// WEBSITE_RUN_FROM_PACKAGE=1, which mounts /home/site/wwwroot read-only at runtime, so local
+/// disk writes there fail in production even though they work in local dev.
 /// </summary>
 public class ProductPhotosController : AdminBaseController
 {
@@ -26,15 +31,15 @@ public class ProductPhotosController : AdminBaseController
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
     private const string PlaceholderMediaUrl = "TBD - needs hosted URL";
-    private const string UploadRelativeFolder = "images/products/condor";
+    private const string ContainerName = "product-photos";
 
     private readonly ApplicationDbContext _context;
-    private readonly IWebHostEnvironment _environment;
+    private readonly IConfiguration _configuration;
 
-    public ProductPhotosController(ApplicationDbContext context, IWebHostEnvironment environment)
+    public ProductPhotosController(ApplicationDbContext context, IConfiguration configuration)
     {
         _context = context;
-        _environment = environment;
+        _configuration = configuration;
     }
 
     public IActionResult Index()
@@ -55,8 +60,14 @@ public class ProductPhotosController : AdminBaseController
             return View("Index", result);
         }
 
-        var uploadRoot = Path.Combine(_environment.WebRootPath, "images", "products", "condor");
-        Directory.CreateDirectory(uploadRoot);
+        var connectionString = _configuration["ProductPhotos:BlobConnectionString"];
+        if (string.IsNullOrEmpty(connectionString))
+        {
+            result.Invalid.Add("Blob storage isn't configured (ProductPhotos:BlobConnectionString is missing).");
+            return View("Index", result);
+        }
+        var containerClient = new BlobContainerClient(connectionString, ContainerName);
+        await containerClient.CreateIfNotExistsAsync(Azure.Storage.Blobs.Models.PublicAccessType.Blob);
 
         var touchedProductIds = new HashSet<int>();
 
@@ -112,12 +123,12 @@ public class ProductPhotosController : AdminBaseController
             }
 
             var safeFileName = file.FileName.ToLowerInvariant();
-            var fullPath = Path.Combine(uploadRoot, safeFileName);
-            await using (var stream = System.IO.File.Create(fullPath))
+            var blobClient = containerClient.GetBlobClient(safeFileName);
+            await using (var stream = file.OpenReadStream())
             {
-                await file.CopyToAsync(stream);
+                await blobClient.UploadAsync(stream, overwrite: true);
             }
-            var mediaUrl = $"/{UploadRelativeFolder}/{safeFileName}";
+            var mediaUrl = blobClient.Uri.ToString();
 
             var existingMedia = await _context.ProductMedia
                 .Where(m => m.ProductId == product.Id && m.ProductColorId == productColor.Id)
