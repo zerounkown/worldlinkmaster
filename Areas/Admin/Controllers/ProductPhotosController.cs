@@ -124,9 +124,19 @@ public class ProductPhotosController : AdminBaseController
 
             var safeFileName = file.FileName.ToLowerInvariant();
             var blobClient = containerClient.GetBlobClient(safeFileName);
+            var contentType = extension switch
+            {
+                ".webp" => "image/webp",
+                ".png" => "image/png",
+                _ => "image/jpeg"
+            };
             await using (var stream = file.OpenReadStream())
             {
-                await blobClient.UploadAsync(stream, overwrite: true);
+                await blobClient.UploadAsync(stream, new Azure.Storage.Blobs.Models.BlobUploadOptions
+                {
+                    HttpHeaders = new Azure.Storage.Blobs.Models.BlobHttpHeaders { ContentType = contentType },
+                    Conditions = null
+                });
             }
             var mediaUrl = blobClient.Uri.ToString();
 
