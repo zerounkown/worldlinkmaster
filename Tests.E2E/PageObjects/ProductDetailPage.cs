@@ -34,9 +34,16 @@ public class ProductDetailPage
 
     public async Task OpenReviewsTabAsync()
     {
-        // The review form lives inside a Bootstrap pill tab-pane (#pdpTabReviews) that starts
-        // hidden — the "Description" tab is active by default.
-        await _page.ClickAsync("[data-bs-target='#pdpTabReviews']");
+        // The review form lives inside a Bootstrap collapse accordion panel (#pdpAccReviews)
+        // that starts closed. Guarded on aria-expanded rather than always clicking — unlike the
+        // Bootstrap Tab system this replaced, a collapse trigger toggles closed if clicked while
+        // already open, and SubmitReviewAsync below calls this a second time after the caller
+        // may have already opened it once.
+        var trigger = _page.Locator("[data-bs-target='#pdpAccReviews']");
+        if (await trigger.GetAttributeAsync("aria-expanded") != "true")
+        {
+            await trigger.ClickAsync();
+        }
         await ReviewForm.WaitForAsync();
     }
 
