@@ -56,36 +56,40 @@
     {
         <div class="category-subcat-row">
             <div class="container-listing">
-                <div class="category-subcat-grid">
-                    <a class="category-subcat-tile" asp-action="Index" asp-route-categoryId="@currentCategory.Id">
-                        <span class="category-subcat-tile-img-wrap">
-                            @if (!string.IsNullOrWhiteSpace(currentCategory.ImageUrl))
-                            {
-                                <img src="@currentCategory.ImageUrl" alt="@Localizer["All {0}", currentCategory.LocalizedName()]" />
-                            }
-                            else
-                            {
-                                <span class="category-subcat-tile-placeholder"><i class="bi bi-box-seam"></i></span>
-                            }
-                        </span>
-                        <span class="category-subcat-tile-label">@Localizer["All {0}", currentCategory.LocalizedName()]</span>
-                    </a>
-                    @foreach (var sub in currentCategory.Subcategories.OrderBy(s => s.DisplayOrder).ThenBy(s => s.Name))
-                    {
-                        <a class="category-subcat-tile" asp-action="Index" asp-route-categoryId="@currentCategory.Id" asp-route-subcategoryId="@sub.Id">
+                <div class="product-carousel category-subcat-carousel" aria-label="@Localizer["Browse {0} subcategories", currentCategory.LocalizedName()]">
+                    <button type="button" class="product-carousel-arrow product-carousel-prev" aria-label="@Localizer["Previous"]"><i class="bi bi-chevron-left"></i></button>
+                    <div class="product-carousel-track">
+                        <a class="category-subcat-tile product-carousel-item" asp-action="Index" asp-route-categoryId="@currentCategory.Id">
                             <span class="category-subcat-tile-img-wrap">
-                                @if (!string.IsNullOrWhiteSpace(sub.ImageUrl))
+                                @if (!string.IsNullOrWhiteSpace(currentCategory.ImageUrl))
                                 {
-                                    <img src="@sub.ImageUrl" alt="@sub.LocalizedName()" />
+                                    <img src="@currentCategory.ImageUrl" alt="@Localizer["All {0}", currentCategory.LocalizedName()]" />
                                 }
                                 else
                                 {
                                     <span class="category-subcat-tile-placeholder"><i class="bi bi-box-seam"></i></span>
                                 }
                             </span>
-                            <span class="category-subcat-tile-label">@sub.LocalizedName()</span>
+                            <span class="category-subcat-tile-label">@Localizer["All {0}", currentCategory.LocalizedName()]</span>
                         </a>
-                    }
+                        @foreach (var sub in currentCategory.Subcategories.OrderBy(s => s.DisplayOrder).ThenBy(s => s.Name))
+                        {
+                            <a class="category-subcat-tile product-carousel-item" asp-action="Index" asp-route-categoryId="@currentCategory.Id" asp-route-subcategoryId="@sub.Id">
+                                <span class="category-subcat-tile-img-wrap">
+                                    @if (!string.IsNullOrWhiteSpace(sub.ImageUrl))
+                                    {
+                                        <img src="@sub.ImageUrl" alt="@sub.LocalizedName()" />
+                                    }
+                                    else
+                                    {
+                                        <span class="category-subcat-tile-placeholder"><i class="bi bi-box-seam"></i></span>
+                                    }
+                                </span>
+                                <span class="category-subcat-tile-label">@sub.LocalizedName()</span>
+                            </a>
+                        }
+                    </div>
+                    <button type="button" class="product-carousel-arrow product-carousel-next" aria-label="@Localizer["Next"]"><i class="bi bi-chevron-right"></i></button>
                 </div>
             </div>
         </div>
