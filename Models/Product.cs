@@ -53,6 +53,12 @@ public class Product
     [Required, StringLength(40)]
     public string Sku { get; set; } = string.Empty;
 
+    // Manufacturer's own style number (e.g. Condor's "101228"), distinct from our internal Sku
+    // (e.g. "CON-0001"). Used to match incoming product photos, which vendors name by their own
+    // SKU-color code rather than ours. Null for products with no known vendor SKU.
+    [StringLength(40)]
+    public string? VendorSku { get; set; }
+
     public int StockQuantity { get; set; }
 
     [StringLength(500)]

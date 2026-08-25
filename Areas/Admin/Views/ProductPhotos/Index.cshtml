@@ -1,0 +1,86 @@
+@using WorldLinkMaster.Web.Models.ViewModels
+@model ProductPhotoUploadResult
+@{
+    ViewData["Title"] = Localizer["Product Photos"];
+}
+
+<h1>@Localizer["Product Photos"]</h1>
+<p class="text-muted">@Localizer["Bulk-upload vendor product photos. Files must be named with the vendor's own SKU-color code (e.g. Condor's \"101228-002.webp\") — each is matched to a Product by its Vendor SKU and a color by its Vendor Color Code, and the matching image is saved and linked automatically."]</p>
+
+@if (Model.HasActivity)
+{
+    <div class="alert @(Model.UnmatchedProduct.Count + Model.UnmatchedColor.Count + Model.Invalid.Count > 0 ? "alert-warning" : "alert-success")">
+        <div class="row g-2">
+            <div class="col-6 col-md-3">@Localizer["Matched & saved"]: <strong>@Model.Matched.Count</strong></div>
+            <div class="col-6 col-md-3">@Localizer["Unknown product"]: <strong>@Model.UnmatchedProduct.Count</strong></div>
+            <div class="col-6 col-md-3">@Localizer["Unknown color"]: <strong>@Model.UnmatchedColor.Count</strong></div>
+            <div class="col-6 col-md-3">@Localizer["Invalid files"]: <strong>@Model.Invalid.Count</strong></div>
+        </div>
+    </div>
+
+    @if (Model.Matched.Count > 0)
+    {
+        <h5 class="mt-3">@Localizer["Matched & saved"]</h5>
+        <div class="table-responsive">
+            <table class="table table-sm">
+                <thead><tr><th>@Localizer["File"]</th><th>@Localizer["Product"]</th><th>@Localizer["Color"]</th><th>@Localizer["Media URL"]</th><th></th></tr></thead>
+                <tbody>
+                    @foreach (var m in Model.Matched)
+                    {
+                        <tr>
+                            <td>@m.FileName</td>
+                            <td>@m.ProductName <span class="text-muted">(@m.ProductCode)</span></td>
+                            <td>@m.ColorName</td>
+                            <td><code>@m.MediaUrl</code></td>
+                            <td>@if (m.Replaced) { <span class="badge text-bg-secondary">@Localizer["replaced placeholder"]</span> }</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+
+    @if (Model.UnmatchedProduct.Count > 0)
+    {
+        <h5 class="mt-3">@Localizer["Unknown product (no product has this Vendor SKU)"]</h5>
+        <ul>
+            @foreach (var u in Model.UnmatchedProduct)
+            {
+                <li>@u.FileName — vendor SKU <strong>@u.VendorSku</strong></li>
+            }
+        </ul>
+    }
+
+    @if (Model.UnmatchedColor.Count > 0)
+    {
+        <h5 class="mt-3">@Localizer["Unknown color (product found, but color code not recognized)"]</h5>
+        <ul>
+            @foreach (var u in Model.UnmatchedColor)
+            {
+                <li>@u.FileName — @u.ProductName, color code <strong>@u.VendorColorCode</strong> not among known colors: @(string.IsNullOrEmpty(u.KnownColors) ? Localizer["(none set)"] : u.KnownColors)</li>
+            }
+        </ul>
+    }
+
+    @if (Model.Invalid.Count > 0)
+    {
+        <h5 class="mt-3">@Localizer["Invalid files"]</h5>
+        <ul>
+            @foreach (var msg in Model.Invalid)
+            {
+                <li>@msg</li>
+            }
+        </ul>
+    }
+}
+
+<div class="summary-box mt-3">
+    <h4>@Localizer["Upload photos"]</h4>
+    <p class="mb-0">@Localizer["Accepted: JPG, PNG, WEBP, 15 MB max each. Uploading a file with the same name as one already saved replaces it. Re-running the same batch is safe — already-matched files are skipped."]</p>
+    <form asp-action="Upload" method="post" enctype="multipart/form-data" class="d-flex gap-2 mt-3">
+        <input type="file" name="files" class="form-control" accept=".jpg,.jpeg,.png,.webp" multiple required />
+        <button type="submit" class="btn btn-primary text-nowrap"><i class="bi bi-upload"></i> @Localizer["Upload"]</button>
+    </form>
+</div>
+
+<a class="mt-4 d-inline-block" asp-controller="ProductImport" asp-action="Index">&larr; @Localizer["Back to Product Import"]</a>

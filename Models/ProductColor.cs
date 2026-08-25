@@ -18,6 +18,12 @@ public class ProductColor
     public int ColorId { get; set; }
     public Color? Color { get; set; }
 
+    // Manufacturer's own color code for this product (e.g. Condor's "002" for Black), distinct
+    // from our internal Code (e.g. "CON-0001-BLK"). Used to match incoming product photos, which
+    // vendors name by their own SKU-color code. Null for colors with no known vendor code.
+    [StringLength(20)]
+    public string? VendorColorCode { get; set; }
+
     public int DisplayOrder { get; set; }
 
     public bool DefaultColor { get; set; }
