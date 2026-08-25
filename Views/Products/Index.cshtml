@@ -48,7 +48,11 @@
         </div>
     </div>
 
-    if (currentCategory!.Subcategories.Any())
+    // Only show the "browse other subcategories" tile row when landing on the category as a
+    // whole (View All) — once a specific subcategory is selected (single subcategoryId or the
+    // multi-select subcategoryIds a "family" link like T-Shirts/Pants uses), skip straight to
+    // the filtered results below instead of making the shopper click through this grid again.
+    if (currentCategory!.Subcategories.Any() && currentSubcategory == null)
     {
         <div class="category-subcat-row">
             <div class="container-listing">
