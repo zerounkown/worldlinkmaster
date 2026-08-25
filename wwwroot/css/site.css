@@ -3618,54 +3618,71 @@ a:hover {
   color: var(--wlm-forest-dark);
 }
 
-.pdp-info-tabs {
-  background: white;
-  border: 1px solid var(--wlm-sand-light);
-  border-radius: 8px;
-  overflow: hidden;
+/* Product info accordion (Features / Specifications / Overview / Description / Reviews /
+   Shipping & Returns) — replaces the earlier horizontal tab bar with stacked full-width rows,
+   matching the reference the site owner supplied. Built on Bootstrap's native collapse
+   component (already loaded via bootstrap.bundle.js, same as everywhere else on this page) for
+   the slide animation and single-open-at-a-time behavior via the shared data-bs-parent — only
+   the visual chrome and the +/x icon swap below are custom. */
+.pdp-accordion {
+  border-top: 1px solid var(--wlm-sand-light);
 }
 
-/* Horizontal underline tab bar (Description / Specifications / Shipping & Returns / Reviews),
-   full width above the tab content — replaces the earlier vertical sidebar nav. */
-.pdp-tab-nav {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-  background: var(--wlm-cream);
+.pdp-accordion-item {
   border-bottom: 1px solid var(--wlm-sand-light);
-  padding: 0 8px;
-  overflow-x: auto;
 }
 
-.pdp-tab-link {
-  border: none;
+.pdp-accordion-header {
+  margin: 0;
+}
+
+.pdp-accordion-button {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px 4px;
   background: none;
-  padding: 16px 18px;
+  border: none;
   font-family: var(--font-heading);
-  font-size: 0.88rem;
-  font-weight: 600;
+  font-size: 0.95rem;
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.02em;
+  letter-spacing: 0.03em;
   color: var(--wlm-ink);
-  opacity: 0.65;
   cursor: pointer;
-  white-space: nowrap;
-  border-bottom: 3px solid transparent;
-  transition: color 0.15s ease, border-color 0.15s ease, opacity 0.15s ease;
+  transition: color 0.15s ease;
 }
 
-.pdp-tab-link:hover {
-  opacity: 1;
-}
-
-.pdp-tab-link.active {
-  opacity: 1;
+.pdp-accordion-button:hover {
   color: var(--wlm-forest-dark);
-  border-bottom-color: var(--wlm-sand);
 }
 
-.pdp-tab-content {
-  padding: 24px;
+.pdp-accordion-icon {
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.85rem;
+}
+
+.pdp-accordion-icon-close {
+  display: none;
+}
+
+.pdp-accordion-button[aria-expanded="true"] .pdp-accordion-icon-plus {
+  display: none;
+}
+
+.pdp-accordion-button[aria-expanded="true"] .pdp-accordion-icon-close {
+  display: inline-flex;
+}
+
+.pdp-accordion-body {
+  padding: 0 4px 28px;
 }
 
 /* Description tab: intro/materials text + checklist on one side, an optional per-color

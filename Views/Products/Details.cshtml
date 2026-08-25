@@ -498,135 +498,180 @@
         </div>
     </div>
 
-    <div class="pdp-info-tabs mt-4">
-        <div class="nav pdp-tab-nav" role="tablist">
-            <button class="pdp-tab-link active" data-bs-toggle="pill" data-bs-target="#pdpTabDescription" type="button" role="tab">
-                @Localizer["Description"]
-            </button>
-            @if (specAttributeValues.Count > 0)
-            {
-                <button class="pdp-tab-link" data-bs-toggle="pill" data-bs-target="#pdpTabSpecifications" type="button" role="tab">
-                    @Localizer["Specifications"]
+    <div class="pdp-accordion mt-4" id="pdpAccordion">
+        @if (featureBullets.Count > 0)
+        {
+            <div class="pdp-accordion-item">
+                <h3 class="pdp-accordion-header">
+                    <button class="pdp-accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#pdpAccFeatures" aria-expanded="false" aria-controls="pdpAccFeatures">
+                        @Localizer["Features"]
+                        <span class="pdp-accordion-icon"><i class="bi bi-plus-lg pdp-accordion-icon-plus"></i><i class="bi bi-x-lg pdp-accordion-icon-close"></i></span>
+                    </button>
+                </h3>
+                <div id="pdpAccFeatures" class="collapse" data-bs-parent="#pdpAccordion">
+                    <div class="pdp-accordion-body">
+                        <ul class="pdp-checklist">
+                            @foreach (var bullet in featureBullets)
+                            {
+                                <li><i class="bi bi-check-circle-fill"></i> @bullet</li>
+                            }
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        }
+        @if (specAttributeValues.Count > 0)
+        {
+            <div class="pdp-accordion-item">
+                <h3 class="pdp-accordion-header">
+                    <button class="pdp-accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#pdpAccSpecifications" aria-expanded="false" aria-controls="pdpAccSpecifications">
+                        @Localizer["Specifications"]
+                        <span class="pdp-accordion-icon"><i class="bi bi-plus-lg pdp-accordion-icon-plus"></i><i class="bi bi-x-lg pdp-accordion-icon-close"></i></span>
+                    </button>
+                </h3>
+                <div id="pdpAccSpecifications" class="collapse" data-bs-parent="#pdpAccordion">
+                    <div class="pdp-accordion-body">
+                        <table class="pdp-spec-table">
+                            <tbody>
+                                @foreach (var attr in specAttributeValues)
+                                {
+                                    <tr>
+                                        <th>@(isArabicUi ? (attr.AttributeDefinition?.NameAr ?? attr.AttributeDefinition?.NameEn) : attr.AttributeDefinition?.NameEn)</th>
+                                        <td>@(isArabicUi && !string.IsNullOrWhiteSpace(attr.ValueAr) ? attr.ValueAr : attr.ValueEn)</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        }
+        @if (!string.IsNullOrWhiteSpace(Model.LocalizedOverview()))
+        {
+            <div class="pdp-accordion-item">
+                <h3 class="pdp-accordion-header">
+                    <button class="pdp-accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#pdpAccOverview" aria-expanded="false" aria-controls="pdpAccOverview">
+                        @Localizer["Overview"]
+                        <span class="pdp-accordion-icon"><i class="bi bi-plus-lg pdp-accordion-icon-plus"></i><i class="bi bi-x-lg pdp-accordion-icon-close"></i></span>
+                    </button>
+                </h3>
+                <div id="pdpAccOverview" class="collapse" data-bs-parent="#pdpAccordion">
+                    <div class="pdp-accordion-body">
+                        @foreach (var paragraph in Model.LocalizedOverview()!.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+                        {
+                            <p>@paragraph</p>
+                        }
+                    </div>
+                </div>
+            </div>
+        }
+        <div class="pdp-accordion-item">
+            <h3 class="pdp-accordion-header">
+                <button class="pdp-accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#pdpAccDescription" aria-expanded="false" aria-controls="pdpAccDescription">
+                    @Localizer["Description"]
+                    <span class="pdp-accordion-icon"><i class="bi bi-plus-lg pdp-accordion-icon-plus"></i><i class="bi bi-x-lg pdp-accordion-icon-close"></i></span>
                 </button>
-            }
-            <button class="pdp-tab-link" data-bs-toggle="pill" data-bs-target="#pdpTabShipping" type="button" role="tab">
-                @Localizer["Shipping & Returns"]
-            </button>
-            <button class="pdp-tab-link" data-bs-toggle="pill" data-bs-target="#pdpTabReviews" type="button" role="tab">
-                @Localizer["Reviews"] (@Model.ReviewCount)
-            </button>
-        </div>
-        <div class="tab-content pdp-tab-content">
-            <div class="tab-pane fade show active" id="pdpTabDescription" role="tabpanel">
-                <div class="pdp-description-layout">
-                    <div class="pdp-description-text">
-                        @if (!string.IsNullOrWhiteSpace(Model.LocalizedShortDescription()))
-                        {
-                            <p>@Model.LocalizedShortDescription()</p>
-                        }
-                        @if (!string.IsNullOrWhiteSpace(Model.LocalizedDescription()))
-                        {
-                            <p>@Model.LocalizedDescription()</p>
-                        }
-                        @if (!string.IsNullOrWhiteSpace(Model.LocalizedOverview()))
-                        {
-                            @foreach (var paragraph in Model.LocalizedOverview()!.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+            </h3>
+            <div id="pdpAccDescription" class="collapse" data-bs-parent="#pdpAccordion">
+                <div class="pdp-accordion-body">
+                    <div class="pdp-description-layout">
+                        <div class="pdp-description-text">
+                            @if (!string.IsNullOrWhiteSpace(Model.LocalizedShortDescription()))
                             {
-                                <p>@paragraph</p>
+                                <p>@Model.LocalizedShortDescription()</p>
                             }
-                        }
-                        @if (featureBullets.Count > 0)
-                        {
-                            <ul class="pdp-checklist">
-                                @foreach (var bullet in featureBullets)
-                                {
-                                    <li><i class="bi bi-check-circle-fill"></i> @bullet</li>
-                                }
-                            </ul>
-                        }
-                    </div>
-                    @if (hasAnyLifestylePhoto)
-                    {
-                        <div class="pdp-description-photo" id="pdpLifestylePhoto" style="@(string.IsNullOrEmpty(initialLifestyleUrl) ? "display:none;" : "")">
-                            <img id="pdpLifestyleImage" src="@initialLifestyleUrl" alt="@Model.LocalizedName()" />
+                            @if (!string.IsNullOrWhiteSpace(Model.LocalizedDescription()))
+                            {
+                                <p>@Model.LocalizedDescription()</p>
+                            }
                         </div>
-                        <script type="application/json" id="lifestyleByColorData">@Html.Raw(lifestyleDataJson)</script>
-                    }
-                </div>
-            </div>
-            @if (specAttributeValues.Count > 0)
-            {
-                <div class="tab-pane fade" id="pdpTabSpecifications" role="tabpanel">
-                    <table class="pdp-spec-table">
-                        <tbody>
-                            @foreach (var attr in specAttributeValues)
-                            {
-                                <tr>
-                                    <th>@(isArabicUi ? (attr.AttributeDefinition?.NameAr ?? attr.AttributeDefinition?.NameEn) : attr.AttributeDefinition?.NameEn)</th>
-                                    <td>@(isArabicUi && !string.IsNullOrWhiteSpace(attr.ValueAr) ? attr.ValueAr : attr.ValueEn)</td>
-                                </tr>
-                            }
-                        </tbody>
-                    </table>
-                </div>
-            }
-            <div class="tab-pane fade" id="pdpTabShipping" role="tabpanel">
-                <p>@Localizer["We deliver across all seven Emirates, with free shipping on orders over AED 365."]</p>
-                <p>@Localizer["Most items ship out within 1-2 business days of your order."]</p>
-                <p>@Localizer["Not the right fit? Returns are accepted within 30 days of delivery — see our"] <a asp-controller="Home" asp-action="ReturnPolicy">@Localizer["Return & Refund Policy"]</a>.</p>
-            </div>
-            <div class="tab-pane fade" id="pdpTabReviews" role="tabpanel">
-                <div class="pdp-reviews-summary">
-                    <partial name="_StarRating" model="Model" />
-                    <span class="pdp-reviews-summary-count">@Model.Rating.ToString("0.0") &middot; @Localizer["{0} reviews", Model.ReviewCount]</span>
-                </div>
-
-                <div class="pdp-review-form-section">
-                    @if (User.Identity?.IsAuthenticated == true)
-                    {
-                        <h3 class="pdp-review-form-heading">@(myReview != null ? Localizer["Update Your Review"] : Localizer["Write a Review"])</h3>
-                        <form asp-controller="Reviews" asp-action="Submit" method="post" class="pdp-review-form">
-                            <input type="hidden" name="productId" value="@Model.Id" />
-                            <input type="hidden" name="slug" value="@Model.Slug" />
-                            <div class="pdp-star-input" id="reviewStarInput">
-                                @for (int i = 1; i <= 5; i++)
-                                {
-                                    <button type="button" class="pdp-star-input-btn @(myReview != null && myReview.Rating >= i ? "active" : "")" data-value="@i" aria-label="@Localizer["{0} stars", i]">
-                                        <i class="bi @(myReview != null && myReview.Rating >= i ? "bi-star-fill" : "bi-star")"></i>
-                                    </button>
-                                }
-                                <input type="hidden" name="rating" id="reviewRatingInput" value="@(myReview?.Rating ?? 0)" />
-                            </div>
-                            <textarea name="comment" class="pdp-review-textarea" minlength="10" maxlength="1000" required
-                                      placeholder="@Localizer["Share your thoughts about this product (10–1000 characters)..."]">@(myReview?.Comment)</textarea>
-                            <button type="submit" class="pdp-btn-buynow pdp-review-submit">@(myReview != null ? Localizer["Update Review"] : Localizer["Submit Review"])</button>
-                        </form>
-                    }
-                    else
-                    {
-                        <p class="pdp-review-login-prompt">
-                            @Localizer["Please log in to leave a review."]
-                            <a asp-area="Identity" asp-page="/Account/Login" asp-route-returnUrl="@Url.Action("Details", "Products", new { slug = Model.Slug })">@Localizer["Log in"]</a>
-                        </p>
-                    }
-                </div>
-
-                @if (productReviews.Count > 0)
-                {
-                    <div class="pdp-review-list">
-                        @foreach (var review in productReviews)
+                        @if (hasAnyLifestylePhoto)
                         {
-                            <div class="pdp-review-item">
-                                <div class="pdp-review-item-header">
-                                    <partial name="_StarRatingValue" model="(decimal)review.Rating" />
-                                    <span class="pdp-review-author">@review.ReviewerName</span>
-                                    <span class="pdp-review-date">@review.CreatedAt.ToString("MMM d, yyyy")</span>
-                                </div>
-                                <p class="pdp-review-comment">@review.Comment</p>
+                            <div class="pdp-description-photo" id="pdpLifestylePhoto" style="@(string.IsNullOrEmpty(initialLifestyleUrl) ? "display:none;" : "")">
+                                <img id="pdpLifestyleImage" src="@initialLifestyleUrl" alt="@Model.LocalizedName()" />
                             </div>
+                            <script type="application/json" id="lifestyleByColorData">@Html.Raw(lifestyleDataJson)</script>
                         }
                     </div>
-                }
+                </div>
+            </div>
+        </div>
+        <div class="pdp-accordion-item">
+            <h3 class="pdp-accordion-header">
+                <button class="pdp-accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#pdpAccReviews" aria-expanded="false" aria-controls="pdpAccReviews">
+                    @Localizer["Reviews"] (@Model.ReviewCount)
+                    <span class="pdp-accordion-icon"><i class="bi bi-plus-lg pdp-accordion-icon-plus"></i><i class="bi bi-x-lg pdp-accordion-icon-close"></i></span>
+                </button>
+            </h3>
+            <div id="pdpAccReviews" class="collapse" data-bs-parent="#pdpAccordion">
+                <div class="pdp-accordion-body">
+                    <div class="pdp-reviews-summary">
+                        <partial name="_StarRating" model="Model" />
+                        <span class="pdp-reviews-summary-count">@Model.Rating.ToString("0.0") &middot; @Localizer["{0} reviews", Model.ReviewCount]</span>
+                    </div>
+
+                    <div class="pdp-review-form-section">
+                        @if (User.Identity?.IsAuthenticated == true)
+                        {
+                            <h3 class="pdp-review-form-heading">@(myReview != null ? Localizer["Update Your Review"] : Localizer["Write a Review"])</h3>
+                            <form asp-controller="Reviews" asp-action="Submit" method="post" class="pdp-review-form">
+                                <input type="hidden" name="productId" value="@Model.Id" />
+                                <input type="hidden" name="slug" value="@Model.Slug" />
+                                <div class="pdp-star-input" id="reviewStarInput">
+                                    @for (int i = 1; i <= 5; i++)
+                                    {
+                                        <button type="button" class="pdp-star-input-btn @(myReview != null && myReview.Rating >= i ? "active" : "")" data-value="@i" aria-label="@Localizer["{0} stars", i]">
+                                            <i class="bi @(myReview != null && myReview.Rating >= i ? "bi-star-fill" : "bi-star")"></i>
+                                        </button>
+                                    }
+                                    <input type="hidden" name="rating" id="reviewRatingInput" value="@(myReview?.Rating ?? 0)" />
+                                </div>
+                                <textarea name="comment" class="pdp-review-textarea" minlength="10" maxlength="1000" required
+                                          placeholder="@Localizer["Share your thoughts about this product (10–1000 characters)..."]">@(myReview?.Comment)</textarea>
+                                <button type="submit" class="pdp-btn-buynow pdp-review-submit">@(myReview != null ? Localizer["Update Review"] : Localizer["Submit Review"])</button>
+                            </form>
+                        }
+                        else
+                        {
+                            <p class="pdp-review-login-prompt">
+                                @Localizer["Please log in to leave a review."]
+                                <a asp-area="Identity" asp-page="/Account/Login" asp-route-returnUrl="@Url.Action("Details", "Products", new { slug = Model.Slug })">@Localizer["Log in"]</a>
+                            </p>
+                        }
+                    </div>
+
+                    @if (productReviews.Count > 0)
+                    {
+                        <div class="pdp-review-list">
+                            @foreach (var review in productReviews)
+                            {
+                                <div class="pdp-review-item">
+                                    <div class="pdp-review-item-header">
+                                        <partial name="_StarRatingValue" model="(decimal)review.Rating" />
+                                        <span class="pdp-review-author">@review.ReviewerName</span>
+                                        <span class="pdp-review-date">@review.CreatedAt.ToString("MMM d, yyyy")</span>
+                                    </div>
+                                    <p class="pdp-review-comment">@review.Comment</p>
+                                </div>
+                            }
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+        <div class="pdp-accordion-item">
+            <h3 class="pdp-accordion-header">
+                <button class="pdp-accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#pdpAccShipping" aria-expanded="false" aria-controls="pdpAccShipping">
+                    @Localizer["Shipping & Returns"]
+                    <span class="pdp-accordion-icon"><i class="bi bi-plus-lg pdp-accordion-icon-plus"></i><i class="bi bi-x-lg pdp-accordion-icon-close"></i></span>
+                </button>
+            </h3>
+            <div id="pdpAccShipping" class="collapse" data-bs-parent="#pdpAccordion">
+                <div class="pdp-accordion-body">
+                    <p>@Localizer["We deliver across all seven Emirates, with free shipping on orders over AED 365."]</p>
+                    <p>@Localizer["Most items ship out within 1-2 business days of your order."]</p>
+                    <p>@Localizer["Not the right fit? Returns are accepted within 30 days of delivery — see our"] <a asp-controller="Home" asp-action="ReturnPolicy">@Localizer["Return & Refund Policy"]</a>.</p>
+                </div>
             </div>
         </div>
     </div>
@@ -665,9 +710,12 @@
     {
         <script>
             document.addEventListener("DOMContentLoaded", function () {
-                var tabBtn = document.querySelector('[data-bs-target="#pdpTabReviews"]');
-                if (tabBtn && window.bootstrap) {
-                    new bootstrap.Tab(tabBtn).show();
+                var reviewsPanel = document.getElementById("pdpAccReviews");
+                if (reviewsPanel && window.bootstrap) {
+                    new bootstrap.Collapse(reviewsPanel, { show: true });
+                    reviewsPanel.addEventListener("shown.bs.collapse", function () {
+                        reviewsPanel.scrollIntoView({ behavior: "smooth", block: "start" });
+                    }, { once: true });
                 }
             });
         </script>
