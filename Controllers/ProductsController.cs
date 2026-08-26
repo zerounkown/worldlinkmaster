@@ -68,6 +68,9 @@ public class ProductsController : Controller
             .GroupBy(f => f.Code)
             .ToDictionary(g => g.Key, g => g.Select(f => f.Value).ToList());
 
+        var searchTrimmed = search?.Trim() ?? string.Empty;
+        var searchIsNumericId = int.TryParse(searchTrimmed, out var searchNumericId);
+
         // Factored out (rather than a plain local variable) so the facet-count queries below can
         // rebuild the same filtered base query against their own separate DbContext instances —
         // needed to actually run them concurrently, since a single context can't handle more than
@@ -93,13 +96,24 @@ public class ProductsController : Controller
                 q = q.Where(p => p.CategoryId == categoryId.Value);
             }
 
-            if (!string.IsNullOrWhiteSpace(search))
+            // Multi-field search: SKU / numeric product ID / variant barcode (identifier fields,
+            // partial + case-insensitive via ILIKE, same as everything else here) / name / brand /
+            // variant color / description, all in one query rather than name-only. No Nickname or
+            // Barcode-on-Product field exists in the schema, so those two are out of scope here —
+            // see the PR description for what that would take to add.
+            if (!string.IsNullOrWhiteSpace(searchTrimmed))
             {
                 q = q.Where(p =>
-                    p.Name.Contains(search) ||
-                    (p.ShortDescription != null && p.ShortDescription.Contains(search)) ||
-                    (p.NameAr != null && p.NameAr.Contains(search)) ||
-                    (p.ShortDescriptionAr != null && p.ShortDescriptionAr.Contains(search)));
+                    EF.Functions.ILike(p.Sku, $"%{searchTrimmed}%") ||
+                    (searchIsNumericId && p.Id == searchNumericId) ||
+                    p.Variants.Any(v => v.Barcode != null && EF.Functions.ILike(v.Barcode, $"%{searchTrimmed}%")) ||
+                    EF.Functions.ILike(p.Name, $"%{searchTrimmed}%") ||
+                    (p.NameAr != null && EF.Functions.ILike(p.NameAr, $"%{searchTrimmed}%")) ||
+                    (p.Brand != null && EF.Functions.ILike(p.Brand.Name, $"%{searchTrimmed}%")) ||
+                    p.Variants.Any(v => v.Color != null && EF.Functions.ILike(v.Color.Name, $"%{searchTrimmed}%")) ||
+                    (p.ShortDescription != null && EF.Functions.ILike(p.ShortDescription, $"%{searchTrimmed}%")) ||
+                    (p.ShortDescriptionAr != null && EF.Functions.ILike(p.ShortDescriptionAr, $"%{searchTrimmed}%")) ||
+                    (p.Description != null && EF.Functions.ILike(p.Description, $"%{searchTrimmed}%")));
             }
 
             return q;
@@ -186,12 +200,28 @@ public class ProductsController : Controller
 
         var query = ApplyFacets(baseQuery);
 
+        // Relevance ranking only kicks in for the default sort while a search is active — an
+        // explicit sort choice (price/newest/rating) still wins, same as Amazon/Propper letting
+        // you re-sort search results. Tiers: exact identifier match (SKU/ID/barcode) > exact or
+        // prefix name match > partial name match > matched only in description/brand/color.
         query = sort switch
         {
             "price_asc" => query.OrderBy(p => p.Price),
             "price_desc" => query.OrderByDescending(p => p.Price),
             "newest" => query.OrderByDescending(p => p.CreatedAt),
             "rating" => query.OrderByDescending(p => p.Rating).ThenByDescending(p => p.ReviewCount),
+            _ when !string.IsNullOrWhiteSpace(searchTrimmed) => query
+                .OrderByDescending(p =>
+                    (EF.Functions.ILike(p.Sku, searchTrimmed)
+                        || (searchIsNumericId && p.Id == searchNumericId)
+                        || p.Variants.Any(v => v.Barcode != null && EF.Functions.ILike(v.Barcode, searchTrimmed)))
+                        ? 100
+                    : (EF.Functions.ILike(p.Name, searchTrimmed) || EF.Functions.ILike(p.Name, searchTrimmed + "%"))
+                        ? 80
+                    : EF.Functions.ILike(p.Name, "%" + searchTrimmed + "%")
+                        ? 60
+                    : 40)
+                .ThenBy(p => p.Name),
             _ => query.OrderBy(p => p.Name)
         };
 
