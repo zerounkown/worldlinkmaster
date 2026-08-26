@@ -24,13 +24,51 @@ public class ProductsController : AdminBaseController
         _localizer = localizer;
     }
 
-    public async Task<IActionResult> Index(string? search, int page = 1)
+    // Deliberately unfiltered by IsPublished at the base query — this is the staff-facing view,
+    // the only place in the app that lists Draft products at all (every customer-facing listing
+    // and the public search filter to Published only). "status" narrows it back down and
+    // defaults to "draft", since finding unpublished products (e.g. the Condor import batch
+    // stuck in Draft) is this view's main job.
+    public async Task<IActionResult> Index(string? search, string? status, int page = 1)
     {
-        var query = _context.Products.AsNoTracking().Include(p => p.Category).AsQueryable();
-
-        if (!string.IsNullOrWhiteSpace(search))
+        var statusFilter = status?.ToLowerInvariant() switch
         {
-            query = query.Where(p => p.Name.Contains(search) || p.Sku.Contains(search));
+            "published" => "published",
+            "all" => "all",
+            _ => "draft"
+        };
+
+        var query = _context.Products
+            .AsNoTracking()
+            .Include(p => p.Category)
+            .Include(p => p.Brand)
+            .AsQueryable();
+
+        query = statusFilter switch
+        {
+            "draft" => query.Where(p => !p.IsPublished),
+            "published" => query.Where(p => p.IsPublished),
+            _ => query
+        };
+
+        // Same multi-field match as the customer-facing search (SKU / numeric Id / variant
+        // Barcode / Name / Brand / variant Color / Description), minus the IsPublished
+        // restriction — that's handled by statusFilter above instead, independently.
+        var searchTrimmed = search?.Trim() ?? string.Empty;
+        var searchIsNumericId = int.TryParse(searchTrimmed, out var searchNumericId);
+        if (!string.IsNullOrWhiteSpace(searchTrimmed))
+        {
+            query = query.Where(p =>
+                EF.Functions.ILike(p.Sku, $"%{searchTrimmed}%") ||
+                (searchIsNumericId && p.Id == searchNumericId) ||
+                p.Variants.Any(v => v.Barcode != null && EF.Functions.ILike(v.Barcode, $"%{searchTrimmed}%")) ||
+                EF.Functions.ILike(p.Name, $"%{searchTrimmed}%") ||
+                (p.NameAr != null && EF.Functions.ILike(p.NameAr, $"%{searchTrimmed}%")) ||
+                (p.Brand != null && EF.Functions.ILike(p.Brand.Name, $"%{searchTrimmed}%")) ||
+                p.Variants.Any(v => v.Color != null && EF.Functions.ILike(v.Color.Name, $"%{searchTrimmed}%")) ||
+                (p.ShortDescription != null && EF.Functions.ILike(p.ShortDescription, $"%{searchTrimmed}%")) ||
+                (p.ShortDescriptionAr != null && EF.Functions.ILike(p.ShortDescriptionAr, $"%{searchTrimmed}%")) ||
+                (p.Description != null && EF.Functions.ILike(p.Description, $"%{searchTrimmed}%")));
         }
 
         var totalCount = await query.CountAsync();
@@ -47,6 +85,7 @@ public class ProductsController : AdminBaseController
         {
             Products = products,
             SearchTerm = search,
+            StatusFilter = statusFilter,
             Page = page,
             TotalPages = totalPages,
             TotalCount = totalCount
