@@ -1630,12 +1630,24 @@ a:hover {
 /* Hero */
 .hero {
   background-image: linear-gradient(120deg, rgba(5, 5, 5, 0.78), rgba(10, 10, 10, 0.6) 55%, rgba(30, 20, 15, 0.45)),
-    url('/images/hero-soldier.jpg');
+    url('/images/hero-tactical-banner.jpg');
   background-size: cover;
-  background-position: center 15%;
+  /* Gear composition sits right-of-center in the source photo (2000x900) — on wide viewports
+     the full width shows so this axis is mostly inert, but it matters once width stops being
+     the binding dimension (narrower desktop windows, tall aspect ratios). */
+  background-position: 75% 25%;
   color: var(--wlm-cream);
   padding: 110px 0;
   margin-bottom: 40px;
+}
+
+/* RTL text right-aligns onto the box's right side — exactly where the gear composition sits.
+   Mirror the overlay gradient horizontally (dark corner top-right instead of top-left, same
+   240deg = 360 - 120) and strengthen it slightly, so the busiest part of the photo gets the
+   darkest coverage for Arabic too. LTR is untouched — this rule only fires under dir="rtl". */
+[dir="rtl"] .hero {
+  background-image: linear-gradient(240deg, rgba(5, 5, 5, 0.85), rgba(10, 10, 10, 0.68) 55%, rgba(30, 20, 15, 0.5)),
+    url('/images/hero-tactical-banner.jpg');
 }
 
 .hero-eyebrow {
@@ -5574,6 +5586,10 @@ a:hover {
      on initial load (no scroll) sits directly behind them otherwise. */
   .hero {
     padding: 28px 0 110px;
+    /* Mobile's tall/narrow hero box is height-bound, not width-bound, so cover crops
+       horizontally — bias further right to keep the gear composition in frame instead of
+       showing the image's empty left-side backdrop. */
+    background-position: 85% center;
   }
 
   .hero-eyebrow {
