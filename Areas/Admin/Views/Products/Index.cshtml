@@ -12,12 +12,18 @@
     </div>
 </div>
 
-<form method="get" class="d-flex gap-2 my-3" style="max-width: 420px;">
-    <input type="text" name="search" class="form-control" placeholder="@Localizer["Search by name or SKU…"]" value="@Model.SearchTerm" />
+<form method="get" class="d-flex gap-2 my-3 flex-wrap align-items-center">
+    <input type="text" name="search" class="form-control" style="max-width: 320px;" placeholder="@Localizer["Search by SKU, ID, barcode, name, brand, color…"]" value="@Model.SearchTerm" />
+    <input type="hidden" name="status" value="@Model.StatusFilter" id="statusFilterInput" />
+    <div class="btn-group" role="group" aria-label="@Localizer["Status filter"]">
+        <button type="submit" class="btn btn-sm @(Model.StatusFilter == "draft" ? "btn-primary" : "btn-outline-primary")" onclick="document.getElementById('statusFilterInput').value='draft';">@Localizer["Draft"]</button>
+        <button type="submit" class="btn btn-sm @(Model.StatusFilter == "published" ? "btn-primary" : "btn-outline-primary")" onclick="document.getElementById('statusFilterInput').value='published';">@Localizer["Published"]</button>
+        <button type="submit" class="btn btn-sm @(Model.StatusFilter == "all" ? "btn-primary" : "btn-outline-primary")" onclick="document.getElementById('statusFilterInput').value='all';">@Localizer["All"]</button>
+    </div>
     <button type="submit" class="btn btn-outline-primary"><i class="bi bi-search"></i> @Localizer["Search"]</button>
     @if (!string.IsNullOrWhiteSpace(Model.SearchTerm))
     {
-        <a asp-action="Index" class="btn btn-outline-secondary">@Localizer["Clear"]</a>
+        <a asp-action="Index" asp-route-status="@Model.StatusFilter" class="btn btn-outline-secondary">@Localizer["Clear search"]</a>
     }
 </form>
 
@@ -26,20 +32,54 @@
 <div class="table-responsive">
 <table class="table bg-white align-middle">
     <thead>
-        <tr><th></th><th>@Localizer["Name"]</th><th>@Localizer["SKU"]</th><th>@Localizer["Category"]</th><th>@Localizer["Price"]</th><th>@Localizer["Wholesale"]</th><th>@Localizer["Stock"]</th><th>@Localizer["Featured"]</th><th></th></tr>
+        <tr><th></th><th>@Localizer["Name"]</th><th>@Localizer["SKU"]</th><th>@Localizer["Category"]</th><th>@Localizer["Status"]</th><th>@Localizer["Image"]</th><th>@Localizer["Price"]</th><th>@Localizer["Wholesale"]</th><th>@Localizer["Stock"]</th><th>@Localizer["Featured"]</th><th></th></tr>
     </thead>
     <tbody>
         @if (Model.Products.Count == 0)
         {
-            <tr><td colspan="9" class="text-muted">@Localizer["No products found."]</td></tr>
+            <tr><td colspan="11" class="text-muted">@Localizer["No products found."]</td></tr>
         }
         @foreach (var product in Model.Products)
         {
+            var hasRealImage = !string.IsNullOrWhiteSpace(product.ImageUrl) && !product.ImageUrl.Contains("TBD", StringComparison.OrdinalIgnoreCase);
             <tr>
-                <td><img src="@product.ImageUrl" style="width:48px;height:48px;object-fit:cover;border-radius:4px;" /></td>
+                <td>
+                    @if (hasRealImage)
+                    {
+                        <img src="@product.ImageUrl" style="width:48px;height:48px;object-fit:cover;border-radius:4px;" />
+                    }
+                    else
+                    {
+                        <div class="d-flex align-items-center justify-content-center bg-light text-muted" style="width:48px;height:48px;border-radius:4px;"><i class="bi bi-image"></i></div>
+                    }
+                </td>
                 <td>@product.Name</td>
                 <td class="text-muted small">@product.Sku</td>
                 <td>@product.Category?.Name</td>
+                <td>
+                    @if (product.IsPublished)
+                    {
+                        <span class="badge bg-success">@Localizer["Published"]</span>
+                    }
+                    else
+                    {
+                        <span class="badge bg-secondary">@Localizer["Draft"]</span>
+                    }
+                </td>
+                <td>
+                    @if (string.IsNullOrWhiteSpace(product.ImageUrl))
+                    {
+                        <span class="badge bg-danger">@Localizer["Missing"]</span>
+                    }
+                    else if (product.ImageUrl.Contains("TBD", StringComparison.OrdinalIgnoreCase))
+                    {
+                        <span class="badge bg-warning text-dark">@Localizer["Placeholder"]</span>
+                    }
+                    else
+                    {
+                        <span class="badge bg-success">@Localizer["Real"]</span>
+                    }
+                </td>
                 <td>@product.Price.ToAed()</td>
                 <td>@(product.WholesalePrice.HasValue ? product.WholesalePrice.Value.ToAed() : "—")</td>
                 <td>
@@ -74,7 +114,7 @@
             @for (int i = 1; i <= Model.TotalPages; i++)
             {
                 <li class="page-item @(i == Model.Page ? "active" : "")">
-                    <a class="page-link" asp-action="Index" asp-route-search="@Model.SearchTerm" asp-route-page="@i">@i</a>
+                    <a class="page-link" asp-action="Index" asp-route-search="@Model.SearchTerm" asp-route-status="@Model.StatusFilter" asp-route-page="@i">@i</a>
                 </li>
             }
         </ul>
