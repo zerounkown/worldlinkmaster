@@ -1690,6 +1690,7 @@ a:hover {
   flex-wrap: wrap;
   align-items: center;
   gap: 12px 14px;
+  margin-top: 40px;
 }
 
 .btn-wlm {
@@ -5609,6 +5610,10 @@ a:hover {
     margin: 14px 0 30px;
   }
 
+  .hero-cta-row {
+    margin-top: 16px;
+  }
+
   .hero-cta-row .btn-wlm,
   .hero-cta-row .btn-wlm-outline {
     padding: 11px 20px;
@@ -5638,6 +5643,10 @@ a:hover {
     font-size: 0.85rem;
     line-height: 1.45;
     margin: 8px 0 20px;
+  }
+
+  .hero-cta-row {
+    margin-top: 8px;
   }
 
   .hero-cta-row .btn-wlm,
