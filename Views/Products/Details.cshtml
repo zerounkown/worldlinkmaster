@@ -147,6 +147,24 @@
 
     var sizeDataJson = JsonSerializer.Serialize(sizesByColorId);
 
+    // Maps "<colorKey>|<sizeLabel>" to that specific ProductVariant's Sku, so the SKU line can
+    // follow whichever variant is currently selected instead of always showing the parent
+    // Product.Sku. colorKey is the ProductColor.Id for imported products (matching the color
+    // swatches' data-color-id above) or the shared Color.Id for legacy products (colorOptions) —
+    // either half of the key is "" when the product has no color/size dimension at all. Grouped
+    // rather than a plain ToDictionary since nothing at the DB level guarantees a variant is
+    // unique per (ProductColorId, SizeId) the way it is per (ColorId, SizeId).
+    var variantSkuByKey = Model.Variants
+        .GroupBy(v => (hasProductColors ? v.ProductColorId?.ToString() : v.ColorId?.ToString()) + "|" + (v.Size?.Label ?? ""))
+        .ToDictionary(g => g.Key, g => g.First().Sku);
+    var variantSkuDataJson = JsonSerializer.Serialize(variantSkuByKey);
+
+    var initialColorKey = hasProductColors
+        ? defaultProductColor?.Id.ToString()
+        : (colorOptions.Count > 0 ? colorOptions[0].Color.Id.ToString() : null);
+    var initialSizeLabel = initialSizeOptions.Count > 0 ? initialSizeOptions[0].Label : null;
+    var initialVariantSku = variantSkuByKey.GetValueOrDefault($"{initialColorKey}|{initialSizeLabel}", Model.Sku);
+
     // Description-tab feature bullets — rows in the Attributes sheet with Attribute Code
     // "FEATURE" (kept out of the Specifications table below; those are real spec facts,
     // these are marketing bullets, so they're excluded from one another's sections).
@@ -280,7 +298,7 @@
             <span class="category-tag">@Model.Category?.LocalizedName()</span>
             <h1>@Model.LocalizedName()</h1>
             <p class="pdp-meta-line mt-1 mb-1">
-                @Localizer["SKU"]: @Model.Sku
+                @Localizer["SKU"]: <span id="pdpSkuValue" data-base-sku="@Model.Sku">@initialVariantSku</span>
                 @if (Model.Brand != null)
                 {
                     <text><span class="pdp-meta-sep">|</span> @Localizer["Brand"]: @Model.Brand.LocalizedName()</text>
@@ -358,7 +376,7 @@
                                     var opt = colorOptions[i];
                                     var swatchStyle = $"background-color: {opt.Color.HexCode};";
                                     <label class="color-swatch" style="@swatchStyle" title="@opt.Color.Name">
-                                        <input type="radio" name="color" value="@opt.Color.Name" data-image="@(opt.ImageUrl ?? Model.ImageUrl)" data-label="@opt.Color.Name" required="@(i == 0 ? "required" : null)" checked="@(i == 0 ? "checked" : null)" />
+                                        <input type="radio" name="color" value="@opt.Color.Name" data-color-id="@opt.Color.Id" data-image="@(opt.ImageUrl ?? Model.ImageUrl)" data-label="@opt.Color.Name" required="@(i == 0 ? "required" : null)" checked="@(i == 0 ? "checked" : null)" />
                                     </label>
                                 }
                             </div>
@@ -385,6 +403,11 @@
                         {
                             <script type="application/json" id="sizesByColorData">@Html.Raw(sizeDataJson)</script>
                         }
+                    }
+
+                    @if (Model.Variants.Count > 0)
+                    {
+                        <script type="application/json" id="variantSkuData">@Html.Raw(variantSkuDataJson)</script>
                     }
 
                     <div class="pdp-qty-cart-row mb-2">
