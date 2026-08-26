@@ -1633,9 +1633,11 @@ a:hover {
     url('/images/hero-tactical-banner.jpg');
   background-size: cover;
   /* Gear composition sits right-of-center in the source photo (2000x900) — on wide viewports
-     the full width shows so this axis is mostly inert, but it matters once width stops being
-     the binding dimension (narrower desktop windows, tall aspect ratios). */
-  background-position: 75% 25%;
+     the full width shows so the X axis is mostly inert, but it matters once width stops being
+     the binding dimension (narrower desktop windows, tall aspect ratios). The Y axis is the
+     opposite: on wide viewports cover crops vertically, and a high Y value keeps the crop
+     coming from the empty sky at the top instead of the boots/cap at the bottom. */
+  background-position: 75% 90%;
   color: var(--wlm-cream);
   padding: 110px 0;
   margin-bottom: 40px;
