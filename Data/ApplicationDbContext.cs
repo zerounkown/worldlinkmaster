@@ -70,6 +70,14 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
         builder.Entity<Product>()
             .HasIndex(p => p.VendorSku);
 
+        // Search now matches on Sku (exact-match relevance tier, plus partial ILIKE), which had
+        // no index at all before — ProductVariant.Sku already had one, this closes the gap on
+        // the Product side. Not unique: the SKU audit found zero duplicates in production today,
+        // but nothing currently enforces that at the DB level, so a plain index rather than a
+        // uniqueness constraint to avoid silently changing that guarantee.
+        builder.Entity<Product>()
+            .HasIndex(p => p.Sku);
+
         builder.Entity<Product>()
             .HasOne(p => p.Category)
             .WithMany(c => c.Products)
