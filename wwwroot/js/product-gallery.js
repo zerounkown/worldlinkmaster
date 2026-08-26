@@ -13,6 +13,8 @@
     var lifestyleDataEl = document.getElementById("lifestyleByColorData");
     var lifestylePhoto = document.getElementById("pdpLifestylePhoto");
     var lifestyleImage = document.getElementById("pdpLifestyleImage");
+    var skuValueEl = document.getElementById("pdpSkuValue");
+    var variantSkuDataEl = document.getElementById("variantSkuData");
 
     if (!mainImage || !zoomContainer) {
         return;
@@ -51,6 +53,49 @@
         } catch (e) {
             lifestyleByColorId = null;
         }
+    }
+
+    // Per-variant SKU, keyed the same way as the size lookup above: "<colorKey>|<sizeLabel>",
+    // where colorKey is whichever id the currently-checked color radio's data-color-id carries
+    // (ProductColor.Id or shared Color.Id, matching how the server built this map) and "" fills
+    // in for a missing color/size dimension. { "<colorKey>|<sizeLabel>": "<sku>", ... }
+    var variantSkuByKey = null;
+    if (variantSkuDataEl) {
+        try {
+            variantSkuByKey = JSON.parse(variantSkuDataEl.textContent);
+        } catch (e) {
+            variantSkuByKey = null;
+        }
+    }
+
+    function currentColorKey() {
+        var checked = document.querySelector('input[name="color"]:checked');
+        return (checked && checked.getAttribute("data-color-id")) || "";
+    }
+
+    function currentSizeLabel() {
+        var checked = sizeContainer ? sizeContainer.querySelector('input[name="size"]:checked') : null;
+        return checked ? checked.value : "";
+    }
+
+    // Falls back to the parent product's SKU (stashed in data-base-sku) whenever the current
+    // color+size combination doesn't resolve to a specific variant — e.g. a product with no
+    // variants at all, or a color/size combo that genuinely has no stock row for it.
+    function updateSku() {
+        if (!skuValueEl || !variantSkuByKey) return;
+        var key = currentColorKey() + "|" + currentSizeLabel();
+        skuValueEl.textContent = variantSkuByKey[key] || skuValueEl.getAttribute("data-base-sku");
+    }
+
+    // Size pills are rebuilt from scratch on every color change (see renderSizes below), so a
+    // delegated listener on the container — rather than binding each pill directly — is what
+    // keeps working after a rebuild without needing to rebind anything.
+    if (sizeContainer) {
+        sizeContainer.addEventListener("change", function (e) {
+            if (e.target && e.target.name === "size") {
+                updateSku();
+            }
+        });
     }
 
     // Rebuilds the size-pill row from scratch for the given list of size labels — mirrors the
@@ -241,6 +286,10 @@
             if (sizesByColorId && colorId) {
                 renderSizes(sizesByColorId[colorId] || []);
             }
+
+            // After renderSizes (if it ran) so this reads whichever size pill just got
+            // auto-checked as the new color's default, not the previous color's selection.
+            updateSku();
 
             if (lifestylePhoto && lifestyleImage && lifestyleByColorId && colorId) {
                 var lifestyleUrl = lifestyleByColorId[colorId];
