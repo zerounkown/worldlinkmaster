@@ -26,6 +26,6 @@ public static class ProductCardImageExtensions
                 .Select(m => m.MediaUrl);
 
         return sharedImages.Concat(colorImages)
-            .FirstOrDefault(url => !string.IsNullOrWhiteSpace(url) && !string.Equals(url, primaryImageUrl, StringComparison.OrdinalIgnoreCase));
+            .FirstOrDefault(url => ImagePlaceholder.IsRealImageUrl(url) && !string.Equals(url, primaryImageUrl, StringComparison.OrdinalIgnoreCase));
     }
 }
