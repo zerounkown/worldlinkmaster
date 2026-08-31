@@ -39,7 +39,7 @@
     var colorOptions = Model.Variants
         .Where(v => v.ColorId.HasValue)
         .GroupBy(v => v.ColorId!.Value)
-        .Select(g => (Color: g.First().Color!, ImageUrl: g.Select(v => v.ImageUrl).FirstOrDefault(url => url != null)))
+        .Select(g => (Color: g.First().Color!, ImageUrl: g.Select(v => v.ImageUrl).FirstOrDefault(ImagePlaceholder.IsRealImageUrl)))
         .ToList();
     var sizeOptions = Model.Variants
         .Where(v => v.SizeId.HasValue)
@@ -58,7 +58,7 @@
         defaultProductColor = Model.ProductColors.FirstOrDefault(pc => pc.DefaultColor) ?? Model.ProductColors.First();
 
         var sharedItems = Model.Media
-            .Where(m => m.ProductColorId == null && m.MediaScope == "Shared" && m.ShowInGallery)
+            .Where(m => m.ProductColorId == null && m.MediaScope == "Shared" && m.ShowInGallery && ImagePlaceholder.IsRealImageUrl(m.MediaUrl))
             .OrderBy(m => m.DisplayOrder)
             .ToList();
 
@@ -70,11 +70,11 @@
         foreach (var pc in Model.ProductColors)
         {
             var ownMedia = Model.Media
-                .Where(m => m.ProductColorId == pc.Id && m.ShowInGallery)
+                .Where(m => m.ProductColorId == pc.Id && m.ShowInGallery && ImagePlaceholder.IsRealImageUrl(m.MediaUrl))
                 .OrderByDescending(m => m.IsColorMain)
                 .ThenBy(m => m.DisplayOrder)
                 .FirstOrDefault();
-            var ownUrl = ownMedia?.MediaUrl ?? pc.SwatchImageUrl;
+            var ownUrl = ownMedia?.MediaUrl ?? (ImagePlaceholder.IsRealImageUrl(pc.SwatchImageUrl) ? pc.SwatchImageUrl : null);
             if (!string.IsNullOrEmpty(ownUrl) && !colorIdByUrl.ContainsKey(ownUrl))
             {
                 colorIdByUrl[ownUrl] = pc.Id;
@@ -90,15 +90,33 @@
             ["colorId"] = colorIdByUrl.TryGetValue(m.MediaUrl, out var mediaColorId) ? mediaColorId.ToString() : null
         };
 
+        // Fallback source for products whose ProductColors/ProductMedia gallery has no real
+        // photo at all for a color (e.g. the Condor catalog cleanup, which sourced real images
+        // into the legacy ProductVariants.ImageUrl per color but never backfilled the newer
+        // ProductMedia rows — those are still seeded with the pending-placeholder string).
+        var variantImageByColorId = Model.Variants
+            .Where(v => v.ColorId.HasValue && ImagePlaceholder.IsRealImageUrl(v.ImageUrl))
+            .GroupBy(v => v.ColorId!.Value)
+            .ToDictionary(g => g.Key, g => g.First().ImageUrl);
+
         foreach (var pc in Model.ProductColors)
         {
             var colorItems = Model.Media
-                .Where(m => m.ProductColorId == pc.Id && m.ShowInGallery)
+                .Where(m => m.ProductColorId == pc.Id && m.ShowInGallery && ImagePlaceholder.IsRealImageUrl(m.MediaUrl))
                 .OrderBy(m => m.DisplayOrder);
             var combined = sharedItems.Concat(colorItems).Select(ToGalleryItem).ToList();
-            if (combined.Count == 0 && !string.IsNullOrEmpty(pc.SwatchImageUrl))
+            if (combined.Count == 0 && ImagePlaceholder.IsRealImageUrl(pc.SwatchImageUrl))
             {
                 combined.Add(new Dictionary<string, string?> { ["type"] = "Image", ["url"] = pc.SwatchImageUrl, ["thumb"] = pc.SwatchImageUrl, ["alt"] = pc.Color?.Name, ["colorId"] = pc.Id.ToString() });
+            }
+            if (combined.Count == 0)
+            {
+                var fallbackUrl = variantImageByColorId.TryGetValue(pc.ColorId, out var vUrl) ? vUrl
+                    : (ImagePlaceholder.IsRealImageUrl(Model.ImageUrl) ? Model.ImageUrl : null);
+                if (fallbackUrl != null)
+                {
+                    combined.Add(new Dictionary<string, string?> { ["type"] = "Image", ["url"] = fallbackUrl, ["thumb"] = fallbackUrl, ["alt"] = pc.Color?.Name, ["colorId"] = pc.Id.ToString() });
+                }
             }
 
             // The item representing this color itself (not just a Shared photo that happens to
@@ -359,7 +377,7 @@
                                     // color picker.
                                     var swatchStyle = $"background-color: {pc.Color?.HexCode};";
                                     <label class="color-swatch" style="@swatchStyle" title="@pc.Color?.Name">
-                                        <input type="radio" name="color" value="@pc.Color?.Name" data-color-id="@pc.Id" data-image="@(fallbackImage ?? Model.ImageUrl)" data-label="@pc.Color?.Name" required="@(i == 0 ? "required" : null)" checked="@(isSelected ? "checked" : null)" />
+                                        <input type="radio" name="color" value="@pc.Color?.Name" data-color-id="@pc.Id" data-image="@(ImagePlaceholder.IsRealImageUrl(fallbackImage) ? fallbackImage : Model.ImageUrl)" data-label="@pc.Color?.Name" required="@(i == 0 ? "required" : null)" checked="@(isSelected ? "checked" : null)" />
                                     </label>
                                 }
                             </div>
@@ -376,7 +394,7 @@
                                     var opt = colorOptions[i];
                                     var swatchStyle = $"background-color: {opt.Color.HexCode};";
                                     <label class="color-swatch" style="@swatchStyle" title="@opt.Color.Name">
-                                        <input type="radio" name="color" value="@opt.Color.Name" data-color-id="@opt.Color.Id" data-image="@(opt.ImageUrl ?? Model.ImageUrl)" data-label="@opt.Color.Name" required="@(i == 0 ? "required" : null)" checked="@(i == 0 ? "checked" : null)" />
+                                        <input type="radio" name="color" value="@opt.Color.Name" data-color-id="@opt.Color.Id" data-image="@(ImagePlaceholder.IsRealImageUrl(opt.ImageUrl) ? opt.ImageUrl : Model.ImageUrl)" data-label="@opt.Color.Name" required="@(i == 0 ? "required" : null)" checked="@(i == 0 ? "checked" : null)" />
                                     </label>
                                 }
                             </div>
