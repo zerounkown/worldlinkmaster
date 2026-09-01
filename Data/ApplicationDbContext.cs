@@ -59,6 +59,31 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
     {
         base.OnModelCreating(builder);
 
+        // Every text column the product search (Controllers/ProductsController.cs Index action)
+        // runs EF.Functions.ILike("%term%") against gets a trigram GIN index here. A plain
+        // B-tree index (like the ones below on Sku/Slug) can't be used for a leading-wildcard
+        // pattern at all — without this, every search was a full sequential scan. Covers both
+        // Product's own columns and the two correlated-subquery columns reached via
+        // ProductVariant (Barcode, Color.Name) and Brand.Name, since those are ILIKE'd in the
+        // exact same WHERE clause.
+        builder.HasPostgresExtension("pg_trgm");
+
+        // Product.Sku and ProductVariant.Barcode already have their own plain B-tree indexes
+        // elsewhere in this method (exact-match/uniqueness). The name has to be passed directly
+        // to HasIndex() here (not chained on afterward via HasDatabaseName) — EF Core keys an
+        // index's identity off its column set otherwise, so a later HasDatabaseName() call on a
+        // second HasIndex(x => x.SameColumn) doesn't create a distinct index, it silently merges
+        // configuration (unique/method/operators) onto the *existing* one for that column set.
+        builder.Entity<Product>().HasIndex(p => p.Sku, "IX_Products_Sku_Trgm").HasMethod("gin").HasOperators("gin_trgm_ops");
+        builder.Entity<Product>().HasIndex(p => p.Name, "IX_Products_Name_Trgm").HasMethod("gin").HasOperators("gin_trgm_ops");
+        builder.Entity<Product>().HasIndex(p => p.NameAr, "IX_Products_NameAr_Trgm").HasMethod("gin").HasOperators("gin_trgm_ops");
+        builder.Entity<Product>().HasIndex(p => p.Description, "IX_Products_Description_Trgm").HasMethod("gin").HasOperators("gin_trgm_ops");
+        builder.Entity<Product>().HasIndex(p => p.ShortDescription, "IX_Products_ShortDescription_Trgm").HasMethod("gin").HasOperators("gin_trgm_ops");
+        builder.Entity<Product>().HasIndex(p => p.ShortDescriptionAr, "IX_Products_ShortDescriptionAr_Trgm").HasMethod("gin").HasOperators("gin_trgm_ops");
+        builder.Entity<Brand>().HasIndex(b => b.Name, "IX_Brands_Name_Trgm").HasMethod("gin").HasOperators("gin_trgm_ops");
+        builder.Entity<Color>().HasIndex(c => c.Name, "IX_Colors_Name_Trgm").HasMethod("gin").HasOperators("gin_trgm_ops");
+        builder.Entity<ProductVariant>().HasIndex(v => v.Barcode, "IX_ProductVariants_Barcode_Trgm").HasMethod("gin").HasOperators("gin_trgm_ops");
+
         builder.Entity<Category>()
             .HasIndex(c => c.Slug)
             .IsUnique();
