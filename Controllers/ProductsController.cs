@@ -234,9 +234,11 @@ public class ProductsController : Controller
             .Take(PageSize)
             .ToListAsync();
 
+        // Views/Products/Index.cshtml never reads Category.Products or a product count derived
+        // from it (only .Subcategories) — that Include used to hydrate every published Product
+        // row for every category on every listing/search request for nothing.
         var categories = await _context.Categories
             .AsNoTracking()
-            .Include(c => c.Products)
             .Include(c => c.Subcategories.OrderBy(s => s.Name))
             .OrderBy(c => c.Name)
             .ToListAsync();
