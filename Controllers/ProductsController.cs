@@ -245,81 +245,93 @@ public class ProductsController : Controller
         var allBrands = await _context.Brands.AsNoTracking().ToListAsync();
         ViewBag.ActiveEvent = await _promoService.GetTopActiveEventAsync();
 
-        // Facet counts — each one applies every filter except its own dimension. Previously 7-8
-        // separate awaits run one after another on the request's own context; run them
-        // concurrently instead, each against its own short-lived DbContext from _contextFactory
-        // (a single context can't have more than one query in flight at once, so true
-        // parallelism needs separate connections, not just separate Tasks).
-        async Task<T> WithFacetContextAsync<T>(Func<ApplicationDbContext, IQueryable<Product>, Task<T>> work)
+        // Facet counts — each one applies every filter except its own dimension. This used to run
+        // 7 separate DbContexts concurrently (a single context can't have more than one query in
+        // flight, so true parallelism needed separate connections) — 8 concurrent Postgres
+        // connections per listing-page hit once the base query is counted too. That fan-out was
+        // identified as a major contributor to Supabase connection-pool exhaustion under load, so
+        // it's consolidated into 2 batches sharing one DbContext each: queries within a batch run
+        // sequentially (same pattern already used below for availability/rating), and the 2
+        // batches run concurrently against each other. Same facet queries, same results — 3
+        // connections per request (base + 2 batches) instead of 8.
+        async Task<(Dictionary<int, int> SubcategoryCounts, List<(int Id, int Count)> Brands, (int InStock, int OutOfStock) Availability, Dictionary<int, int> Rating)> RunCountFacetsAsync()
         {
             await using var facetContext = await _contextFactory.CreateDbContextAsync();
-            return await work(facetContext, BuildBaseQuery(facetContext));
-        }
+            var bq = BuildBaseQuery(facetContext);
 
-        // Subcategory counts only make sense once a top-level category narrows the field.
-        var subcategoryCountsTask = categoryId.HasValue
-            ? WithFacetContextAsync((_, bq) => ApplyFacets(bq, skipSubcategory: true)
-                .Where(p => p.SubcategoryId.HasValue)
-                .GroupBy(p => p.SubcategoryId!.Value)
+            // Subcategory counts only make sense once a top-level category narrows the field.
+            var subcategoryCounts = categoryId.HasValue
+                ? await ApplyFacets(bq, skipSubcategory: true)
+                    .Where(p => p.SubcategoryId.HasValue)
+                    .GroupBy(p => p.SubcategoryId!.Value)
+                    .Select(g => new { Id = g.Key, Count = g.Count() })
+                    .ToDictionaryAsync(x => x.Id, x => x.Count)
+                : new Dictionary<int, int>();
+
+            var brands = await ApplyFacets(bq, skipBrand: true)
+                .Where(p => p.BrandId.HasValue)
+                .GroupBy(p => p.BrandId!.Value)
                 .Select(g => new { Id = g.Key, Count = g.Count() })
-                .ToDictionaryAsync(x => x.Id, x => x.Count))
-            : Task.FromResult(new Dictionary<int, int>());
+                .ToListAsync();
 
-        var brandFacetsTask = WithFacetContextAsync((_, bq) => ApplyFacets(bq, skipBrand: true)
-            .Where(p => p.BrandId.HasValue)
-            .GroupBy(p => p.BrandId!.Value)
-            .Select(g => new { Id = g.Key, Count = g.Count() })
-            .ToListAsync());
-
-        var colorFacetsTask = WithFacetContextAsync((_, bq) => ApplyFacets(bq, skipColor: true)
-            .SelectMany(p => p.Variants.Where(v => v.Color != null), (p, v) => new { p.Id, v.Color!.Name, v.Color.HexCode })
-            .GroupBy(x => new { x.Name, x.HexCode })
-            .Select(g => new ColorFacetCount { Name = g.Key.Name, HexCode = g.Key.HexCode, Count = g.Select(x => x.Id).Distinct().Count() })
-            .OrderByDescending(x => x.Count)
-            .ToListAsync());
-
-        var sizeFacetsTask = WithFacetContextAsync((_, bq) => ApplyFacets(bq, skipSize: true)
-            .SelectMany(p => p.Variants.Where(v => v.Size != null), (p, v) => new { p.Id, v.Size!.Label })
-            .GroupBy(x => x.Label)
-            .Select(g => new LabelFacetCount { Label = g.Key, Count = g.Select(x => x.Id).Distinct().Count() })
-            .OrderByDescending(x => x.Count)
-            .ToListAsync());
-
-        var featureFacetsTask = WithFacetContextAsync((_, bq) => ApplyFacets(bq, skipFeature: true)
-            .SelectMany(p => p.Features, (p, f) => new { ProductId = p.Id, FeatureId = f.Id, f.Name, f.NameAr })
-            .GroupBy(x => new { x.FeatureId, x.Name, x.NameAr })
-            .Select(g => new FacetCount { Id = g.Key.FeatureId, Name = g.Key.Name, NameAr = g.Key.NameAr, Count = g.Select(x => x.ProductId).Distinct().Count() })
-            .OrderByDescending(x => x.Count)
-            .ToListAsync());
-
-        var availabilityTask = WithFacetContextAsync(async (_, bq) =>
-        {
             var availabilityBase = ApplyFacets(bq, skipAvailability: true);
             var inStock = await availabilityBase.CountAsync(p => p.StockQuantity > 0);
             var outOfStock = await availabilityBase.CountAsync(p => p.StockQuantity == 0);
-            return (InStock: inStock, OutOfStock: outOfStock);
-        });
 
-        var ratingTask = WithFacetContextAsync(async (_, bq) =>
-        {
             var ratingBase = ApplyFacets(bq, skipRating: true);
-            var counts = new Dictionary<int, int>();
+            var ratingCounts = new Dictionary<int, int>();
             for (var stars = 4; stars >= 1; stars--)
             {
-                counts[stars] = await ratingBase.CountAsync(p => p.Rating >= stars);
+                ratingCounts[stars] = await ratingBase.CountAsync(p => p.Rating >= stars);
             }
-            return counts;
-        });
 
-        await Task.WhenAll(subcategoryCountsTask, brandFacetsTask, colorFacetsTask, sizeFacetsTask, featureFacetsTask, availabilityTask, ratingTask);
+            return (subcategoryCounts, brands.Select(x => (x.Id, x.Count)).ToList(), (inStock, outOfStock), ratingCounts);
+        }
 
-        var subcategoryCountsById = await subcategoryCountsTask;
-        var brandFacets = await brandFacetsTask;
-        var colorFacets = await colorFacetsTask;
-        var sizeFacets = await sizeFacetsTask;
-        var featureFacets = await featureFacetsTask;
-        var (inStockCount, outOfStockCount) = await availabilityTask;
-        var ratingCounts = await ratingTask;
+        async Task<(List<ColorFacetCount> Colors, List<LabelFacetCount> Sizes, List<FacetCount> Features)> RunVariantFacetsAsync()
+        {
+            await using var facetContext = await _contextFactory.CreateDbContextAsync();
+            var bq = BuildBaseQuery(facetContext);
+
+            var colors = await ApplyFacets(bq, skipColor: true)
+                .SelectMany(p => p.Variants.Where(v => v.Color != null), (p, v) => new { p.Id, v.Color!.Name, v.Color.HexCode })
+                .GroupBy(x => new { x.Name, x.HexCode })
+                .Select(g => new ColorFacetCount { Name = g.Key.Name, HexCode = g.Key.HexCode, Count = g.Select(x => x.Id).Distinct().Count() })
+                .OrderByDescending(x => x.Count)
+                .ToListAsync();
+
+            var sizes = await ApplyFacets(bq, skipSize: true)
+                .SelectMany(p => p.Variants.Where(v => v.Size != null), (p, v) => new { p.Id, v.Size!.Label })
+                .GroupBy(x => x.Label)
+                .Select(g => new LabelFacetCount { Label = g.Key, Count = g.Select(x => x.Id).Distinct().Count() })
+                .OrderByDescending(x => x.Count)
+                .ToListAsync();
+
+            var features = await ApplyFacets(bq, skipFeature: true)
+                .SelectMany(p => p.Features, (p, f) => new { ProductId = p.Id, FeatureId = f.Id, f.Name, f.NameAr })
+                .GroupBy(x => new { x.FeatureId, x.Name, x.NameAr })
+                .Select(g => new FacetCount { Id = g.Key.FeatureId, Name = g.Key.Name, NameAr = g.Key.NameAr, Count = g.Select(x => x.ProductId).Distinct().Count() })
+                .OrderByDescending(x => x.Count)
+                .ToListAsync();
+
+            return (colors, sizes, features);
+        }
+
+        var countFacetsTask = RunCountFacetsAsync();
+        var variantFacetsTask = RunVariantFacetsAsync();
+        await Task.WhenAll(countFacetsTask, variantFacetsTask);
+
+        var countFacets = await countFacetsTask;
+        var variantFacets = await variantFacetsTask;
+
+        var subcategoryCountsById = countFacets.SubcategoryCounts;
+        var brandFacets = countFacets.Brands;
+        var (inStockCount, outOfStockCount) = countFacets.Availability;
+        var ratingCounts = countFacets.Rating;
+
+        var colorFacets = variantFacets.Colors;
+        var sizeFacets = variantFacets.Sizes;
+        var featureFacets = variantFacets.Features;
 
         var subcategoryLookup = categories.SelectMany(c => c.Subcategories).ToDictionary(s => s.Id);
         var brandLookup = allBrands.ToDictionary(b => b.Id);
