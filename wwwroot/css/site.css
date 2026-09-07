@@ -494,22 +494,29 @@ a:hover {
   align-content: start;
 }
 
-/* Apparel-only: a physical column can hold more than one group stacked vertically (e.g. Featured
-   + Pants in one column — see apparelMenuColumnGroups in _Layout.cshtml) so the panel uses fewer,
-   taller columns instead of one column per group with a lot of empty space under the shorter
-   ones. The gap here is the seam between stacked groups within a column; .main-nav-mega-group is
-   each individual group's own header + items, unchanged in appearance from before. */
+/* Non-Apparel categories render their subitem links as direct children of .main-nav-mega-column
+   (no .main-nav-mega-group wrapper — see the "else" branch in _Layout.cshtml), so this column's
+   own flex gap was landing between every individual item, not just between grouped sections —
+   the tight Apparel look (~4px between items, from .main-nav-mega-subitem's own padding) has no
+   group wrapper standing between it and this gap. Kept at 0 so all categories get that same tight
+   item density; the seam Apparel actually needs between stacked groups within one column (e.g.
+   Featured + Pants) now lives on .main-nav-mega-group's own margin-top instead, so it only ever
+   applies where a group wrapper actually exists. */
 .main-nav-mega-column {
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 0;
 }
 
 .main-nav-mega-group {
   min-width: 0;
   display: flex;
   flex-direction: column;
+}
+
+.main-nav-mega-group + .main-nav-mega-group {
+  margin-top: 20px;
 }
 
 .main-nav-mega-column-header {
