@@ -23,7 +23,8 @@ public static class SeedData
         await SeedBulkExpansionAsync(context, defaultMerchant.Id, colorCache, sizeCache);
         await SeedSubcategoriesAsync(context);
         await SeedSubcategoryPlaceholderProductsAsync(context, defaultMerchant.Id, colorCache, sizeCache);
-        await SeedMissingVariantsAsync(context, colorCache, sizeCache);
+        var seedLogger = services.GetRequiredService<ILoggerFactory>().CreateLogger("SeedData");
+        await SeedMissingVariantsAsync(context, colorCache, sizeCache, seedLogger);
         await SeedFeaturesAsync(context);
         await SeedInternalAttributeDefinitionsAsync(context);
         await SeedApparelUseCaseAttributeDefinitionAsync(context);
@@ -128,7 +129,7 @@ public static class SeedData
     // have gotten from its original seeding path — curated launch items get their curated
     // colors+sizes, bulk-generated items get their category's color pool + size chart — rather
     // than falling back to something generic and losing e.g. a boot's shoe sizes.
-    private static async Task SeedMissingVariantsAsync(ApplicationDbContext context, Dictionary<string, Color> colorCache, Dictionary<string, Size> sizeCache)
+    private static async Task SeedMissingVariantsAsync(ApplicationDbContext context, Dictionary<string, Color> colorCache, Dictionary<string, Size> sizeCache, ILogger logger)
     {
         var productIdsWithVariants = await context.ProductVariants.Select(v => v.ProductId).Distinct().ToListAsync();
         var productsNeedingVariants = await context.Products
@@ -190,6 +191,21 @@ public static class SeedData
             {
                 var pick = subProfile.Colors.OrderBy(_ => random.Next()).Take(Math.Min(3, subProfile.Colors.Length)).ToList();
                 BuildVariants(product, colorCache, sizeCache, pick, subProfile.Sizes);
+                continue;
+            }
+
+            // Real vendor-imported catalog items (e.g. CON-XXXX from the Condor import) must never
+            // get random placeholder colors — a product with zero variants here means its real
+            // variant data hasn't been imported/restored yet, and silently inventing colors from
+            // genericColorPool produced exactly that: 100+ Condor products carrying random Black/
+            // CoyoteTan/RangerGreen/Charcoal/OliveDrab/Brown combinations that don't match what
+            // Condor actually sells. Skip and log instead so the gap stays visible and gets fixed
+            // with real data, rather than disappearing behind a plausible-looking fake color set.
+            if (product.Sku.StartsWith("CON-", StringComparison.OrdinalIgnoreCase))
+            {
+                logger.LogWarning(
+                    "Skipped variant seeding for {Sku} ({Name}): product has zero ProductVariants and is a vendor-imported item, so it will not be backfilled with placeholder colors. Real variant data must be imported for it to appear correctly.",
+                    product.Sku, product.Name);
                 continue;
             }
 
