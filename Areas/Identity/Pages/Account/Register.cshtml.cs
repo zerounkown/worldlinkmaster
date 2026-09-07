@@ -94,7 +94,7 @@ namespace WorldLinkMaster.Web.Areas.Identity.Pages.Account
                     var confirmationHtml = $@"
                         <div style='font-family: Arial, Helvetica, sans-serif; max-width: 480px; margin: 0 auto; border: 1px solid #e5e0d8; border-radius: 6px; overflow: hidden;'>
                             <div style='background: #0d0d0d; padding: 24px 32px; text-align: center;'>
-                                <span style='color: #f0d264; font-size: 20px; font-weight: bold; letter-spacing: 1px;'>WORLD LINK MASTER</span>
+                                <span style='color: #c9a64b; font-size: 20px; font-weight: bold; letter-spacing: 1px;'>WORLD LINK MASTER</span>
                             </div>
                             <div style='padding: 32px;'>
                                 <h1 style='font-size: 20px; color: #111111; margin: 0 0 16px;'>Confirm your email address</h1>
@@ -102,7 +102,7 @@ namespace WorldLinkMaster.Web.Areas.Identity.Pages.Account
                                     Thanks for creating an account with World Link Master. Please confirm your email address to activate your account.
                                 </p>
                                 <div style='text-align: center; margin: 0 0 24px;'>
-                                    <a href='{encodedCallbackUrl}' style='background: #f0d264; color: #0d0d0d; text-decoration: none; font-weight: bold; padding: 14px 32px; border-radius: 4px; display: inline-block; font-size: 15px;'>Confirm My Account</a>
+                                    <a href='{encodedCallbackUrl}' style='background: #c9a64b; color: #0d0d0d; text-decoration: none; font-weight: bold; padding: 14px 32px; border-radius: 4px; display: inline-block; font-size: 15px;'>Confirm My Account</a>
                                 </div>
                                 <p style='font-size: 13px; color: #777777; line-height: 1.5;'>
                                     If the button above doesn't work, copy and paste this link into your browser:<br/>

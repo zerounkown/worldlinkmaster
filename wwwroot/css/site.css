@@ -5,19 +5,13 @@
   --wlm-forest-dark: #0d0d0d;
   --wlm-forest: #1a1a1a;
   --wlm-forest-mid: #333333;
-  --wlm-sand: #f0d264;
+  --wlm-sand: #c9a64b;
   --wlm-sand-light: #eaeaea;
   --wlm-cream: #ffffff;
   --wlm-ink: #111111;
   --wlm-blue-dark: #1a1a1a;
   --wlm-blue: #6b6b6b;
   --wlm-danger: #b5482c;
-  /* Warm bronze/gold — used by the Shop mega-menu's light theme (a deliberately muted accent,
-     distinct from --wlm-sand's brighter CTA-button yellow, chosen for that component's own
-     look). Not used by the homepage "Featured Products" panel anymore — that section was moved
-     to --wlm-sand, the same brand gold already used by primary CTA buttons like "Start Shopping
-     With Us", per explicit design feedback. */
-  --wlm-gold-bronze: #a6793d;
   /* Off-white panel background for the homepage "Featured Products" panel — barely warmer than
      --wlm-cream (pure white), just enough to read as its own framed block against the page. */
   --wlm-cream-panel: #fbfaf7;
@@ -224,7 +218,7 @@ a:hover {
   right: 0;
   bottom: 0;
   height: 2px;
-  background: var(--wlm-gold-bronze);
+  background: var(--wlm-sand);
   transform: scaleX(0);
   transition: transform 0.15s ease;
 }
@@ -245,7 +239,7 @@ a:hover {
   bottom: -2px;
   width: 6px;
   height: 6px;
-  background: var(--wlm-gold-bronze);
+  background: var(--wlm-sand);
   transform: translateX(-50%) rotate(45deg);
   opacity: 0;
   transition: opacity 0.15s ease;
@@ -271,7 +265,7 @@ a:hover {
   height: 0;
   border-left: 7px solid transparent;
   border-right: 7px solid transparent;
-  border-top: 7px solid var(--wlm-gold-bronze);
+  border-top: 7px solid var(--wlm-sand);
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.15s ease;
@@ -1629,15 +1623,27 @@ a:hover {
 
 /* Hero */
 .hero {
-  background-image: url('/images/hero-tactical-banner.jpg');
+  background-image: url('/images/hero-tactical-spotlight.jpg');
   background-size: cover;
-  /* Gear composition sits right-of-center in the source photo (2000x900) — on wide viewports
-     the full width shows so this axis is mostly inert, but it matters once width stops being
-     the binding dimension (narrower desktop windows, tall aspect ratios). */
-  background-position: 75% 25%;
+  /* Gear composition sits right-of-center in the source photo (2000x900), vertically centered
+     between empty headroom above the helmet and the reflective floor below the boots. At >=1422px
+     wide (640px hero height x the image's ~2.22:1 aspect ratio) cover crops vertically only, so Y
+     is what keeps the full helmet-to-boots figure in frame; X only starts cropping below that
+     width. Same values for LTR and RTL — the background image itself doesn't flip, only the text
+     block's alignment does. */
+  background-position: 75% 50%;
   color: var(--wlm-cream);
-  padding: 110px 0;
+  min-height: 640px;
+  display: flex;
+  align-items: center;
+  padding: 40px 0;
   margin-bottom: 40px;
+  position: relative;
+}
+
+.hero > .container {
+  position: relative;
+  z-index: 1;
 }
 
 .hero-eyebrow {
@@ -2217,15 +2223,13 @@ a:hover {
   cursor: pointer;
 }
 
-/* Hover uses the muted bronze token (distinct from the bright gold reserved for the active tab)
-   so pointing at a tab is clearly visible without being mistaken for "this is now selected". */
 .featured-tab-link:hover:not(.active) {
   color: var(--wlm-ink);
-  border-bottom-color: var(--wlm-gold-bronze);
+  border-bottom-color: var(--wlm-sand);
 }
 
 .featured-tab-link:hover:not(.active) i {
-  color: var(--wlm-gold-bronze);
+  color: var(--wlm-sand);
 }
 
 .featured-tab-link.active {
@@ -5575,11 +5579,29 @@ a:hover {
      position: fixed to the viewport, so whatever page content lands in that same screen region
      on initial load (no scroll) sits directly behind them otherwise. */
   .hero {
+    /* Desktop's fixed min-height + flex centering is a wide-viewport-only sizing choice — mobile
+       keeps its own original padding-driven height (auto, content-sized) so it doesn't inherit
+       the 640px floor and grow taller than this breakpoint was ever tuned for. */
+    min-height: 0;
+    display: block;
     padding: 28px 0 110px;
     /* Mobile's tall/narrow hero box is height-bound, not width-bound, so cover crops
-       horizontally — bias further right to keep the gear composition in frame instead of
-       showing the image's empty left-side backdrop. */
-    background-position: 85% center;
+       horizontally — bias right to keep the gear composition in frame instead of showing the
+       image's empty left-side backdrop. */
+    background-position: 55% center;
+  }
+
+  /* Text sits directly on top of the image at this width (desktop's side-by-side layout has
+     empty dark backdrop to sit beside; mobile's stacked layout doesn't) — the new spotlight
+     source image's light beam is broad enough that no crop window fully avoids it, so a top-
+     anchored scrim darkens specifically the eyebrow/heading/paragraph zone. Fades out by
+     roughly where the CTA buttons start, since those already sit on solid button backgrounds
+     and don't need it, and fading keeps the gear composition below from reading as washed out. */
+  .hero::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(180deg, rgba(5, 5, 5, 0.8) 0%, rgba(5, 5, 5, 0.55) 45%, rgba(5, 5, 5, 0.15) 70%, rgba(5, 5, 5, 0) 88%);
   }
 
   .hero-eyebrow {
