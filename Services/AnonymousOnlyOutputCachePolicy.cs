@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Localization;
 using Microsoft.AspNetCore.OutputCaching;
 
 namespace WorldLinkMaster.Web.Services;
@@ -36,6 +37,17 @@ public sealed class AnonymousOnlyOutputCachePolicy : IOutputCachePolicy
         context.AllowCacheLookup = true;
         context.AllowCacheStorage = true;
         context.ResponseExpirationTimeSpan = _duration;
+
+        // The page's rendered HTML depends on two cookies beyond the URL itself: the UI
+        // language (dir="rtl"/"ltr", every translated string) and the display currency
+        // (every shown price). Without varying by these, the first anonymous visitor to
+        // populate the cache — whatever language/currency they happened to be using —
+        // would have that same render served to every other anonymous visitor regardless
+        // of their own cookie, until the entry expired. There's no built-in VaryByCookie
+        // list (only VaryByValues, a free-form key/value bag), so the cookie values are
+        // read directly and fed into it.
+        context.CacheVaryByRules.VaryByValues["culture"] = httpContext.Request.Cookies[CookieRequestCultureProvider.DefaultCookieName] ?? string.Empty;
+        context.CacheVaryByRules.VaryByValues["currency"] = httpContext.Request.Cookies["currency"] ?? string.Empty;
 
         foreach (var tag in _tags)
         {

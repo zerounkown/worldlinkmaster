@@ -44,6 +44,20 @@ public class CartController : Controller
         return View(vm);
     }
 
+    // Deliberately uncached and separate from any full-page render — the header cart badge
+    // reads session state (Areas/Admin aside, carts work for anonymous guests too), and
+    // Home/Products/Index/Details are now output-cached for anonymous requests. A cached
+    // page's server-rendered badge would freeze at whatever count happened to be true for the
+    // first visitor who populated that cache entry, so the layout renders the badge normally
+    // (still correct on every non-cached response) and re-fetches it client-side after load —
+    // see the script in _Layout.cshtml — to correct a stale cached value, if the page came
+    // from the cache at all.
+    [HttpGet]
+    public IActionResult Count()
+    {
+        return Json(new { count = _cartService.GetItemCount() });
+    }
+
     // Shared by Index() and UpdateQuantityAjax() so the page and the AJAX stepper always agree
     // on stock/SKU enrichment and the currently-applied coupon.
     private async Task<CartViewModel> BuildCartViewModelAsync()
