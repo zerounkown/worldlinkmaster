@@ -2,6 +2,7 @@ using System.Globalization;
 using System.IO;
 using ClosedXML.Excel;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.OutputCaching;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Localization;
 using WorldLinkMaster.Web.Data;
@@ -17,11 +18,13 @@ public class ProductsController : AdminBaseController
 
     private readonly ApplicationDbContext _context;
     private readonly IStringLocalizer<SharedResource> _localizer;
+    private readonly IOutputCacheStore _outputCacheStore;
 
-    public ProductsController(ApplicationDbContext context, IStringLocalizer<SharedResource> localizer)
+    public ProductsController(ApplicationDbContext context, IStringLocalizer<SharedResource> localizer, IOutputCacheStore outputCacheStore)
     {
         _context = context;
         _localizer = localizer;
+        _outputCacheStore = outputCacheStore;
     }
 
     // Deliberately unfiltered by IsPublished at the base query — this is the staff-facing view,
@@ -126,6 +129,7 @@ public class ProductsController : AdminBaseController
         product.CreatedAt = DateTime.UtcNow;
         _context.Products.Add(product);
         await _context.SaveChangesAsync();
+        await _outputCacheStore.EvictByTagAsync("products", HttpContext.RequestAborted);
         TempData["AdminMessage"] = _localizer["Product '{0}' created.", product.Name].Value;
         return RedirectToAction(nameof(Index));
     }
@@ -183,6 +187,7 @@ public class ProductsController : AdminBaseController
         existing.IsFeatured = product.IsFeatured;
 
         await _context.SaveChangesAsync();
+        await _outputCacheStore.EvictByTagAsync("products", HttpContext.RequestAborted);
         TempData["AdminMessage"] = _localizer["Product '{0}' updated.", existing.Name].Value;
         return RedirectToAction(nameof(Index));
     }
@@ -222,6 +227,7 @@ public class ProductsController : AdminBaseController
 
         _context.Products.Remove(product);
         await _context.SaveChangesAsync();
+        await _outputCacheStore.EvictByTagAsync("products", HttpContext.RequestAborted);
         TempData["AdminMessage"] = _localizer["Product '{0}' deleted.", product.Name].Value;
 
         return RedirectToAction(nameof(Index));
@@ -524,6 +530,7 @@ public class ProductsController : AdminBaseController
         if (result.UpdatedCount > 0 || result.CreatedCount > 0)
         {
             await _context.SaveChangesAsync();
+            await _outputCacheStore.EvictByTagAsync("products", HttpContext.RequestAborted);
         }
 
         // Optional second sheet: per color/size combo pricing and stock. Absent entirely on
@@ -695,6 +702,7 @@ public class ProductsController : AdminBaseController
         if (result.VariantsUpdatedCount > 0 || result.VariantsCreatedCount > 0)
         {
             await _context.SaveChangesAsync();
+            await _outputCacheStore.EvictByTagAsync("products", HttpContext.RequestAborted);
         }
     }
 
