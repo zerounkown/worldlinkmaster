@@ -13,6 +13,13 @@ namespace WorldLinkMaster.Web.Services;
 /// </summary>
 public sealed class AnonymousOnlyOutputCachePolicy : IOutputCachePolicy
 {
+    // +/-16.7% (e.g. 60s -> 50-70s). Without this, every page cached in the same burst (e.g. a
+    // rush of anonymous traffic right after a deploy or a tag eviction) expires at the exact same
+    // moment, and the next request for each of those URLs becomes a simultaneous cache miss that
+    // hits the database all at once. Spreading expiry across a window turns that synchronized
+    // thundering herd into a trickle of misses instead.
+    private const double JitterFraction = 1.0 / 6.0;
+
     private readonly TimeSpan _duration;
     private readonly string[] _tags;
 
@@ -36,7 +43,7 @@ public sealed class AnonymousOnlyOutputCachePolicy : IOutputCachePolicy
         context.EnableOutputCaching = true;
         context.AllowCacheLookup = true;
         context.AllowCacheStorage = true;
-        context.ResponseExpirationTimeSpan = _duration;
+        context.ResponseExpirationTimeSpan = ApplyJitter(_duration);
 
         // The page's rendered HTML depends on two cookies beyond the URL itself: the UI
         // language (dir="rtl"/"ltr", every translated string) and the display currency
@@ -59,6 +66,14 @@ public sealed class AnonymousOnlyOutputCachePolicy : IOutputCachePolicy
 
     public ValueTask ServeFromCacheAsync(OutputCacheContext context, CancellationToken cancellationToken)
         => ValueTask.CompletedTask;
+
+    // Picks a random point in [duration * (1 - JitterFraction), duration * (1 + JitterFraction)].
+    // Random.Shared is thread-safe, so this is safe to call concurrently across requests.
+    private static TimeSpan ApplyJitter(TimeSpan duration)
+    {
+        var jitterMultiplier = 1.0 + ((Random.Shared.NextDouble() * 2.0 - 1.0) * JitterFraction);
+        return duration * jitterMultiplier;
+    }
 
     public ValueTask ServeResponseAsync(OutputCacheContext context, CancellationToken cancellationToken)
     {
