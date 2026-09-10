@@ -300,6 +300,7 @@ public class ProductsController : Controller
                 .GroupBy(x => new { x.Name, x.HexCode })
                 .Select(g => new ColorFacetCount { Name = g.Key.Name, HexCode = g.Key.HexCode, Count = g.Select(x => x.Id).Distinct().Count() })
                 .OrderByDescending(x => x.Count)
+                .ThenBy(x => x.Name)
                 .ToListAsync();
 
             var sizes = await ApplyFacets(bq, skipSize: true)
@@ -307,6 +308,7 @@ public class ProductsController : Controller
                 .GroupBy(x => x.Label)
                 .Select(g => new LabelFacetCount { Label = g.Key, Count = g.Select(x => x.Id).Distinct().Count() })
                 .OrderByDescending(x => x.Count)
+                .ThenBy(x => x.Label)
                 .ToListAsync();
 
             var features = await ApplyFacets(bq, skipFeature: true)
@@ -314,6 +316,7 @@ public class ProductsController : Controller
                 .GroupBy(x => new { x.FeatureId, x.Name, x.NameAr })
                 .Select(g => new FacetCount { Id = g.Key.FeatureId, Name = g.Key.Name, NameAr = g.Key.NameAr, Count = g.Select(x => x.ProductId).Distinct().Count() })
                 .OrderByDescending(x => x.Count)
+                .ThenBy(x => x.Name)
                 .ToListAsync();
 
             return (colors, sizes, features);
