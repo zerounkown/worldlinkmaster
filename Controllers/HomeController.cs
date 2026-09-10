@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.OutputCaching;
 using Microsoft.EntityFrameworkCore;
 using WorldLinkMaster.Web.Data;
 using WorldLinkMaster.Web.Models;
@@ -30,6 +31,7 @@ public class HomeController : Controller
         return RedirectToAction(nameof(Welcome));
     }
 
+    [OutputCache(PolicyName = "HomePage")]
     public async Task<IActionResult> Welcome()
     {
         // Feeds the auto-scrolling "What We Sell" product strip — featured items first, topped

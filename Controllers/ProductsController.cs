@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.OutputCaching;
 using Microsoft.EntityFrameworkCore;
 using WorldLinkMaster.Web.Data;
 using WorldLinkMaster.Web.Extensions;
@@ -27,6 +28,7 @@ public class ProductsController : Controller
         _userManager = userManager;
     }
 
+    [OutputCache(PolicyName = "ProductListing")]
     public async Task<IActionResult> Index(
         int? categoryId,
         int? subcategoryId, int[]? subcategoryIds,
@@ -456,6 +458,7 @@ public class ProductsController : Controller
         return View(products);
     }
 
+    [OutputCache(PolicyName = "ProductDetail")]
     public async Task<IActionResult> Details(string slug)
     {
         var product = await _context.Products

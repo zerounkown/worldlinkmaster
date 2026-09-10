@@ -289,6 +289,22 @@ builder.Services.AddHealthChecks()
     .AddCheck<StripeConfigurationHealthCheck>("stripe", tags: new[] { "ready" })
     .AddCheck<SmtpConfigurationHealthCheck>("smtp", tags: new[] { "ready" });
 
+// ---------------------------------------------------------------------------
+// Output caching — in-memory (no Redis needed), anonymous traffic only (see
+// AnonymousOnlyOutputCachePolicy for why authenticated requests are excluded).
+// Durations sit in the 60-120s range: long enough to meaningfully cut load from
+// the highest-traffic pages, short enough that a price/stock edit is never stale
+// for more than ~2 minutes even if the explicit eviction below is ever missed.
+// All three policies share the "products" tag so any product write can invalidate
+// every cached page that might show that data in one call.
+// ---------------------------------------------------------------------------
+builder.Services.AddOutputCache(options =>
+{
+    options.AddPolicy("HomePage", new AnonymousOnlyOutputCachePolicy(TimeSpan.FromSeconds(60), "products"));
+    options.AddPolicy("ProductListing", new AnonymousOnlyOutputCachePolicy(TimeSpan.FromSeconds(90), "products"));
+    options.AddPolicy("ProductDetail", new AnonymousOnlyOutputCachePolicy(TimeSpan.FromSeconds(120), "products"));
+});
+
 var app = builder.Build();
 
 if (!jwtKeyConfigured)
@@ -377,6 +393,10 @@ app.UseSession();
 
 app.UseAuthentication();
 app.UseAuthorization();
+
+// Must come after UseAuthorization so the policy can see HttpContext.User when deciding
+// whether a request is anonymous (see AnonymousOnlyOutputCachePolicy).
+app.UseOutputCache();
 
 app.MapControllers();
 app.MapHub<ChatHub>("/hubs/chat");
