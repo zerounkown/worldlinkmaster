@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.OutputCaching;
 using Microsoft.EntityFrameworkCore;
 using WorldLinkMaster.Web.Data;
 using WorldLinkMaster.Web.Extensions;
@@ -27,11 +28,7 @@ public class ProductsController : Controller
         _userManager = userManager;
     }
 
-    // Output caching temporarily disabled: the cache key was found to ignore the query string
-    // entirely (categoryId, slug, search, filters), causing anonymous visitors to be served
-    // whatever page happened to be cached first - wrong category, wrong product - for up to the
-    // cache duration. Emergency mitigation while the root cause in AnonymousOnlyOutputCachePolicy
-    // is investigated; re-enable only after the cache key is confirmed to vary by full request URL.
+    [OutputCache(PolicyName = "ProductListing")]
     public async Task<IActionResult> Index(
         int? categoryId,
         int? subcategoryId, int[]? subcategoryIds,
@@ -464,8 +461,7 @@ public class ProductsController : Controller
         return View(products);
     }
 
-    // Output caching temporarily disabled - see the note on Index() above. Confirmed the same
-    // bug here: requesting one product's slug could return a completely different product's page.
+    [OutputCache(PolicyName = "ProductDetail")]
     public async Task<IActionResult> Details(string slug)
     {
         var product = await _context.Products

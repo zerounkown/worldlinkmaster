@@ -45,6 +45,15 @@ public sealed class AnonymousOnlyOutputCachePolicy : IOutputCachePolicy
         context.AllowCacheStorage = true;
         context.ResponseExpirationTimeSpan = ApplyJitter(_duration);
 
+        // CacheVaryByRules.QueryKeys defaults to empty, and an empty QueryKeys means the cache
+        // key includes NO query string at all - not "vary by everything", as it's easy to
+        // assume. That previously left this policy varying only by path + culture + currency,
+        // so /Products?categoryId=1 and /Products?categoryId=3 (or two different product
+        // slugs on the Details route) collapsed onto the same cache entry and one visitor's
+        // page got served to the next. "*" is the documented sentinel that makes
+        // OutputCacheKeyProvider vary by the full query string instead.
+        context.CacheVaryByRules.QueryKeys = "*";
+
         // The page's rendered HTML depends on two cookies beyond the URL itself: the UI
         // language (dir="rtl"/"ltr", every translated string) and the display currency
         // (every shown price). Without varying by these, the first anonymous visitor to
@@ -52,7 +61,8 @@ public sealed class AnonymousOnlyOutputCachePolicy : IOutputCachePolicy
         // would have that same render served to every other anonymous visitor regardless
         // of their own cookie, until the entry expired. There's no built-in VaryByCookie
         // list (only VaryByValues, a free-form key/value bag), so the cookie values are
-        // read directly and fed into it.
+        // read directly and fed into it. This is additive with QueryKeys above, not a
+        // replacement for it - the key provider appends each vary-by rule independently.
         context.CacheVaryByRules.VaryByValues["culture"] = httpContext.Request.Cookies[CookieRequestCultureProvider.DefaultCookieName] ?? string.Empty;
         context.CacheVaryByRules.VaryByValues["currency"] = httpContext.Request.Cookies["currency"] ?? string.Empty;
 
