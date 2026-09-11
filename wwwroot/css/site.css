@@ -7,6 +7,12 @@
   --wlm-forest-mid: #333333;
   --wlm-sand: #c9a64b;
   --wlm-sand-light: #eaeaea;
+  /* Dedicated solid-primary-button color, deliberately separate from --wlm-sand above.
+     --wlm-sand is the general brand-gold accent used everywhere (nav underlines, badges,
+     checkout step dots, the free-shipping bar, etc.) - repointing it would recolor all of
+     that too. This token only backs the actual solid CTA/submit/add-to-cart buttons, so it
+     can change on its own without touching anything else. */
+  --wlm-btn-primary: #c0883a;
   --wlm-cream: #ffffff;
   --wlm-ink: #111111;
   --wlm-blue-dark: #1a1a1a;
@@ -612,7 +618,7 @@ a:hover {
 .main-nav-mega-promo-cta {
   display: block;
   text-align: center;
-  background: var(--wlm-sand);
+  background: var(--wlm-btn-primary);
   color: var(--wlm-forest-dark) !important;
   font-family: var(--font-heading);
   font-weight: 600;
@@ -1695,7 +1701,7 @@ a:hover {
 
 .btn-wlm {
   display: inline-block;
-  background-color: var(--wlm-sand);
+  background-color: var(--wlm-btn-primary);
   color: var(--wlm-forest-dark);
   font-family: var(--font-heading);
   text-transform: uppercase;
@@ -3049,7 +3055,7 @@ a:hover {
   border: none;
   border-radius: 4px;
   padding: 12px 16px;
-  background: var(--wlm-sand);
+  background: var(--wlm-btn-primary);
   color: var(--wlm-forest-dark);
   font-family: var(--font-heading);
   font-weight: 700;
@@ -3256,7 +3262,7 @@ a:hover {
 }
 
 .pdp-btn-buynow {
-  background-color: var(--wlm-sand);
+  background-color: var(--wlm-btn-primary);
   color: var(--wlm-forest-dark);
 }
 
@@ -4479,7 +4485,7 @@ a:hover {
 }
 
 .newsletter-form button {
-  background-color: var(--wlm-sand);
+  background-color: var(--wlm-btn-primary);
   color: var(--wlm-forest-dark);
   border: none;
   padding: 0 20px;
