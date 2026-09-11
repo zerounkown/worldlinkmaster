@@ -1638,18 +1638,20 @@ a:hover {
 .hero {
   background-image: url('/images/hero-tactical-spotlight.jpg');
   background-size: cover;
-  /* Gear composition sits right-of-center in the source photo (2000x900), vertically centered
-     between empty headroom above the helmet and the reflective floor below the boots. At >=1422px
-     wide (640px hero height x the image's ~2.22:1 aspect ratio) cover crops vertically only, so Y
-     is what keeps the full helmet-to-boots figure in frame; X only starts cropping below that
-     width. Same values for LTR and RTL — the background image itself doesn't flip, only the text
-     block's alignment does. */
-  background-position: 75% 50%;
+  /* Gear composition sits right-of-center in the source photo (2000x900). At >=1155px wide
+     (520px hero height x the image's ~2.22:1 aspect ratio) cover crops vertically only, so Y is
+     what keeps the full helmet-to-boots figure in frame; X only starts cropping below that
+     width. Y is biased toward the top (35%, not centered) because the photo has far more empty
+     floor/reflection space below the boots than headroom above the helmet — at this shorter
+     height, a centered crop would clip into the helmet before it ran out of floor to crop
+     instead. Same values for LTR and RTL — the background image itself doesn't flip, only the
+     text block's alignment does. */
+  background-position: 75% 35%;
   color: var(--wlm-cream);
-  min-height: 640px;
+  min-height: 520px;
   display: flex;
   align-items: center;
-  padding: 40px 0;
+  padding: 32px 0;
   margin-bottom: 40px;
   position: relative;
 }
@@ -1676,7 +1678,7 @@ a:hover {
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.02em;
-  max-width: 640px;
+  max-width: 480px;
 }
 
 .hero .accent {
@@ -1684,7 +1686,7 @@ a:hover {
 }
 
 .hero p {
-  max-width: 520px;
+  max-width: 380px;
   color: var(--wlm-cream);
   font-size: 1.1rem;
   font-weight: 500;
