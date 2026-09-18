@@ -51,8 +51,10 @@ public class HomeController : Controller
             .ToListAsync();
         ViewBag.Categories = await _context.Categories.AsNoTracking().OrderBy(c => c.Name).ToListAsync();
         // Only show brands with a real logo in the "Shop by Brand" row — mixing those in
-        // with plain text-wordmark placeholder tiles looked inconsistent.
-        ViewBag.Brands = await _context.Brands.AsNoTracking().Where(b => b.LogoUrl != null)
+        // with plain text-wordmark placeholder tiles looked inconsistent. Active is also
+        // required: this query previously ignored it, so brands already deactivated in Admin
+        // (e.g. Falcon, Nokhbat Al-Nokhba) kept showing up here anyway.
+        ViewBag.Brands = await _context.Brands.AsNoTracking().Where(b => b.LogoUrl != null && b.Active)
             .OrderByDescending(b => b.Name == "WLM")
             .ThenBy(b => b.Name)
             .ToListAsync();

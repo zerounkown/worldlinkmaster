@@ -206,8 +206,15 @@ else
                             <input type="range" class="price-range-input price-range-input-max" min="@rangeMin" max="@rangeMax" value="@currentMax" aria-label="@Localizer["Max"]" />
                         </div>
                         <div class="price-range-values">
-                            <input type="number" id="minPriceInput" name="minPrice" min="@rangeMin" max="@rangeMax" value="@currentMin" aria-label="@Localizer["Min"]" />
-                            <input type="number" id="maxPriceInput" name="maxPrice" min="@rangeMin" max="@rangeMax" value="@currentMax" aria-label="@Localizer["Max"]" />
+                            <div class="price-range-value-group">
+                                <label for="minPriceInput" class="price-range-value-label">@Localizer["Min"]</label>
+                                <input type="number" id="minPriceInput" name="minPrice" min="@rangeMin" max="@rangeMax" value="@currentMin" />
+                            </div>
+                            <span class="price-range-value-sep" aria-hidden="true">&ndash;</span>
+                            <div class="price-range-value-group">
+                                <label for="maxPriceInput" class="price-range-value-label">@Localizer["Max"]</label>
+                                <input type="number" id="maxPriceInput" name="maxPrice" min="@rangeMin" max="@rangeMax" value="@currentMax" />
+                            </div>
                         </div>
                     </div>
                 </details>
