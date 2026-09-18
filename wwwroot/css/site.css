@@ -1641,13 +1641,12 @@ a:hover {
   /* v6 banner (2000x650, ~3.08:1) was composed specifically for this layout: dark empty space
      built into the left third for the text column, gear cluster confined to the right ~40% of
      the frame (roughly x:1250-2000, y:100-560). Much shorter/wider than the old 2000x900 photo,
-     so it doesn't need the tight crop-position tuning that one did — at the current 520px
+     so it doesn't need the tight crop-position tuning that one did — at the current 455px
      min-height, "right center" clears the gear with real margin to spare at both a narrow
-     desktop width (1366px: cover matches the box's height, ~234px of horizontal crop, all of it
-     coming out of the empty left side) and a wide one (1920px: cover matches the box's width,
-     ~40px of vertical crop split top/bottom, well clear of the gear's own vertical span). Same
-     value for LTR and RTL — the background image itself doesn't flip, only the text block's
-     alignment does. */
+     desktop width (1366px: cover matches the box's height almost exactly, ~34px of horizontal
+     crop) and a wide one (1920px: cover matches the box's width, ~169px of vertical crop split
+     top/bottom, well clear of the gear's own vertical span). Same value for LTR and RTL — the
+     background image itself doesn't flip, only the text block's alignment does. */
   background-position: right center;
   color: var(--wlm-cream);
   /* Was 520px — ~12.5% shorter (within the requested 10-15% range) so Shop by Category's title
@@ -1683,9 +1682,6 @@ a:hover {
 
 .hero h1 {
   color: var(--wlm-cream);
-  /* Was 3.4rem — about 18% down from there, inside the requested 15-20% range, landing on a
-     round number. Two-line wrap ("GEAR BUILT FOR THE" / "LONG HAUL") and the orange .accent
-     color on the second line are untouched; only the size changes. */
   font-size: 2.8rem;
   /* Explicit rather than the browser default (~1.15-1.2, varies by font) so the height-budget
      math in the .hero comment above is actually predictable instead of an estimate. */
@@ -1693,32 +1689,35 @@ a:hover {
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.02em;
-  max-width: 480px;
+  /* Was 480px — wide enough for "GEAR BUILT FOR THE" alone, but the line break now lands after
+     "LONG" instead (see the <br> in Welcome.cshtml), and "GEAR BUILT FOR THE LONG" needs
+     noticeably more room at 2.8rem uppercase bold (~575-590px by character-width estimate).
+     640px gives real margin above that so "LONG" doesn't wrap down onto its own line before
+     hitting the intended break — which would silently turn this back into three lines instead
+     of the requested two. */
+  max-width: 640px;
 }
 
 .hero .accent {
-  /* The English markup has no literal line break — "Long Haul" wrapping onto its own line has
-     always been incidental to max-width plus the font size that happened to be in use. Making it
-     block-level guarantees that two-line split regardless of font-size, so shrinking the heading
-     above can't accidentally pull "Long" up onto the first line. */
-  display: block;
+  /* No display: block here on purpose — the line break is now an explicit <br> in the markup
+     (after "Long", before "Haul"), not an implicit one from forcing the whole accent span onto
+     its own line. That matters because "Long" needs to stay inline on the first line while
+     "Haul" alone breaks to the second. */
   color: var(--wlm-sand);
 }
 
-/* Arabic's heading is a single line by design (see Welcome.cshtml's isRtl branch) — reset back
-   to inline so the highlighted portion runs on with the rest of the sentence instead of
-   inheriting the English-only forced line break above. */
-[dir="rtl"] .hero .accent {
-  display: inline;
-}
-
 .hero p {
-  /* Widened from 380px — at that width this paragraph wraps to enough extra lines to push the
-     box taller than the min-height above, fighting the height-reduction goal directly (narrower
-     box = more wrapped lines = MORE height needed, the opposite of what a shorter hero wants).
-     440px keeps a real gap before the gear composition while cutting the wrap count; font-size/
-     line-height are trimmed on top of that to bring the block's own height down further. */
-  max-width: 440px;
+  /* Widened again, from 440px to 520px — at 440 there was too large a visible dark gap between
+     the end of the paragraph and where the gear composition starts in the background image
+     (there's no real two-column layout here to "pull the image left" against — the photo is a
+     single full-bleed background on the whole section, not a separate element, so the only safe
+     lever that can't risk cropping the gear is widening the text itself). ~65 characters/line at
+     this width and 1rem — inside the typical 50-75 char readable range, not the 380px rule's
+     original ~50 chars/line but not egregiously long either. Also a net win on height, not a
+     trade-off against it: wider means fewer wrapped lines, so this makes the paragraph *shorter*
+     top-to-bottom, same direction as the box-height reduction above, not against it. Shared by
+     both languages — no [dir="rtl"] override exists for this rule. */
+  max-width: 520px;
   color: var(--wlm-cream);
   font-size: 1rem;
   line-height: 1.35;
@@ -5693,10 +5692,16 @@ a:hover {
     min-height: 0;
     display: block;
     padding: 28px 0 110px;
-    /* Mobile's tall/narrow hero box is height-bound, not width-bound, so cover crops
-       horizontally — bias right to keep the gear composition in frame instead of showing the
-       image's empty left-side backdrop. */
-    background-position: 55% center;
+    /* Was 55% — tuned for the previous hero photo, never updated when the image changed to the
+       v6 banner (2000x650). Mobile's tall/narrow box is height-bound, not width-bound, so cover
+       scales to match the box's height and crops horizontally — at a representative ~390x552px
+       box that means only ~390px of a ~1700px-wide scaled image is visible, well short of the
+       ~700px the full gear cluster (binoculars through cap, x:1270-1970 of 2000) occupies, so
+       some cropping of the peripheral props is unavoidable regardless of position. 80% centers
+       that narrow window on the soldier mannequin itself (x:~1390-1610, the one element that
+       can't lose pixels without the banner reading as broken) — binoculars stay in frame as a
+       bonus at that position, backpack/cap/shirt are what give way instead. */
+    background-position: 80% center;
   }
 
   /* Text sits directly on top of the image at this width (desktop's side-by-side layout has
@@ -5717,7 +5722,13 @@ a:hover {
   }
 
   .hero h1 {
-    font-size: 1.7rem;
+    /* Was 1.7rem. "GEAR BUILT FOR THE LONG" (the new line-1 text, now that the break falls
+       after "Long" instead of before it) is a longer line than "GEAR BUILT FOR THE" alone was —
+       at 1.7rem it's close enough to a typical ~340-360px mobile content width that "Long" could
+       wrap down onto its own line before reaching the intended break, same failure mode as
+       desktop's max-width fix above. Trimmed for margin instead of widening, since mobile has no
+       spare width to give (max-width is already 100%). */
+    font-size: 1.5rem;
     max-width: 100%;
   }
 
