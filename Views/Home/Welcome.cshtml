@@ -1,7 +1,12 @@
+@using System.Globalization
 @using WorldLinkMaster.Web.Models
 @using WorldLinkMaster.Web.Extensions
 @{
     ViewData["Title"] = Localizer["Welcome"];
+    // Arabic hero copy isn't a literal translation of the English copy (different eyebrow,
+    // different single-line heading with no two-part highlight, different paragraph) — see
+    // the "(Arabic only)" resource keys below, which have no English-side usage/meaning.
+    var isRtl = CultureInfo.CurrentUICulture.TwoLetterISOLanguageName == "ar";
     var scrollProducts = ViewBag.ScrollProducts as List<Product> ?? new List<Product>();
     var homeBanners = ViewBag.HomeBanners as List<HomeBanner> ?? new List<HomeBanner>();
     var welcomeCategories = ViewBag.Categories as List<Category> ?? new List<Category>();
@@ -82,8 +87,16 @@
 
 <section class="hero">
     <div class="container">
-        <span class="hero-eyebrow">@Localizer["Welcome to World Link Master"]</span>
-        <h1>@Localizer["Gear Built for the"] <span class="accent">@Localizer["Long Haul"]</span></h1>
+        @if (isRtl)
+        {
+            <span class="hero-eyebrow">@Localizer["Hero eyebrow (Arabic only)"]</span>
+            <h1>@Localizer["Hero heading lead (Arabic only)"] <span class="accent">@Localizer["Hero heading accent (Arabic only)"]</span></h1>
+        }
+        else
+        {
+            <span class="hero-eyebrow">@Localizer["Welcome to World Link Master"]</span>
+            <h1>@Localizer["Gear Built for the"] <span class="accent">@Localizer["Long Haul"]</span></h1>
+        }
         <p>
             @Localizer["World Link Master was founded on a simple idea: gear should work as hard as the people who rely on it. We're a tactical and outdoor gear retailer, working directly with manufacturers to bring you field-tested apparel, footwear, packs, and equipment — cutting out the markup so operators, adventurers, and everyday professionals get real durability at a fair price."]
         </p>

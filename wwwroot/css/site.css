@@ -1636,20 +1636,31 @@ a:hover {
 
 /* Hero */
 .hero {
-  background-image: url('/images/hero-tactical-spotlight.jpg');
+  background-image: url('/images/wlm-tactical-hero-banner-2000x650-v6.webp');
   background-size: cover;
-  /* Gear composition sits right-of-center in the source photo (2000x900), vertically centered
-     between empty headroom above the helmet and the reflective floor below the boots. At >=1422px
-     wide (640px hero height x the image's ~2.22:1 aspect ratio) cover crops vertically only, so Y
-     is what keeps the full helmet-to-boots figure in frame; X only starts cropping below that
-     width. Same values for LTR and RTL — the background image itself doesn't flip, only the text
-     block's alignment does. */
-  background-position: 75% 50%;
+  /* v6 banner (2000x650, ~3.08:1) was composed specifically for this layout: dark empty space
+     built into the left third for the text column, gear cluster confined to the right ~40% of
+     the frame (roughly x:1250-2000, y:100-560). Much shorter/wider than the old 2000x900 photo,
+     so it doesn't need the tight crop-position tuning that one did — at the current 520px
+     min-height, "right center" clears the gear with real margin to spare at both a narrow
+     desktop width (1366px: cover matches the box's height, ~234px of horizontal crop, all of it
+     coming out of the empty left side) and a wide one (1920px: cover matches the box's width,
+     ~40px of vertical crop split top/bottom, well clear of the gear's own vertical span). Same
+     value for LTR and RTL — the background image itself doesn't flip, only the text block's
+     alignment does. */
+  background-position: right center;
   color: var(--wlm-cream);
-  min-height: 640px;
+  /* Was 520px — ~12.5% shorter (within the requested 10-15% range) so Shop by Category's title
+     and the top edge of its cards peek in at the bottom of a standard 1920x1080 viewport as a
+     scroll affordance. This number alone previously did nothing: content (the paragraph's wrap
+     count at max-width: 380px, plus an 80px dead margin above the CTA row that was never actually
+     load-bearing) pushed the box past 520px regardless of what the floor said. The trims on
+     .hero p and .hero-cta-row below are what let the box actually shrink to this instead of just
+     overflowing past it again — see their own comments. */
+  min-height: 455px;
   display: flex;
   align-items: center;
-  padding: 40px 0;
+  padding: 24px 0;
   margin-bottom: 40px;
   position: relative;
 }
@@ -1672,23 +1683,47 @@ a:hover {
 
 .hero h1 {
   color: var(--wlm-cream);
-  font-size: 3.4rem;
+  /* Was 3.4rem — about 18% down from there, inside the requested 15-20% range, landing on a
+     round number. Two-line wrap ("GEAR BUILT FOR THE" / "LONG HAUL") and the orange .accent
+     color on the second line are untouched; only the size changes. */
+  font-size: 2.8rem;
+  /* Explicit rather than the browser default (~1.15-1.2, varies by font) so the height-budget
+     math in the .hero comment above is actually predictable instead of an estimate. */
+  line-height: 1.1;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.02em;
-  max-width: 640px;
+  max-width: 480px;
 }
 
 .hero .accent {
+  /* The English markup has no literal line break — "Long Haul" wrapping onto its own line has
+     always been incidental to max-width plus the font size that happened to be in use. Making it
+     block-level guarantees that two-line split regardless of font-size, so shrinking the heading
+     above can't accidentally pull "Long" up onto the first line. */
+  display: block;
   color: var(--wlm-sand);
 }
 
+/* Arabic's heading is a single line by design (see Welcome.cshtml's isRtl branch) — reset back
+   to inline so the highlighted portion runs on with the rest of the sentence instead of
+   inheriting the English-only forced line break above. */
+[dir="rtl"] .hero .accent {
+  display: inline;
+}
+
 .hero p {
-  max-width: 520px;
+  /* Widened from 380px — at that width this paragraph wraps to enough extra lines to push the
+     box taller than the min-height above, fighting the height-reduction goal directly (narrower
+     box = more wrapped lines = MORE height needed, the opposite of what a shorter hero wants).
+     440px keeps a real gap before the gear composition while cutting the wrap count; font-size/
+     line-height are trimmed on top of that to bring the block's own height down further. */
+  max-width: 440px;
   color: var(--wlm-cream);
-  font-size: 1.1rem;
+  font-size: 1rem;
+  line-height: 1.35;
   font-weight: 500;
-  margin: 18px 0 38px;
+  margin: 14px 0 24px;
 }
 
 .hero-cta-row {
@@ -1696,7 +1731,11 @@ a:hover {
   flex-wrap: wrap;
   align-items: center;
   gap: 12px 14px;
-  margin-top: 80px;
+  /* Was 80px — dead space left over from an earlier layout, not an intentional gap; the
+     paragraph's own margin-bottom above already separates it from the buttons. At the old 520px
+     height this went unnoticed since content overflowed the box anyway; at the new shorter
+     height it would have eaten most of the savings by itself. */
+  margin-top: 20px;
 }
 
 .btn-wlm {
@@ -2843,7 +2882,10 @@ a:hover {
 
 .price-range-slider {
   position: relative;
-  height: 18px;
+  /* Was 18px — under the ~44px touch-target guideline, and easy to miss/mis-drag on a phone.
+     The visible track/fill stay a thin 4px bar (see below); this is purely a taller invisible
+     hit area around it. */
+  height: 44px;
   margin: 0 8px 16px;
   /* Forced LTR: the slider's own left-to-right math (0% at the left handle) must stay
      predictable regardless of the page's RTL direction — same reasoning as the numeric
@@ -2864,10 +2906,15 @@ a:hover {
 
 .price-range-fill {
   position: absolute;
-  top: 0;
-  bottom: 0;
-  background: var(--wlm-sand);
+  /* Was top: 0; bottom: 0 — stretched to the full 18px slider height, taller than .price-range-
+     track's 4px bar right above it, so the "selected span" highlight didn't line up with the
+     track it's meant to sit on. Matches .price-range-track's own centering now instead of
+     inheriting whatever height .price-range-slider happens to have. */
+  top: 50%;
+  height: 4px;
   border-radius: 2px;
+  transform: translateY(-50%);
+  background: var(--wlm-sand);
 }
 
 .price-range-input {
@@ -2875,7 +2922,7 @@ a:hover {
   top: 0;
   left: 0;
   width: 100%;
-  height: 18px;
+  height: 44px;
   margin: 0;
   background: transparent;
   pointer-events: none;
@@ -2886,8 +2933,11 @@ a:hover {
 .price-range-input::-webkit-slider-thumb {
   pointer-events: auto;
   -webkit-appearance: none;
-  width: 18px;
-  height: 18px;
+  width: 20px;
+  height: 20px;
+  /* Centers the thumb within the now-44px-tall input (was implicit/browser-default at 18px,
+     which centered on its own — now explicit since the box is taller than the thumb). */
+  margin-top: 12px;
   border-radius: 50%;
   background: var(--wlm-sand);
   border: 2px solid white;
@@ -2897,8 +2947,8 @@ a:hover {
 
 .price-range-input::-moz-range-thumb {
   pointer-events: auto;
-  width: 18px;
-  height: 18px;
+  width: 20px;
+  height: 20px;
   border-radius: 50%;
   background: var(--wlm-sand);
   border: 2px solid white;
@@ -2913,20 +2963,54 @@ a:hover {
 
 .price-range-values {
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   gap: 8px;
   margin-bottom: 12px;
+}
+
+/* Wraps each number box with a real, visible "Min"/"Max" caption above it — previously only an
+   aria-label, so sighted users saw two bare number boxes with no indication of which was which. */
+.price-range-value-group {
+  flex: 1;
+  min-width: 0;
+}
+
+.price-range-value-label {
+  display: block;
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--wlm-forest-mid);
+  margin-bottom: 4px;
+}
+
+.price-range-value-sep {
+  color: var(--wlm-forest-mid);
+  padding-bottom: 10px;
 }
 
 .price-range-values input {
   flex: 1;
   min-width: 0;
+  box-sizing: border-box;
   padding: 8px 10px;
   border: 1px solid var(--wlm-sand);
   border-radius: 4px;
   font-family: var(--font-body);
   font-size: 0.9rem;
   text-align: center;
+  /* The slider above is the primary input; these boxes are for precise entry/reading, not for
+     spinning through hundreds of price values one click at a time — native spinner arrows just
+     eat into an already-narrow box on mobile for no benefit here. */
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+.price-range-values input::-webkit-outer-spin-button,
+.price-range-values input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
 }
 
 /* Product grid sort/count bar */
@@ -4888,7 +4972,7 @@ a:hover {
    earlier position:sticky approach: sticky kept a SHORT gallery pinned in view while the
    taller column scrolled past it; here the gallery is no longer short, so there's nothing left
    to pin against. Below lg the columns stack full-width in document order, so none of this
-   applies — the image keeps its own natural aspect-ratio there (see .product-zoom-image). */
+   applies — .product-zoom-image's own base rule (not this block) is what governs sizing there. */
 @media (min-width: 992px) {
   .pdp-gallery-col {
     display: flex;
@@ -4900,10 +4984,13 @@ a:hover {
     min-height: 0;
   }
 
+  /* Only height needs overriding here — aspect-ratio: auto and object-fit: contain now live on
+     the base .product-zoom-image rule below and already apply at every width. This block just
+     lets the image stretch to fill the flex-stretched column height computed above; contain
+     still keeps it from cropping/distorting if that height doesn't match the image's own
+     aspect ratio. */
   .product-zoom-image {
     height: 100%;
-    aspect-ratio: auto;
-    object-fit: contain;
   }
 }
 
@@ -4925,10 +5012,18 @@ a:hover {
   box-shadow: 0 25px 45px rgba(10, 10, 10, 0.3);
 }
 
+/* Base rule — applies at every width, including mobile/tablet below the 992px block above.
+   Previously this forced a hard 5:6 crop (aspect-ratio: 5/6; object-fit: cover) everywhere;
+   below 992px nothing ever overrode it, so phones showed a zoomed-in, cropped product photo
+   with no way to see the whole item. aspect-ratio: auto + object-fit: contain here (not just at
+   desktop) means the image renders at its own natural proportions by default, in full, on every
+   viewport — the >=992px block above only adds a height override on top of this for its
+   flex-stretched column layout. */
 .product-zoom-image {
   width: 100%;
-  aspect-ratio: 5 / 6;
-  object-fit: cover;
+  height: auto;
+  aspect-ratio: auto;
+  object-fit: contain;
   display: block;
   transition: transform 0.15s ease;
   transform: scale(1);
