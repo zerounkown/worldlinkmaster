@@ -17,6 +17,10 @@
     var variantSkuDataEl = document.getElementById("variantSkuData");
     var thumbsArrowPrev = document.getElementById("thumbsArrowPrev");
     var thumbsArrowNext = document.getElementById("thumbsArrowNext");
+    var splitSizeConfigEl = document.getElementById("splitSizeConfig");
+    var sizeUnitContainer = document.getElementById("sizeUnitOptionsContainer");
+    var sizeLengthContainer = document.getElementById("sizeLengthOptionsContainer");
+    var sizeHiddenInput = document.getElementById("pdpSizeHiddenInput");
 
     if (!mainImage || !zoomContainer) {
         return;
@@ -70,14 +74,143 @@
         }
     }
 
+    // Presentation-only Size/Length split (server-gated to WMN-R and FLT-SUIT via
+    // splitSizeConfig — see Details.cshtml for why those two and not others). The two visible
+    // pill rows never submit directly; they only drive the hidden #pdpSizeHiddenInput, which
+    // carries name="size" with the same recombined label ("4"+"R"="4R") the flat single-row
+    // mode would have submitted — CartController and everything else downstream is unaware
+    // this split exists.
+    var isSplitSizeMode = false;
+    if (splitSizeConfigEl) {
+        try {
+            isSplitSizeMode = !!JSON.parse(splitSizeConfigEl.textContent).enabled;
+        } catch (e) {
+            isSplitSizeMode = false;
+        }
+    }
+    var currentSplitLabels = [];
+
     function currentColorKey() {
         var checked = document.querySelector('input[name="color"]:checked');
         return (checked && checked.getAttribute("data-color-id")) || "";
     }
 
     function currentSizeLabel() {
+        if (isSplitSizeMode) {
+            return sizeHiddenInput ? sizeHiddenInput.value : "";
+        }
         var checked = sizeContainer ? sizeContainer.querySelector('input[name="size"]:checked') : null;
         return checked ? checked.value : "";
+    }
+
+    function decomposeSize(label) {
+        var match = /^(\d+)([A-Za-z]+)$/.exec(label);
+        return match ? { unit: match[1], length: match[2].toUpperCase() } : null;
+    }
+
+    function lengthSortRank(length) {
+        return length === "S" ? 0 : length === "R" ? 1 : length === "L" ? 2 : 3;
+    }
+
+    function uniqueInOrder(values) {
+        var seen = {};
+        var result = [];
+        values.forEach(function (v) {
+            if (!seen[v]) { seen[v] = true; result.push(v); }
+        });
+        return result;
+    }
+
+    function unitsForLength(length) {
+        return uniqueInOrder(currentSplitLabels.map(decomposeSize).filter(function (d) { return d && d.length === length; }).map(function (d) { return d.unit; }));
+    }
+
+    function lengthsForUnit(unit) {
+        var lengths = uniqueInOrder(currentSplitLabels.map(decomposeSize).filter(function (d) { return d && d.unit === unit; }).map(function (d) { return d.length; }));
+        return lengths.sort(function (a, b) { return lengthSortRank(a) - lengthSortRank(b); });
+    }
+
+    // Rebuilds one pill row (unit or length) and returns whichever value ends up selected —
+    // preferredValue if it's still a valid option, otherwise the first available one. Shared by
+    // both axes since they're otherwise identical markup/behavior.
+    function buildSplitPillRow(container, inputName, values, preferredValue) {
+        if (!container) return null;
+        container.innerHTML = "";
+        var selected = values.indexOf(preferredValue) >= 0 ? preferredValue : values[0];
+        values.forEach(function (value, i) {
+            var pill = document.createElement("label");
+            pill.className = "size-pill";
+            var input = document.createElement("input");
+            input.type = "radio";
+            input.name = inputName;
+            input.value = value;
+            if (value === selected) {
+                input.checked = true;
+            }
+            if (i === 0) {
+                input.required = true;
+            }
+            pill.appendChild(input);
+            var span = document.createElement("span");
+            span.textContent = value;
+            pill.appendChild(span);
+            container.appendChild(pill);
+        });
+        return selected || null;
+    }
+
+    function syncSplitSize(unit, length) {
+        if (sizeHiddenInput) {
+            sizeHiddenInput.value = (unit || "") + (length || "");
+        }
+        updateSku();
+    }
+
+    function currentSplitUnit() {
+        var checked = sizeUnitContainer ? sizeUnitContainer.querySelector('input[name="sizeUnit"]:checked') : null;
+        return checked ? checked.value : null;
+    }
+
+    function currentSplitLength() {
+        var checked = sizeLengthContainer ? sizeLengthContainer.querySelector('input[name="sizeLength"]:checked') : null;
+        return checked ? checked.value : null;
+    }
+
+    // Rebuilds both pill rows for a new color's label set (mirrors renderSizes' role in flat
+    // mode). Length options are scoped to whichever unit ends up selected, so the customer can
+    // never land on a combination that doesn't actually exist as a variant (e.g. FLT-SUIT's
+    // "34" only ever offers "R", never "S" or "L").
+    function renderSplitSizes(labels) {
+        if (!sizeUnitContainer || !sizeLengthContainer) return;
+        currentSplitLabels = labels || [];
+        var units = uniqueInOrder(currentSplitLabels.map(decomposeSize).filter(Boolean).map(function (d) { return d.unit; }));
+        var selectedUnit = buildSplitPillRow(sizeUnitContainer, "sizeUnit", units, null);
+        var selectedLength = buildSplitPillRow(sizeLengthContainer, "sizeLength", lengthsForUnit(selectedUnit), null);
+        syncSplitSize(selectedUnit, selectedLength);
+    }
+
+    if (isSplitSizeMode && sizeUnitContainer && sizeLengthContainer) {
+        // Server already rendered the correct pills for the default color on page load, but
+        // currentSplitLabels itself only gets populated by renderSplitSizes (called on color
+        // change) — without this, filtering the length/unit options on first interaction (before
+        // any color swap) would see an empty label set and break. Seeding it from the same data
+        // the server used avoids a redundant DOM rebuild here.
+        if (sizesByColorId) {
+            currentSplitLabels = sizesByColorId[currentColorKey()] || [];
+        }
+
+        sizeUnitContainer.addEventListener("change", function (e) {
+            if (!e.target || e.target.name !== "sizeUnit") return;
+            var unit = e.target.value;
+            var selectedLength = buildSplitPillRow(sizeLengthContainer, "sizeLength", lengthsForUnit(unit), currentSplitLength());
+            syncSplitSize(unit, selectedLength);
+        });
+        sizeLengthContainer.addEventListener("change", function (e) {
+            if (!e.target || e.target.name !== "sizeLength") return;
+            var length = e.target.value;
+            var selectedUnit = buildSplitPillRow(sizeUnitContainer, "sizeUnit", unitsForLength(length), currentSplitUnit());
+            syncSplitSize(selectedUnit, length);
+        });
     }
 
     // Falls back to the parent product's SKU (stashed in data-base-sku) whenever the current
@@ -343,7 +476,11 @@
             var colorId = input.getAttribute("data-color-id");
 
             if (sizesByColorId && colorId) {
-                renderSizes(sizesByColorId[colorId] || []);
+                if (isSplitSizeMode) {
+                    renderSplitSizes(sizesByColorId[colorId] || []);
+                } else {
+                    renderSizes(sizesByColorId[colorId] || []);
+                }
             }
 
             // After renderSizes (if it ran) so this reads whichever size pill just got

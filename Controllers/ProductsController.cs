@@ -473,7 +473,7 @@ public class ProductsController : Controller
             .Include(p => p.Merchant)
             .Include(p => p.Images.OrderBy(i => i.SortOrder))
             .Include(p => p.Variants).ThenInclude(v => v.Color)
-            .Include(p => p.Variants).ThenInclude(v => v.Size)
+            .Include(p => p.Variants).ThenInclude(v => v.Size).ThenInclude(s => s!.SizeGroup)
             .Include(p => p.Variants).ThenInclude(v => v.ProductColor)
             .Include(p => p.ProductColors.Where(pc => pc.Active).OrderBy(pc => pc.DisplayOrder)).ThenInclude(pc => pc.Color)
             .Include(p => p.Media.Where(m => m.Active).OrderBy(m => m.DisplayOrder))
