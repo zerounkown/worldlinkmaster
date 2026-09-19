@@ -380,8 +380,23 @@ public class MasterDataController : AdminBaseController
 
         var existing = await _context.Colors.Where(c => c.Code != null).ToDictionaryAsync(c => c.Code!, StringComparer.OrdinalIgnoreCase);
         // Colors seeded before this importer existed have no Code — match those by Name so a
-        // re-import enriches them instead of creating a parallel duplicate.
-        var existingByName = await _context.Colors.Where(c => c.Code == null).ToDictionaryAsync(c => c.Name, StringComparer.OrdinalIgnoreCase);
+        // re-import enriches them instead of creating a parallel duplicate. Some names already
+        // have multiple Code-less rows (pre-existing duplicate data); when that happens, enrich
+        // whichever one is actually referenced by the most ProductColors rows (ties broken by
+        // lowest Id) instead of crashing on the duplicate name or picking arbitrarily.
+        var codelessColors = await _context.Colors.Where(c => c.Code == null).ToListAsync();
+        var codelessIds = codelessColors.Select(c => c.Id).ToList();
+        var usageCounts = await _context.ProductColors
+            .Where(pc => codelessIds.Contains(pc.ColorId))
+            .GroupBy(pc => pc.ColorId)
+            .Select(g => new { ColorId = g.Key, Count = g.Count() })
+            .ToDictionaryAsync(x => x.ColorId, x => x.Count);
+        var existingByName = codelessColors
+            .GroupBy(c => c.Name, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(
+                g => g.Key,
+                g => g.OrderByDescending(c => usageCounts.GetValueOrDefault(c.Id)).ThenBy(c => c.Id).First(),
+                StringComparer.OrdinalIgnoreCase);
         var seenCodes = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         foreach (var row in sheet.RowsUsed().Skip(1))
