@@ -97,11 +97,14 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
 
         // Search now matches on Sku (exact-match relevance tier, plus partial ILIKE), which had
         // no index at all before — ProductVariant.Sku already had one, this closes the gap on
-        // the Product side. Not unique: the SKU audit found zero duplicates in production today,
-        // but nothing currently enforces that at the DB level, so a plain index rather than a
-        // uniqueness constraint to avoid silently changing that guarantee.
+        // the Product side. Unique as of the move to real manufacturer SKUs as Product Code:
+        // without a brand-code prefix, two unrelated products could otherwise collide on the
+        // same vendor style number and silently overwrite each other on import (ImportProductsAsync
+        // matches existing products by Sku). Zero duplicates existed in production when this was
+        // added, so the constraint applies cleanly.
         builder.Entity<Product>()
-            .HasIndex(p => p.Sku);
+            .HasIndex(p => p.Sku)
+            .IsUnique();
 
         builder.Entity<Product>()
             .HasOne(p => p.Category)
