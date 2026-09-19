@@ -10,7 +10,10 @@ namespace WorldLinkMaster.Web.Areas.Admin.Controllers;
 
 /// <summary>
 /// Bulk photo upload for vendor products. Filenames are expected in the vendor's own
-/// "{VendorSku}-{VendorColorCode}[-suffix].ext" convention (e.g. Condor's "101228-002.webp").
+/// "{VendorSku}-{VendorColorCode}[-suffix].ext" convention (e.g. Condor's "101228-002.webp",
+/// or Propper's alphanumeric-style "F5259-BLK.webp" now that real manufacturer SKUs are the
+/// standard Product Code — the pattern below accepts letters as well as digits in both the SKU
+/// and color-code segments for that reason, not just Condor/Rothco's purely-numeric style.
 /// Each file is matched to a Product by Product.VendorSku and a ProductColor by
 /// (ProductId, VendorColorCode) — both populated by the Product/Master Data importers or a
 /// one-off backfill, not by this tool. Files that don't match are reported, not guessed at.
@@ -27,7 +30,7 @@ public class ProductPhotosController : AdminBaseController
         ".webp", ".jpg", ".jpeg", ".png"
     };
     private static readonly Regex FileNamePattern = new(
-        @"^(?<sku>\d{4,8})-(?<color>\d{2,4})(?:-[A-Za-z0-9]+)?\.(?<ext>webp|jpe?g|png)$",
+        @"^(?<sku>[A-Za-z0-9]{2,20})-(?<color>[A-Za-z0-9]{2,10})(?:-[A-Za-z0-9]+)?\.(?<ext>webp|jpe?g|png)$",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
     private const string PlaceholderMediaUrl = "TBD - needs hosted URL";
