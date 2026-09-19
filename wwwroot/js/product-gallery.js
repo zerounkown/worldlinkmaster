@@ -15,6 +15,8 @@
     var lifestyleImage = document.getElementById("pdpLifestyleImage");
     var skuValueEl = document.getElementById("pdpSkuValue");
     var variantSkuDataEl = document.getElementById("variantSkuData");
+    var thumbsArrowPrev = document.getElementById("thumbsArrowPrev");
+    var thumbsArrowNext = document.getElementById("thumbsArrowNext");
 
     if (!mainImage || !zoomContainer) {
         return;
@@ -218,6 +220,63 @@
         });
 
         showMainItem(items[activeIndex].url, items[activeIndex].type || "Image");
+        thumbsContainer.scrollTop = 0;
+        thumbsContainer.scrollLeft = 0;
+        updateThumbsArrows();
+    }
+
+    // The strip scrolls vertically on desktop (a side column) and horizontally on mobile (a row
+    // below the main image, per the CSS breakpoint) — whichever axis actually overflows is the
+    // one the arrows control, so the same up/down buttons work in both layouts without needing
+    // separate left/right icons for mobile.
+    function thumbsScrollAxis() {
+        if (!thumbsContainer) return null;
+        if (thumbsContainer.scrollHeight - thumbsContainer.clientHeight > 2) return "vertical";
+        if (thumbsContainer.scrollWidth - thumbsContainer.clientWidth > 2) return "horizontal";
+        return null;
+    }
+
+    function updateThumbsArrows() {
+        if (!thumbsContainer || !thumbsArrowPrev || !thumbsArrowNext) return;
+        var axis = thumbsScrollAxis();
+        if (!axis) {
+            thumbsArrowPrev.classList.remove("visible");
+            thumbsArrowNext.classList.remove("visible");
+            return;
+        }
+        var atStart, atEnd;
+        if (axis === "vertical") {
+            atStart = thumbsContainer.scrollTop <= 2;
+            atEnd = thumbsContainer.scrollTop + thumbsContainer.clientHeight >= thumbsContainer.scrollHeight - 2;
+        } else {
+            atStart = thumbsContainer.scrollLeft <= 2;
+            atEnd = thumbsContainer.scrollLeft + thumbsContainer.clientWidth >= thumbsContainer.scrollWidth - 2;
+        }
+        thumbsArrowPrev.classList.toggle("visible", !atStart);
+        thumbsArrowNext.classList.toggle("visible", !atEnd);
+    }
+
+    function scrollThumbs(direction) {
+        if (!thumbsContainer) return;
+        var step = 2 * (70 + 10); // ~2 thumbnails + their gap
+        var axis = thumbsScrollAxis();
+        if (axis === "horizontal") {
+            thumbsContainer.scrollBy({ left: direction * step, behavior: "smooth" });
+        } else {
+            thumbsContainer.scrollBy({ top: direction * step, behavior: "smooth" });
+        }
+    }
+
+    if (thumbsArrowPrev) {
+        thumbsArrowPrev.addEventListener("click", function () { scrollThumbs(-1); });
+    }
+    if (thumbsArrowNext) {
+        thumbsArrowNext.addEventListener("click", function () { scrollThumbs(1); });
+    }
+    if (thumbsContainer) {
+        thumbsContainer.addEventListener("scroll", updateThumbsArrows);
+        window.addEventListener("resize", updateThumbsArrows);
+        updateThumbsArrows();
     }
 
     // Hover-to-zoom: scale the image and track cursor position as the transform origin.
