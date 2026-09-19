@@ -165,6 +165,29 @@
 
     var sizeDataJson = JsonSerializer.Serialize(sizesByColorId);
 
+    // Presentation-only Size/Length split (Media Rules aside — this is a display convenience,
+    // not a schema change): only for Size Groups whose Label is a clean, 100%-consistent
+    // "<number><letter(s)>" pattern across every size in the catalog today (Women's R-Sizes —
+    // "4R".."12R" — and Flight Suit chest/height — "34R".."48L"). Deliberately excludes
+    // Trouser Waist×Length and Clothing Letter sizes, both of which have accumulated
+    // inconsistent labels (plain letters, "X - Long" suffixes, a blank label) that a blind
+    // split would misparse — those need a data cleanup pass before this can safely extend to
+    // them. The split itself never touches the underlying Size row or variant lookup: the two
+    // pickers recombine into the exact same label string ("4"+"R"="4R") that already round-trips
+    // through sizesByColorId/variantSkuByKey above, so the hidden `size` form field — and
+    // everything downstream of it (CartController matches by Size.Label) — is unchanged.
+    var splitSizeGroupCodes = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "WMN-R", "FLT-SUIT" };
+    var productSizeGroupCode = Model.Variants.Select(v => v.Size?.SizeGroup?.Code).FirstOrDefault(c => c != null);
+    var isSplitSizeProduct = productSizeGroupCode != null && splitSizeGroupCodes.Contains(productSizeGroupCode);
+
+    (string Unit, string Length) DecomposeSize(string label)
+    {
+        var match = System.Text.RegularExpressions.Regex.Match(label, @"^(\d+)([A-Za-z]+)$");
+        return match.Success ? (match.Groups[1].Value, match.Groups[2].Value.ToUpperInvariant()) : (label, "");
+    }
+
+    int LengthSortRank(string length) => length switch { "S" => 0, "R" => 1, "L" => 2, _ => 3 };
+
     // Maps "<colorKey>|<sizeLabel>" to that specific ProductVariant's Sku, so the SKU line can
     // follow whichever variant is currently selected instead of always showing the parent
     // Product.Sku. colorKey is the ProductColor.Id for imported products (matching the color
@@ -417,7 +440,43 @@
                         </div>
                     }
 
-                    @if (initialSizeOptions.Count > 0 || hasProductColors)
+                    @if (isSplitSizeProduct && initialSizeOptions.Count > 0)
+                    {
+                        var initialDecomposed = initialSizeOptions.Select(s => DecomposeSize(s.Label)).ToList();
+                        var initialUnits = initialDecomposed.Select(d => d.Unit).Distinct().ToList();
+                        var initialLengths = initialDecomposed.Select(d => d.Length).Distinct().OrderBy(LengthSortRank).ToList();
+                        <div class="mb-3">
+                            <label class="option-label">@Localizer["Size"]</label>
+                            <div class="size-options" id="sizeUnitOptionsContainer">
+                                @for (int i = 0; i < initialUnits.Count; i++)
+                                {
+                                    <label class="size-pill">
+                                        <input type="radio" name="sizeUnit" value="@initialUnits[i]" required="@(i == 0 ? "required" : null)" checked="@(i == 0 ? "checked" : null)" />
+                                        <span>@initialUnits[i]</span>
+                                    </label>
+                                }
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="option-label">@Localizer["Length"]</label>
+                            <div class="size-options" id="sizeLengthOptionsContainer">
+                                @for (int i = 0; i < initialLengths.Count; i++)
+                                {
+                                    <label class="size-pill">
+                                        <input type="radio" name="sizeLength" value="@initialLengths[i]" required="@(i == 0 ? "required" : null)" checked="@(i == 0 ? "checked" : null)" />
+                                        <span>@initialLengths[i]</span>
+                                    </label>
+                                }
+                            </div>
+                        </div>
+                        <input type="hidden" name="size" id="pdpSizeHiddenInput" value="@initialSizeOptions[0].Label" />
+                        <script type="application/json" id="splitSizeConfig">@Html.Raw(JsonSerializer.Serialize(new { enabled = true }))</script>
+                        @if (hasProductColors)
+                        {
+                            <script type="application/json" id="sizesByColorData">@Html.Raw(sizeDataJson)</script>
+                        }
+                    }
+                    else if (initialSizeOptions.Count > 0 || hasProductColors)
                     {
                         <div class="mb-3">
                             <label class="option-label">@Localizer["Size"]</label>
