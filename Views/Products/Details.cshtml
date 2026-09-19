@@ -246,22 +246,30 @@
                 <div class="product-gallery-layout">
                     @if (initialGallery.Count > 1 || Model.ProductColors.Count > 1)
                     {
-                        <div class="product-thumbs" id="productThumbs">
-                            @for (int i = 0; i < initialGallery.Count; i++)
-                            {
-                                var item = initialGallery[i];
-                                var isVideo = item["type"] == "Video";
-                                <span class="product-thumb-item">
-                                    <img src="@(item["thumb"] ?? ImagePlaceholder.DataUri)"
-                                         class="product-thumb @(i == initialActiveIndex ? "active" : "")"
-                                         data-full="@item["url"]" data-type="@item["type"]" data-color-id="@item.GetValueOrDefault("colorId")"
-                                         alt="@(item["alt"] ?? Model.LocalizedName())" />
-                                    @if (isVideo)
-                                    {
-                                        <i class="bi bi-play-circle-fill product-thumb-play"></i>
-                                    }
-                                </span>
-                            }
+                        <div class="product-thumbs-wrap" id="productThumbsWrap">
+                            <button type="button" class="product-thumbs-arrow product-thumbs-arrow-prev" id="thumbsArrowPrev" aria-label="@Localizer["Scroll thumbnails up"]">
+                                <i class="bi bi-chevron-up"></i>
+                            </button>
+                            <div class="product-thumbs" id="productThumbs">
+                                @for (int i = 0; i < initialGallery.Count; i++)
+                                {
+                                    var item = initialGallery[i];
+                                    var isVideo = item["type"] == "Video";
+                                    <span class="product-thumb-item">
+                                        <img src="@(item["thumb"] ?? ImagePlaceholder.DataUri)"
+                                             class="product-thumb @(i == initialActiveIndex ? "active" : "")"
+                                             data-full="@item["url"]" data-type="@item["type"]" data-color-id="@item.GetValueOrDefault("colorId")"
+                                             alt="@(item["alt"] ?? Model.LocalizedName())" />
+                                        @if (isVideo)
+                                        {
+                                            <i class="bi bi-play-circle-fill product-thumb-play"></i>
+                                        }
+                                    </span>
+                                }
+                            </div>
+                            <button type="button" class="product-thumbs-arrow product-thumbs-arrow-next" id="thumbsArrowNext" aria-label="@Localizer["Scroll thumbnails down"]">
+                                <i class="bi bi-chevron-down"></i>
+                            </button>
                         </div>
                     }
                     <div class="product-zoom-container" id="zoomContainer">
@@ -282,11 +290,19 @@
                 <div class="product-gallery-layout">
                     @if (gallery.Count > 1)
                     {
-                        <div class="product-thumbs" id="productThumbs">
-                            @for (int i = 0; i < gallery.Count; i++)
-                            {
-                                <img src="@gallery[i]" class="product-thumb @(i == 0 ? "active" : "")" data-full="@gallery[i]" data-type="Image" alt="@Model.LocalizedName() view @(i + 1)" />
-                            }
+                        <div class="product-thumbs-wrap" id="productThumbsWrap">
+                            <button type="button" class="product-thumbs-arrow product-thumbs-arrow-prev" id="thumbsArrowPrev" aria-label="@Localizer["Scroll thumbnails up"]">
+                                <i class="bi bi-chevron-up"></i>
+                            </button>
+                            <div class="product-thumbs" id="productThumbs">
+                                @for (int i = 0; i < gallery.Count; i++)
+                                {
+                                    <img src="@gallery[i]" class="product-thumb @(i == 0 ? "active" : "")" data-full="@gallery[i]" data-type="Image" alt="@Model.LocalizedName() view @(i + 1)" />
+                                }
+                            </div>
+                            <button type="button" class="product-thumbs-arrow product-thumbs-arrow-next" id="thumbsArrowNext" aria-label="@Localizer["Scroll thumbnails down"]">
+                                <i class="bi bi-chevron-down"></i>
+                            </button>
                         </div>
                     }
                     <div class="product-zoom-container" id="zoomContainer">

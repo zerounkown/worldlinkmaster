@@ -284,6 +284,8 @@
 
   <!-- ===================== Products / Details ===================== -->
   <data name="Hover to zoom · Click to enlarge" xml:space="preserve"><value>مرّر للتكبير · انقر للتكبير</value></data>
+  <data name="Scroll thumbnails up" xml:space="preserve"><value>تمرير الصور المصغرة للأعلى</value></data>
+  <data name="Scroll thumbnails down" xml:space="preserve"><value>تمرير الصور المصغرة للأسفل</value></data>
   <data name="SKU" xml:space="preserve"><value>رمز المنتج</value></data>
   <data name="{0} reviews" xml:space="preserve"><value>{0} تقييم</value></data>
   <data name="Sold by" xml:space="preserve"><value>يُباع بواسطة</value></data>
