@@ -104,7 +104,10 @@
             var colorItems = Model.Media
                 .Where(m => m.ProductColorId == pc.Id && m.ShowInGallery && ImagePlaceholder.IsRealImageUrl(m.MediaUrl))
                 .OrderBy(m => m.DisplayOrder);
-            var combined = sharedItems.Concat(colorItems).Select(ToGalleryItem).ToList();
+            // Color's own items first (front → side → back, per DisplayOrder), Shared items
+            // (fabric/detail close-ups common to every color) appended at the end — so the
+            // gallery always opens on this color's own front view, not a generic shared photo.
+            var combined = colorItems.Concat(sharedItems).Select(ToGalleryItem).ToList();
             if (combined.Count == 0 && ImagePlaceholder.IsRealImageUrl(pc.SwatchImageUrl))
             {
                 combined.Add(new Dictionary<string, string?> { ["type"] = "Image", ["url"] = pc.SwatchImageUrl, ["thumb"] = pc.SwatchImageUrl, ["alt"] = pc.Color?.Name, ["colorId"] = pc.Id.ToString() });
@@ -119,10 +122,11 @@
                 }
             }
 
-            // The item representing this color itself (not just a Shared photo that happens to
-            // be listed first) is what should be shown/highlighted by default when this color
-            // is selected — otherwise selecting e.g. Grey would show the first Shared photo
-            // (Black) as the main image instead of Grey's own picture.
+            // Defensive fallback: color items are ordered first above, so this color's own photo
+            // is normally already at index 0 and no explicit "active" flag is needed (the
+            // Razor/JS default-to-0 logic already covers that). This only matters if a color has
+            // no gallery items of its own at all (Shared-only, e.g. via the SwatchImageUrl/
+            // variant-image fallbacks above) — then its own item won't land at index 0 naturally.
             var ownIndex = combined.FindIndex(item => item.GetValueOrDefault("colorId") == pc.Id.ToString());
             if (ownIndex > 0)
             {
@@ -260,7 +264,14 @@
 
     <div class="row g-5 pdp-top-row">
         <div class="col-12 col-lg-5 pdp-gallery-col">
-            @if (hasProductColors)
+            @if (hasProductColors && Model.ProductColors.Count > 1)
+            {
+                var galleryPanelViewData = new ViewDataDictionary(ViewData);
+                galleryPanelViewData["GalleryByColorId"] = galleryByColorId;
+                <partial name="_PdpColorGallery" model="Model" view-data="galleryPanelViewData" />
+                <script type="application/json" id="colorGalleryData">@Html.Raw(galleryDataJson)</script>
+            }
+            else if (hasProductColors)
             {
                 var initialActiveIndex = initialGallery.FindIndex(item => item.GetValueOrDefault("active") == "1");
                 if (initialActiveIndex < 0) { initialActiveIndex = 0; }
@@ -399,7 +410,7 @@
                         @Localizer["Total"]: <strong id="cartTotalPrice">@currencySymbol@effectiveUnitPrice.ToString("N2", System.Globalization.CultureInfo.InvariantCulture)</strong>
                     </p>
 
-                    @if (hasProductColors)
+                    @if (hasProductColors && Model.ProductColors.Count == 1)
                     {
                         <div class="mb-3">
                             <label class="option-label">@Localizer["Color"]</label>
@@ -422,7 +433,7 @@
                             <span class="option-value" id="selectedColorLabel">@defaultProductColor!.Color?.Name</span>
                         </div>
                     }
-                    else if (colorOptions.Count > 0)
+                    else if (!hasProductColors && colorOptions.Count > 0)
                     {
                         <div class="mb-3">
                             <label class="option-label">@Localizer["Color"]</label>
@@ -815,8 +826,11 @@
 </div>
 
 <div class="zoom-lightbox" id="zoomLightbox">
-    <button type="button" class="zoom-lightbox-close" id="zoomLightboxClose">&times;</button>
+    <button type="button" class="zoom-lightbox-close" id="zoomLightboxClose" aria-label="@Localizer["Close"]">&times;</button>
+    <button type="button" class="zoom-lightbox-arrow zoom-lightbox-prev" id="zoomLightboxPrev" aria-label="@Localizer["Previous"]"><i class="bi bi-chevron-left"></i></button>
     <img src="" alt="" id="zoomLightboxImage" />
+    <button type="button" class="zoom-lightbox-arrow zoom-lightbox-next" id="zoomLightboxNext" aria-label="@Localizer["Next"]"><i class="bi bi-chevron-right"></i></button>
+    <span class="zoom-lightbox-counter" id="zoomLightboxCounter"></span>
 </div>
 
 @section Scripts {

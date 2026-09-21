@@ -6,6 +6,9 @@
     var lightbox = document.getElementById("zoomLightbox");
     var lightboxImage = document.getElementById("zoomLightboxImage");
     var lightboxClose = document.getElementById("zoomLightboxClose");
+    var lightboxPrevBtn = document.getElementById("zoomLightboxPrev");
+    var lightboxNextBtn = document.getElementById("zoomLightboxNext");
+    var lightboxCounter = document.getElementById("zoomLightboxCounter");
     var colorLabel = document.getElementById("selectedColorLabel");
     var galleryDataEl = document.getElementById("colorGalleryData");
     var sizeDataEl = document.getElementById("sizesByColorData");
@@ -435,9 +438,85 @@
     });
 
     // Click-to-enlarge lightbox (images only — video already has native controls for that).
+    // The lightbox's image list is always read directly from the current thumbnail strip DOM
+    // (not a separate data source) so it's guaranteed to be the same set, same order, as
+    // whatever the customer is already looking at — including the legacy single-image fallback
+    // path, where there's no thumb strip at all.
+    var lightboxItems = [];
+    var lightboxIndex = 0;
+
+    function getCurrentGalleryItems() {
+        if (!thumbsContainer) {
+            return [{ url: mainImage.src, type: "Image" }];
+        }
+        var thumbs = thumbsContainer.querySelectorAll(".product-thumb");
+        if (thumbs.length === 0) {
+            return [{ url: mainImage.src, type: "Image" }];
+        }
+        return Array.prototype.map.call(thumbs, function (t) {
+            return { url: t.getAttribute("data-full"), type: t.getAttribute("data-type") || "Image" };
+        });
+    }
+
+    function getCurrentGalleryIndex() {
+        if (!thumbsContainer) return 0;
+        var thumbs = thumbsContainer.querySelectorAll(".product-thumb");
+        var activeThumb = thumbsContainer.querySelector(".product-thumb.active");
+        var idx = activeThumb ? Array.prototype.indexOf.call(thumbs, activeThumb) : -1;
+        return idx >= 0 ? idx : 0;
+    }
+
+    function updateLightboxNav() {
+        if (lightboxCounter) {
+            lightboxCounter.textContent = lightboxItems.length ? (lightboxIndex + 1) + " / " + lightboxItems.length : "";
+        }
+        if (lightboxPrevBtn) {
+            lightboxPrevBtn.disabled = lightboxIndex <= 0;
+        }
+        if (lightboxNextBtn) {
+            lightboxNextBtn.disabled = lightboxIndex >= lightboxItems.length - 1;
+        }
+    }
+
+    // Fades the lightbox image out, swaps src, fades back in — 0.3s each way, matching the
+    // main image's own transition on #zoomLightbox img. Also keeps the underlying page's main
+    // image + active thumb in sync live, so closing the lightbox (by any method) always leaves
+    // the page showing whatever the customer last navigated to, not the image it was opened on.
+    function renderLightboxImage(withFade) {
+        var item = lightboxItems[lightboxIndex];
+        if (!item) return;
+        var apply = function () {
+            lightboxImage.src = item.url;
+            lightboxImage.classList.remove("fading");
+        };
+        if (withFade) {
+            lightboxImage.classList.add("fading");
+            window.setTimeout(apply, 300);
+        } else {
+            apply();
+        }
+        updateLightboxNav();
+        showMainItem(item.url, item.type);
+        if (thumbsContainer) {
+            var matchingThumb = thumbsContainer.querySelector('.product-thumb[data-full="' + CSS.escape(item.url) + '"]');
+            setActiveThumb(matchingThumb);
+        }
+    }
+
+    function lightboxGoTo(index) {
+        if (index < 0 || index >= lightboxItems.length || index === lightboxIndex) return;
+        lightboxIndex = index;
+        renderLightboxImage(true);
+    }
+
+    function lightboxPrev() { lightboxGoTo(lightboxIndex - 1); }
+    function lightboxNext() { lightboxGoTo(lightboxIndex + 1); }
+
     function openLightbox() {
-        if (mainImage.style.display === "none") return;
-        lightboxImage.src = mainImage.src;
+        if (mainImage.style.display === "none") return; // no lightbox for videos
+        lightboxItems = getCurrentGalleryItems();
+        lightboxIndex = getCurrentGalleryIndex();
+        renderLightboxImage(false);
         lightbox.classList.add("open");
         document.body.style.overflow = "hidden";
     }
@@ -451,16 +530,52 @@
     if (lightboxClose) {
         lightboxClose.addEventListener("click", closeLightbox);
     }
+    if (lightboxPrevBtn) {
+        lightboxPrevBtn.addEventListener("click", lightboxPrev);
+    }
+    if (lightboxNextBtn) {
+        lightboxNextBtn.addEventListener("click", lightboxNext);
+    }
     if (lightbox) {
         lightbox.addEventListener("click", function (e) {
             if (e.target === lightbox) {
                 closeLightbox();
             }
         });
+
+        // Swipe left/right to navigate, swipe down to close — threshold-based, whichever axis
+        // moved further wins so a diagonal swipe doesn't trigger both.
+        var touchStartX = 0;
+        var touchStartY = 0;
+        var swipeThreshold = 50;
+        lightbox.addEventListener("touchstart", function (e) {
+            var t = e.changedTouches[0];
+            touchStartX = t.clientX;
+            touchStartY = t.clientY;
+        }, { passive: true });
+        lightbox.addEventListener("touchend", function (e) {
+            var t = e.changedTouches[0];
+            var dx = t.clientX - touchStartX;
+            var dy = t.clientY - touchStartY;
+            var absDx = Math.abs(dx);
+            var absDy = Math.abs(dy);
+            if (absDy > absDx && dy > swipeThreshold) {
+                closeLightbox();
+            } else if (absDx > absDy && absDx > swipeThreshold) {
+                if (dx < 0) { lightboxNext(); } else { lightboxPrev(); }
+            }
+        }, { passive: true });
     }
     document.addEventListener("keydown", function (e) {
         if (e.key === "Escape") {
             closeLightbox();
+            return;
+        }
+        if (!lightbox || !lightbox.classList.contains("open")) return;
+        if (e.key === "ArrowLeft") {
+            lightboxPrev();
+        } else if (e.key === "ArrowRight") {
+            lightboxNext();
         }
     });
 

@@ -30,6 +30,13 @@
   --font-heading: 'Oswald', sans-serif;
   --font-body: 'Inter', sans-serif;
 
+  /* PDP color bar + lightbox sizing — first spacing/sizing tokens on the site (everything
+     before this was colors/fonts only), scoped with a --pdp- prefix matching the page's own
+     .pdp-* class prefix rather than extending --wlm- (a brand-color/font namespace). */
+  --pdp-swatch-size: 46px;
+  --pdp-swatch-border-selected: 3px;
+  --pdp-swatch-border-unselected: 1px;
+  --pdp-lightbox-arrow-size: 56px;
 }
 
 * {
@@ -4944,6 +4951,39 @@ a:hover {
 /* Gallery layout: a narrow vertical thumbnail column beside the main image on desktop
    (matches typical PDP references), falling back to a horizontal row below the image on
    mobile where there isn't room for a side column. */
+/* Condor-style gallery: color bar sits above the thumbs+main-image row, both stacked inside
+   one panel so the pair can flex-stretch together (see the 992px block below) exactly like
+   .product-gallery-layout alone does on single-color products. Only rendered for products with
+   more than one color — see Views/Products/_PdpColorGallery.cshtml. */
+.pdp-gallery-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.pdp-color-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.pdp-color-bar-label {
+  margin-bottom: 0;
+}
+
+.pdp-color-bar-label #selectedColorLabel {
+  text-transform: none;
+  font-family: var(--font-body);
+  letter-spacing: normal;
+  font-weight: 400;
+  color: var(--wlm-ink);
+  margin-inline-start: 6px;
+}
+
+.pdp-color-bar-swatches {
+  flex-wrap: nowrap;
+}
+
 .product-gallery-layout {
   display: flex;
   gap: 12px;
@@ -4977,6 +5017,15 @@ a:hover {
   .pdp-gallery-col {
     display: flex;
     flex-direction: column;
+  }
+
+  /* Wrapper around the color bar + .product-gallery-layout on multi-color products (see
+     .pdp-gallery-panel below) — needs the same flex:1 treatment .product-gallery-layout gets
+     directly on single-color/no-color products, so it (not the color bar) absorbs the extra
+     height when .pdp-content-col is the taller column. */
+  .pdp-gallery-panel {
+    flex: 1;
+    min-height: 0;
   }
 
   .product-gallery-layout {
@@ -5103,6 +5152,13 @@ a:hover {
     flex-direction: column-reverse;
   }
 
+  /* Smaller swatches on narrow phones so all 5 still sit on one line without scrolling —
+     46px * 5 + 10px gap * 4 = 270px, tight on sub-360px screens once page padding is
+     accounted for. */
+  .pdp-color-bar-swatches {
+    --pdp-swatch-size: 38px;
+  }
+
   /* Horizontal scroll strip instead of wrapping to multiple rows — wrapping leaves a lopsided
      trailing row (e.g. 4 thumbs then 1 alone) whenever the count isn't a clean multiple of
      however many fit per row; a single scrollable row sidesteps that regardless of count. The
@@ -5199,6 +5255,11 @@ a:hover {
   max-width: 90vw;
   max-height: 90vh;
   border-radius: 6px;
+  transition: opacity 0.3s ease;
+}
+
+.zoom-lightbox img.fading {
+  opacity: 0;
 }
 
 .zoom-lightbox-close {
@@ -5211,6 +5272,79 @@ a:hover {
   font-size: 2.5rem;
   line-height: 1;
   cursor: pointer;
+  z-index: 1;
+  min-width: 40px;
+  min-height: 40px;
+}
+
+/* Prev/next arrows — large, high-contrast, positioned at the far edges on desktop and inset
+   just enough on mobile that they don't sit on top of the image (spec item 4I). No-wrap
+   navigation: the JS disables (not hides) the button at each end so the layout doesn't shift. */
+.zoom-lightbox-arrow {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: var(--pdp-lightbox-arrow-size);
+  height: var(--pdp-lightbox-arrow-size);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.1);
+  border: none;
+  border-radius: 50%;
+  color: var(--wlm-sand-light);
+  font-size: 1.75rem;
+  cursor: pointer;
+  transition: background 0.15s ease, opacity 0.15s ease;
+  z-index: 1;
+}
+
+.zoom-lightbox-arrow:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.2);
+  color: white;
+}
+
+.zoom-lightbox-arrow:disabled {
+  opacity: 0.5;
+  cursor: default;
+  pointer-events: none;
+}
+
+.zoom-lightbox-prev {
+  left: 20px;
+}
+
+.zoom-lightbox-next {
+  right: 20px;
+}
+
+.zoom-lightbox-counter {
+  position: absolute;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  color: white;
+  font-size: 0.9rem;
+  background: rgba(10, 10, 10, 0.6);
+  padding: 4px 14px;
+  border-radius: 20px;
+  min-width: 14px;
+}
+
+@media (max-width: 575.98px) {
+  .zoom-lightbox-arrow {
+    width: 44px;
+    height: 44px;
+    font-size: 1.4rem;
+  }
+
+  .zoom-lightbox-prev {
+    left: 8px;
+  }
+
+  .zoom-lightbox-next {
+    right: 8px;
+  }
 }
 
 /* Color & size option pickers */
@@ -5232,16 +5366,18 @@ a:hover {
 }
 
 .color-swatch {
-  width: 48px;
-  height: 48px;
+  width: var(--pdp-swatch-size);
+  height: var(--pdp-swatch-size);
+  box-sizing: border-box;
   border-radius: 50%;
   display: inline-block;
   cursor: pointer;
-  border: 2px solid var(--wlm-sand-light);
-  box-shadow: 0 0 0 2px transparent;
+  border: var(--pdp-swatch-border-unselected) solid var(--wlm-sand-light);
   position: relative;
   background-size: cover;
   background-position: center;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  flex: 0 0 auto;
 }
 
 .color-swatch input {
@@ -5253,9 +5389,13 @@ a:hover {
   cursor: pointer;
 }
 
+.color-swatch:hover {
+  transform: scale(1.08);
+  box-shadow: 0 2px 8px rgba(10, 10, 10, 0.25);
+}
+
 .color-swatch:has(input:checked) {
-  box-shadow: 0 0 0 2px var(--wlm-forest);
-  border-color: white;
+  border: var(--pdp-swatch-border-selected) solid var(--wlm-forest);
 }
 
 .option-value {
