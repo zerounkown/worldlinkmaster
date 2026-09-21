@@ -394,7 +394,7 @@
                         <p class="pdp-savings mb-1">@Localizer["You save {0} ({1}%)", saveAmount.ToDisplayCurrency(), activeEvent!.DiscountPercent.ToString("0.##")]</p>
                     }
                     <p class="pdp-stock-line mb-3">
-                        <span class="pdp-stock-dot"></span> @Localizer["Stock"]: @Localizer["{0} available", Model.StockQuantity]
+                        <span class="pdp-stock-dot"></span> @Localizer["In Stock"]
                         <span class="pdp-meta-sep">|</span>
                         @Localizer["Total"]: <strong id="cartTotalPrice">@currencySymbol@effectiveUnitPrice.ToString("N2", System.Globalization.CultureInfo.InvariantCulture)</strong>
                     </p>
