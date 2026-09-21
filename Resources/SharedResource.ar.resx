@@ -904,6 +904,7 @@
   <data name="You are eligible for free shipping!" xml:space="preserve"><value>أنت مؤهل للشحن المجاني!</value></data>
   <data name="{0} away from free shipping" xml:space="preserve"><value>متبقي {0} للحصول على الشحن المجاني</value></data>
   <data name="Low Stock ({0} left)" xml:space="preserve"><value>كمية محدودة (متبقي {0})</value></data>
+  <data name="Low Stock" xml:space="preserve"><value>كمية محدودة</value></data>
   <data name="Standard Delivery (2–3 Working Days)" xml:space="preserve"><value>توصيل عادي (2-3 أيام عمل)</value></data>
   <data name="Total (Incl. VAT)" xml:space="preserve"><value>الإجمالي (شامل الضريبة)</value></data>
   <data name="You saved" xml:space="preserve"><value>لقد وفرت</value></data>
