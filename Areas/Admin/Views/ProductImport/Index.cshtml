@@ -31,6 +31,20 @@
             </div>
         }
     </div>
+
+    @if (Model.Warnings.Count > 0)
+    {
+        <div class="alert alert-info mt-2">
+            <strong>@Localizer["{0} row(s) saved without a Vendor SKU / Vendor Color Code", Model.Warnings.Count]</strong>
+            <span class="text-muted">— @Localizer["not a problem if this is a WLM own-label product with no real vendor code; otherwise worth filling in."]</span>
+            <ul class="mb-0 mt-1" style="max-height: 300px; overflow-y: auto;">
+                @foreach (var warning in Model.Warnings)
+                {
+                    <li>@warning</li>
+                }
+            </ul>
+        </div>
+    }
 }
 
 <div class="summary-box">
