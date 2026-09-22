@@ -20,6 +20,12 @@
     var variantSkuDataEl = document.getElementById("variantSkuData");
     var thumbsArrowPrev = document.getElementById("thumbsArrowPrev");
     var thumbsArrowNext = document.getElementById("thumbsArrowNext");
+    // Fixed additional-images strip (pocket/back/side/detail shots common to every color, see
+    // _PdpColorGallery.cshtml) — a second, independent thumb strip that's never rebuilt on color
+    // change, only present on multi-color products that actually have Shared-scope media.
+    var sharedThumbsContainer = document.getElementById("productSharedThumbs");
+    var sharedThumbsArrowPrev = document.getElementById("sharedThumbsArrowPrev");
+    var sharedThumbsArrowNext = document.getElementById("sharedThumbsArrowNext");
     var splitSizeConfigEl = document.getElementById("splitSizeConfig");
     var sizeUnitContainer = document.getElementById("sizeUnitOptionsContainer");
     var sizeLengthContainer = document.getElementById("sizeLengthOptionsContainer");
@@ -302,9 +308,16 @@
         }
     }
 
+    // Clears "active" across BOTH strips (color thumbs + fixed additional-images strip) before
+    // marking the given one — only ever one active thumb at a time regardless of which strip
+    // it's in, since both drive the same single main image.
     function setActiveThumb(thumb) {
-        if (!thumbsContainer) return;
-        thumbsContainer.querySelectorAll(".product-thumb").forEach(function (t) { t.classList.remove("active"); });
+        if (thumbsContainer) {
+            thumbsContainer.querySelectorAll(".product-thumb").forEach(function (t) { t.classList.remove("active"); });
+        }
+        if (sharedThumbsContainer) {
+            sharedThumbsContainer.querySelectorAll(".product-thumb").forEach(function (t) { t.classList.remove("active"); });
+        }
         if (thumb) {
             thumb.classList.add("active");
         }
@@ -333,6 +346,19 @@
                     matchingInput.dispatchEvent(new Event("change", { bubbles: true }));
                 }
             }
+        });
+    }
+
+    // Shared-strip thumbs carry no color, so clicking one only swaps the main image and its own
+    // active state — the color swatches/SKU/size selection are left exactly as they were.
+    if (sharedThumbsContainer) {
+        sharedThumbsContainer.addEventListener("click", function (e) {
+            var thumb = e.target.closest(".product-thumb");
+            if (!thumb) return;
+            var full = thumb.getAttribute("data-full");
+            var type = thumb.getAttribute("data-type") || "Image";
+            showMainItem(full, type);
+            setActiveThumb(thumb);
         });
     }
 
@@ -386,56 +412,64 @@
     // The strip scrolls vertically on desktop (a side column) and horizontally on mobile (a row
     // below the main image, per the CSS breakpoint) — whichever axis actually overflows is the
     // one the arrows control, so the same up/down buttons work in both layouts without needing
-    // separate left/right icons for mobile.
-    function thumbsScrollAxis() {
-        if (!thumbsContainer) return null;
-        if (thumbsContainer.scrollHeight - thumbsContainer.clientHeight > 2) return "vertical";
-        if (thumbsContainer.scrollWidth - thumbsContainer.clientWidth > 2) return "horizontal";
-        return null;
+    // separate left/right icons for mobile. Factored out so the same behavior can be wired up
+    // independently for the color-thumbs strip and the fixed additional-images strip below it —
+    // each scrolls on its own, with its own arrow pair.
+    function createThumbScroller(container, arrowPrev, arrowNext) {
+        if (!container) return { update: function () {} };
+
+        function scrollAxis() {
+            if (container.scrollHeight - container.clientHeight > 2) return "vertical";
+            if (container.scrollWidth - container.clientWidth > 2) return "horizontal";
+            return null;
+        }
+
+        function update() {
+            if (!arrowPrev || !arrowNext) return;
+            var axis = scrollAxis();
+            if (!axis) {
+                arrowPrev.classList.remove("visible");
+                arrowNext.classList.remove("visible");
+                return;
+            }
+            var atStart, atEnd;
+            if (axis === "vertical") {
+                atStart = container.scrollTop <= 2;
+                atEnd = container.scrollTop + container.clientHeight >= container.scrollHeight - 2;
+            } else {
+                atStart = container.scrollLeft <= 2;
+                atEnd = container.scrollLeft + container.clientWidth >= container.scrollWidth - 2;
+            }
+            arrowPrev.classList.toggle("visible", !atStart);
+            arrowNext.classList.toggle("visible", !atEnd);
+        }
+
+        function scroll(direction) {
+            var step = 2 * (70 + 10); // ~2 thumbnails + their gap
+            var axis = scrollAxis();
+            if (axis === "horizontal") {
+                container.scrollBy({ left: direction * step, behavior: "smooth" });
+            } else {
+                container.scrollBy({ top: direction * step, behavior: "smooth" });
+            }
+        }
+
+        if (arrowPrev) {
+            arrowPrev.addEventListener("click", function () { scroll(-1); });
+        }
+        if (arrowNext) {
+            arrowNext.addEventListener("click", function () { scroll(1); });
+        }
+        container.addEventListener("scroll", update);
+        window.addEventListener("resize", update);
+        update();
+
+        return { update: update };
     }
 
-    function updateThumbsArrows() {
-        if (!thumbsContainer || !thumbsArrowPrev || !thumbsArrowNext) return;
-        var axis = thumbsScrollAxis();
-        if (!axis) {
-            thumbsArrowPrev.classList.remove("visible");
-            thumbsArrowNext.classList.remove("visible");
-            return;
-        }
-        var atStart, atEnd;
-        if (axis === "vertical") {
-            atStart = thumbsContainer.scrollTop <= 2;
-            atEnd = thumbsContainer.scrollTop + thumbsContainer.clientHeight >= thumbsContainer.scrollHeight - 2;
-        } else {
-            atStart = thumbsContainer.scrollLeft <= 2;
-            atEnd = thumbsContainer.scrollLeft + thumbsContainer.clientWidth >= thumbsContainer.scrollWidth - 2;
-        }
-        thumbsArrowPrev.classList.toggle("visible", !atStart);
-        thumbsArrowNext.classList.toggle("visible", !atEnd);
-    }
-
-    function scrollThumbs(direction) {
-        if (!thumbsContainer) return;
-        var step = 2 * (70 + 10); // ~2 thumbnails + their gap
-        var axis = thumbsScrollAxis();
-        if (axis === "horizontal") {
-            thumbsContainer.scrollBy({ left: direction * step, behavior: "smooth" });
-        } else {
-            thumbsContainer.scrollBy({ top: direction * step, behavior: "smooth" });
-        }
-    }
-
-    if (thumbsArrowPrev) {
-        thumbsArrowPrev.addEventListener("click", function () { scrollThumbs(-1); });
-    }
-    if (thumbsArrowNext) {
-        thumbsArrowNext.addEventListener("click", function () { scrollThumbs(1); });
-    }
-    if (thumbsContainer) {
-        thumbsContainer.addEventListener("scroll", updateThumbsArrows);
-        window.addEventListener("resize", updateThumbsArrows);
-        updateThumbsArrows();
-    }
+    var thumbsScroller = createThumbScroller(thumbsContainer, thumbsArrowPrev, thumbsArrowNext);
+    createThumbScroller(sharedThumbsContainer, sharedThumbsArrowPrev, sharedThumbsArrowNext);
+    function updateThumbsArrows() { thumbsScroller.update(); }
 
     // Hover-to-zoom: scale the image and track cursor position as the transform origin.
     // The container itself also tilts in 3D toward the cursor, so the photo feels
@@ -467,24 +501,29 @@
     var lightboxItems = [];
     var lightboxIndex = 0;
 
+    // Spans both strips (color thumbs + fixed additional-images strip) in DOM order, so the
+    // lightbox pages through everything currently on the page — including a shared/detail photo
+    // if that's what's active — not just whichever strip happens to be first.
+    function getAllThumbEls() {
+        var primary = thumbsContainer ? Array.prototype.slice.call(thumbsContainer.querySelectorAll(".product-thumb")) : [];
+        var shared = sharedThumbsContainer ? Array.prototype.slice.call(sharedThumbsContainer.querySelectorAll(".product-thumb")) : [];
+        return primary.concat(shared);
+    }
+
     function getCurrentGalleryItems() {
-        if (!thumbsContainer) {
-            return [{ url: mainImage.src, type: "Image" }];
-        }
-        var thumbs = thumbsContainer.querySelectorAll(".product-thumb");
+        var thumbs = getAllThumbEls();
         if (thumbs.length === 0) {
             return [{ url: mainImage.src, type: "Image" }];
         }
-        return Array.prototype.map.call(thumbs, function (t) {
+        return thumbs.map(function (t) {
             return { url: t.getAttribute("data-full"), type: t.getAttribute("data-type") || "Image" };
         });
     }
 
     function getCurrentGalleryIndex() {
-        if (!thumbsContainer) return 0;
-        var thumbs = thumbsContainer.querySelectorAll(".product-thumb");
-        var activeThumb = thumbsContainer.querySelector(".product-thumb.active");
-        var idx = activeThumb ? Array.prototype.indexOf.call(thumbs, activeThumb) : -1;
+        var thumbs = getAllThumbEls();
+        var activeThumb = thumbs.find(function (t) { return t.classList.contains("active"); });
+        var idx = activeThumb ? thumbs.indexOf(activeThumb) : -1;
         return idx >= 0 ? idx : 0;
     }
 
@@ -519,10 +558,8 @@
         }
         updateLightboxNav();
         showMainItem(item.url, item.type);
-        if (thumbsContainer) {
-            var matchingThumb = thumbsContainer.querySelector('.product-thumb[data-full="' + CSS.escape(item.url) + '"]');
-            setActiveThumb(matchingThumb);
-        }
+        var matchingThumb = getAllThumbEls().find(function (t) { return t.getAttribute("data-full") === item.url; });
+        setActiveThumb(matchingThumb);
     }
 
     function lightboxGoTo(index) {

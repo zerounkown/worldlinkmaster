@@ -5122,6 +5122,31 @@ a:hover {
   border-color: var(--wlm-forest);
 }
 
+/* Two-strip variant (_PdpColorGallery.cshtml, multi-color products): the fixed color thumbs
+   stacked above a second, independently-scrolling strip of shared/detail photos that never
+   changes when the color changes. .product-thumbs-wrap's own flex/width rules above assume
+   it's a direct row-context child of .product-gallery-layout; nested one level deeper here
+   (inside this column) those need re-pointing at the column's vertical axis instead, hence
+   the overrides below rather than relying on the base rule as-is. */
+.product-gallery-thumbs-column {
+  display: flex;
+  flex-direction: column;
+  flex: 0 0 70px;
+  gap: 16px;
+  max-height: 520px;
+}
+
+.product-gallery-thumbs-column .product-thumbs-wrap {
+  flex: 0 0 auto;
+  width: 70px;
+  max-height: 260px;
+}
+
+.product-gallery-thumbs-column .product-thumbs-wrap-shared {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
 @media (max-width: 991.98px) {
   .product-gallery-layout {
     flex-direction: column-reverse;
@@ -5137,6 +5162,21 @@ a:hover {
     flex: 0 0 auto;
     max-height: none;
     width: 100%;
+  }
+
+  /* Below lg, both strips stack as full-width horizontal rows (each still using the
+     .product-thumbs-wrap row behavior above) instead of sharing a fixed-width vertical column. */
+  .product-gallery-thumbs-column {
+    flex-direction: column;
+    flex: 0 0 auto;
+    width: 100%;
+    max-height: none;
+  }
+
+  .product-gallery-thumbs-column .product-thumbs-wrap,
+  .product-gallery-thumbs-column .product-thumbs-wrap-shared {
+    width: 100%;
+    max-height: none;
   }
 
   .product-thumbs {
