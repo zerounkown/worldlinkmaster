@@ -2,10 +2,12 @@
 @using WorldLinkMaster.Web.Extensions
 @model Product
 @{
-    // Condor-style gallery: a horizontal color bar sits above the thumbs+main-image block,
-    // so color selection is visually and functionally part of the gallery rather than the
-    // buy-box column. Scoped to multi-color products only (Details.cshtml only renders this
-    // partial when Model.ProductColors.Count > 1) — a color bar makes no sense with one color.
+    // Gallery: swatches sit at the top of the vertical thumbnail column (desktop) — color
+    // selection lives in the same left-hand strip as the thumbnails, with the large image
+    // taking the rest of the row. On mobile the swatches sit as their own full-width row
+    // above the horizontal thumbnail strip (see the 991.98px block in site.css). Scoped to
+    // multi-color products only (Details.cshtml only renders this partial when
+    // Model.ProductColors.Count > 1) — a color bar makes no sense with one color.
     var galleryByColorId = (Dictionary<int, List<Dictionary<string, string?>>>)ViewData["GalleryByColorId"]!;
     var defaultProductColor = Model.ProductColors.FirstOrDefault(pc => pc.DefaultColor) ?? Model.ProductColors.First();
 
@@ -21,55 +23,52 @@
     var firstIsVideo = firstItem["type"] == "Video";
 }
 <div class="pdp-gallery-panel">
-    <div class="pdp-color-bar">
-        <span class="option-label pdp-color-bar-label">
-            @Localizer["Color"] <span id="selectedColorLabel">@defaultProductColor.Color?.Name</span>
-        </span>
-        <div class="color-options pdp-color-bar-swatches">
-            @for (int i = 0; i < Model.ProductColors.Count; i++)
-            {
-                var pc = Model.ProductColors.ElementAt(i);
-                var isSelected = pc.Id == defaultProductColor.Id;
-                var fallbackImage = galleryByColorId.GetValueOrDefault(pc.Id)?.FirstOrDefault()?.GetValueOrDefault("url");
-                // Solid swatch color always — a photo thumbnail here (even the color's own
-                // swatch photo) reads as visually identical across colors at this size and
-                // defeats the point of a color picker.
-                var swatchStyle = $"background-color: {pc.Color?.HexCode};";
-                <label class="color-swatch" style="@swatchStyle" title="@pc.Color?.Name">
-                    <input type="radio" name="color" value="@pc.Color?.Name" data-color-id="@pc.Id" data-image="@(ImagePlaceholder.IsRealImageUrl(fallbackImage) ? fallbackImage : Model.ImageUrl)" data-label="@pc.Color?.Name" required="@(i == 0 ? "required" : null)" checked="@(isSelected ? "checked" : null)" />
-                </label>
-            }
-        </div>
-    </div>
     <div class="product-gallery-layout">
-        @if (initialGallery.Count > 1 || Model.ProductColors.Count > 1)
-        {
-            <div class="product-thumbs-wrap" id="productThumbsWrap">
-                <button type="button" class="product-thumbs-arrow product-thumbs-arrow-prev" id="thumbsArrowPrev" aria-label="@Localizer["Scroll thumbnails up"]">
-                    <i class="bi bi-chevron-up"></i>
-                </button>
-                <div class="product-thumbs" id="productThumbs">
-                    @for (int i = 0; i < initialGallery.Count; i++)
+        <div class="product-thumbs-wrap" id="productThumbsWrap">
+            <div class="pdp-color-bar">
+                <span class="option-label pdp-color-bar-label">
+                    @Localizer["Color"] <span id="selectedColorLabel">@defaultProductColor.Color?.Name</span>
+                </span>
+                <div class="color-options pdp-color-bar-swatches">
+                    @for (int i = 0; i < Model.ProductColors.Count; i++)
                     {
-                        var item = initialGallery[i];
-                        var isVideo = item["type"] == "Video";
-                        <span class="product-thumb-item">
-                            <img src="@(item["thumb"] ?? ImagePlaceholder.DataUri)"
-                                 class="product-thumb @(i == initialActiveIndex ? "active" : "")"
-                                 data-full="@item["url"]" data-type="@item["type"]" data-color-id="@item.GetValueOrDefault("colorId")"
-                                 alt="@(item["alt"] ?? Model.LocalizedName())" />
-                            @if (isVideo)
-                            {
-                                <i class="bi bi-play-circle-fill product-thumb-play"></i>
-                            }
-                        </span>
+                        var pc = Model.ProductColors.ElementAt(i);
+                        var isSelected = pc.Id == defaultProductColor.Id;
+                        var fallbackImage = galleryByColorId.GetValueOrDefault(pc.Id)?.FirstOrDefault()?.GetValueOrDefault("url");
+                        // Solid swatch color always — a photo thumbnail here (even the color's own
+                        // swatch photo) reads as visually identical across colors at this size and
+                        // defeats the point of a color picker.
+                        var swatchStyle = $"background-color: {pc.Color?.HexCode};";
+                        <label class="color-swatch" style="@swatchStyle" title="@pc.Color?.Name">
+                            <input type="radio" name="color" value="@pc.Color?.Name" data-color-id="@pc.Id" data-image="@(ImagePlaceholder.IsRealImageUrl(fallbackImage) ? fallbackImage : Model.ImageUrl)" data-label="@pc.Color?.Name" required="@(i == 0 ? "required" : null)" checked="@(isSelected ? "checked" : null)" />
+                        </label>
                     }
                 </div>
-                <button type="button" class="product-thumbs-arrow product-thumbs-arrow-next" id="thumbsArrowNext" aria-label="@Localizer["Scroll thumbnails down"]">
-                    <i class="bi bi-chevron-down"></i>
-                </button>
             </div>
-        }
+            <button type="button" class="product-thumbs-arrow product-thumbs-arrow-prev" id="thumbsArrowPrev" aria-label="@Localizer["Scroll thumbnails up"]">
+                <i class="bi bi-chevron-up"></i>
+            </button>
+            <div class="product-thumbs" id="productThumbs">
+                @for (int i = 0; i < initialGallery.Count; i++)
+                {
+                    var item = initialGallery[i];
+                    var isVideo = item["type"] == "Video";
+                    <span class="product-thumb-item">
+                        <img src="@(item["thumb"] ?? ImagePlaceholder.DataUri)"
+                             class="product-thumb @(i == initialActiveIndex ? "active" : "")"
+                             data-full="@item["url"]" data-type="@item["type"]" data-color-id="@item.GetValueOrDefault("colorId")"
+                             alt="@(item["alt"] ?? Model.LocalizedName())" />
+                        @if (isVideo)
+                        {
+                            <i class="bi bi-play-circle-fill product-thumb-play"></i>
+                        }
+                    </span>
+                }
+            </div>
+            <button type="button" class="product-thumbs-arrow product-thumbs-arrow-next" id="thumbsArrowNext" aria-label="@Localizer["Scroll thumbnails down"]">
+                <i class="bi bi-chevron-down"></i>
+            </button>
+        </div>
         <div class="product-zoom-container" id="zoomContainer">
             <img src="@(firstIsVideo ? (firstItem["thumb"] ?? ImagePlaceholder.DataUri) : firstItem["url"])" alt="@Model.LocalizedName()" class="product-zoom-image" id="mainProductImage" style="@(firstIsVideo ? "display:none;" : "")" />
             <video id="mainProductVideo" controls class="product-zoom-video" style="@(firstIsVideo ? "" : "display:none;")">
