@@ -5041,6 +5041,13 @@ a:hover {
   .product-zoom-image {
     height: 100%;
   }
+
+  /* Swatches stack vertically at the top of the thumbnail column on desktop, matching the
+     column's own 70px width — .pdp-color-bar-swatches otherwise inherits a horizontal row
+     from .color-options (used everywhere else swatches appear, e.g. the mobile row below). */
+  .pdp-color-bar-swatches {
+    flex-direction: column;
+  }
 }
 
 .product-zoom-container {
@@ -5163,12 +5170,20 @@ a:hover {
      trailing row (e.g. 4 thumbs then 1 alone) whenever the count isn't a clean multiple of
      however many fit per row; a single scrollable row sidesteps that regardless of count. The
      wrap flips to a row too, so the prev/next arrows sit left/right of the strip instead of
-     above/below it — same up/down chevron icons, just scrolling the horizontal axis now. */
+     above/below it — same up/down chevron icons, just scrolling the horizontal axis now.
+     flex-wrap: wrap + the color bar's own 100% basis (below) pushes the color bar onto its
+     own full-width line, with the arrows+thumbs row wrapping onto the line under it — same
+     stacked look as before the color bar moved inside this wrapper. */
   .product-thumbs-wrap {
     flex-direction: row;
+    flex-wrap: wrap;
     flex: 0 0 auto;
     max-height: none;
     width: 100%;
+  }
+
+  .product-thumbs-wrap .pdp-color-bar {
+    flex: 1 0 100%;
   }
 
   .product-thumbs {
