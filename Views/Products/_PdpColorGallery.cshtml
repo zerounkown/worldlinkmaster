@@ -2,12 +2,10 @@
 @using WorldLinkMaster.Web.Extensions
 @model Product
 @{
-    // Gallery: swatches sit at the top of the vertical thumbnail column (desktop) — color
-    // selection lives in the same left-hand strip as the thumbnails, with the large image
-    // taking the rest of the row. On mobile the swatches sit as their own full-width row
-    // above the horizontal thumbnail strip (see the 991.98px block in site.css). Scoped to
-    // multi-color products only (Details.cshtml only renders this partial when
-    // Model.ProductColors.Count > 1) — a color bar makes no sense with one color.
+    // Gallery: thumbnails + main image only — color selection lives in the buy-box column
+    // (see Details.cshtml, the hasProductColors swatch block), not here. Scoped to multi-color
+    // products only (Details.cshtml only renders this partial when Model.ProductColors.Count > 1);
+    // single-color products use the near-identical inline markup directly in Details.cshtml.
     var galleryByColorId = (Dictionary<int, List<Dictionary<string, string?>>>)ViewData["GalleryByColorId"]!;
     var defaultProductColor = Model.ProductColors.FirstOrDefault(pc => pc.DefaultColor) ?? Model.ProductColors.First();
 
@@ -25,26 +23,6 @@
 <div class="pdp-gallery-panel">
     <div class="product-gallery-layout">
         <div class="product-thumbs-wrap" id="productThumbsWrap">
-            <div class="pdp-color-bar">
-                <span class="option-label pdp-color-bar-label">
-                    @Localizer["Color"] <span id="selectedColorLabel">@defaultProductColor.Color?.Name</span>
-                </span>
-                <div class="color-options pdp-color-bar-swatches">
-                    @for (int i = 0; i < Model.ProductColors.Count; i++)
-                    {
-                        var pc = Model.ProductColors.ElementAt(i);
-                        var isSelected = pc.Id == defaultProductColor.Id;
-                        var fallbackImage = galleryByColorId.GetValueOrDefault(pc.Id)?.FirstOrDefault()?.GetValueOrDefault("url");
-                        // Solid swatch color always — a photo thumbnail here (even the color's own
-                        // swatch photo) reads as visually identical across colors at this size and
-                        // defeats the point of a color picker.
-                        var swatchStyle = $"background-color: {pc.Color?.HexCode};";
-                        <label class="color-swatch" style="@swatchStyle" title="@pc.Color?.Name">
-                            <input type="radio" name="color" value="@pc.Color?.Name" data-color-id="@pc.Id" data-image="@(ImagePlaceholder.IsRealImageUrl(fallbackImage) ? fallbackImage : Model.ImageUrl)" data-label="@pc.Color?.Name" required="@(i == 0 ? "required" : null)" checked="@(isSelected ? "checked" : null)" />
-                        </label>
-                    }
-                </div>
-            </div>
             <button type="button" class="product-thumbs-arrow product-thumbs-arrow-prev" id="thumbsArrowPrev" aria-label="@Localizer["Scroll thumbnails up"]">
                 <i class="bi bi-chevron-up"></i>
             </button>

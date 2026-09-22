@@ -4951,37 +4951,12 @@ a:hover {
 /* Gallery layout: a narrow vertical thumbnail column beside the main image on desktop
    (matches typical PDP references), falling back to a horizontal row below the image on
    mobile where there isn't room for a side column. */
-/* Condor-style gallery: color bar sits above the thumbs+main-image row, both stacked inside
-   one panel so the pair can flex-stretch together (see the 992px block below) exactly like
-   .product-gallery-layout alone does on single-color products. Only rendered for products with
-   more than one color — see Views/Products/_PdpColorGallery.cshtml. */
+/* Wraps .product-gallery-layout on multi-color products (see Views/Products/_PdpColorGallery.cshtml)
+   — color selection itself lives in the buy-box column, not here. Only rendered for products
+   with more than one color. */
 .pdp-gallery-panel {
   display: flex;
   flex-direction: column;
-  gap: 14px;
-}
-
-.pdp-color-bar {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.pdp-color-bar-label {
-  margin-bottom: 0;
-}
-
-.pdp-color-bar-label #selectedColorLabel {
-  text-transform: none;
-  font-family: var(--font-body);
-  letter-spacing: normal;
-  font-weight: 400;
-  color: var(--wlm-ink);
-  margin-inline-start: 6px;
-}
-
-.pdp-color-bar-swatches {
-  flex-wrap: nowrap;
 }
 
 .product-gallery-layout {
@@ -5040,13 +5015,6 @@ a:hover {
      aspect ratio. */
   .product-zoom-image {
     height: 100%;
-  }
-
-  /* Swatches stack vertically at the top of the thumbnail column on desktop, matching the
-     column's own 70px width — .pdp-color-bar-swatches otherwise inherits a horizontal row
-     from .color-options (used everywhere else swatches appear, e.g. the mobile row below). */
-  .pdp-color-bar-swatches {
-    flex-direction: column;
   }
 }
 
@@ -5159,31 +5127,16 @@ a:hover {
     flex-direction: column-reverse;
   }
 
-  /* Smaller swatches on narrow phones so all 5 still sit on one line without scrolling —
-     46px * 5 + 10px gap * 4 = 270px, tight on sub-360px screens once page padding is
-     accounted for. */
-  .pdp-color-bar-swatches {
-    --pdp-swatch-size: 38px;
-  }
-
   /* Horizontal scroll strip instead of wrapping to multiple rows — wrapping leaves a lopsided
      trailing row (e.g. 4 thumbs then 1 alone) whenever the count isn't a clean multiple of
      however many fit per row; a single scrollable row sidesteps that regardless of count. The
      wrap flips to a row too, so the prev/next arrows sit left/right of the strip instead of
-     above/below it — same up/down chevron icons, just scrolling the horizontal axis now.
-     flex-wrap: wrap + the color bar's own 100% basis (below) pushes the color bar onto its
-     own full-width line, with the arrows+thumbs row wrapping onto the line under it — same
-     stacked look as before the color bar moved inside this wrapper. */
+     above/below it — same up/down chevron icons, just scrolling the horizontal axis now. */
   .product-thumbs-wrap {
     flex-direction: row;
-    flex-wrap: wrap;
     flex: 0 0 auto;
     max-height: none;
     width: 100%;
-  }
-
-  .product-thumbs-wrap .pdp-color-bar {
-    flex: 1 0 100%;
   }
 
   .product-thumbs {

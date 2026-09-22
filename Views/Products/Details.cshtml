@@ -410,7 +410,7 @@
                         @Localizer["Total"]: <strong id="cartTotalPrice">@currencySymbol@effectiveUnitPrice.ToString("N2", System.Globalization.CultureInfo.InvariantCulture)</strong>
                     </p>
 
-                    @if (hasProductColors && Model.ProductColors.Count == 1)
+                    @if (hasProductColors)
                     {
                         <div class="mb-3">
                             <label class="option-label">@Localizer["Color"]</label>
