@@ -178,4 +178,57 @@ public class ProductImportControllerTests
         Assert.Equal("https://example.com/condor/101228-002-hero.jpg", media.MediaUrl);
         Assert.True(media.IsColorMain);
     }
+
+    // VendorSku isn't unique — a still-unmerged duplicate-product pair can legitimately share the
+    // same real vendor code until someone merges them (found live: CON-0007/CON-0033 both
+    // "101121"). A row referencing an ambiguous vendor code must fail with a specific error, not
+    // crash the whole import (ToDictionaryAsync on a duplicate key throws) or silently guess.
+    [Fact]
+    public async Task Import_MediaRowKeyedByAmbiguousVendorSku_FailsThatRowWithoutCrashing()
+    {
+        using var context = CreateContext();
+
+        var merchant = new Merchant { UserId = "merchant-1", BusinessName = "Test Merchant", Slug = "test-merchant" };
+        var category = new Category { Code = "CAT", Name = "Test Category", Slug = "test-category" };
+        context.Merchants.Add(merchant);
+        context.Categories.Add(category);
+        await context.SaveChangesAsync();
+
+        // Two still-unmerged products sharing the same real vendor SKU.
+        var productA = new Product { Sku = "CON-0007", VendorSku = "101121", Name = "Maxfort Ls Training Top", Slug = "maxfort-ls-training-top", Price = 100m, CategoryId = category.Id, MerchantId = merchant.Id };
+        var productB = new Product { Sku = "CON-0033", VendorSku = "101121", Name = "Maxfort Ls Training", Slug = "maxfort-ls-training", Price = 100m, CategoryId = category.Id, MerchantId = merchant.Id };
+        context.Products.AddRange(productA, productB);
+        await context.SaveChangesAsync();
+
+        using var workbook = new XLWorkbook();
+        var productsSheet = workbook.Worksheets.Add("Products");
+        string[] productHeaders = { "Action", "Product Code", "Name EN", "Main Category Code", "Default Price Excl. VAT" };
+        for (var i = 0; i < productHeaders.Length; i++) productsSheet.Cell(1, i + 1).Value = productHeaders[i];
+
+        var mediaSheet = workbook.Worksheets.Add("Media");
+        string[] mediaHeaders = { "Action", "Product Code", "Product Color Code", "Media Scope", "Media Type", "Media Role", "Media URL", "Display Order", "Is Color Main", "Active" };
+        for (var i = 0; i < mediaHeaders.Length; i++) mediaSheet.Cell(1, i + 1).Value = mediaHeaders[i];
+        mediaSheet.Cell(2, 1).Value = "ADD";
+        mediaSheet.Cell(2, 2).Value = "101121";
+        mediaSheet.Cell(2, 4).Value = "Shared";
+        mediaSheet.Cell(2, 5).Value = "Image";
+        mediaSheet.Cell(2, 7).Value = "https://example.com/condor/101121-hero.jpg";
+        mediaSheet.Cell(2, 8).Value = 1;
+        mediaSheet.Cell(2, 10).Value = "Yes";
+
+        var file = ToFormFile(workbook);
+        var controller = new ProductImportController(context);
+
+        // Must not throw -- this is the regression this test guards against.
+        var viewResult = await controller.Import(file);
+        var result = Assert.IsType<Microsoft.AspNetCore.Mvc.ViewResult>(viewResult).Model as WorldLinkMaster.Web.Models.ViewModels.ProductImportResult;
+
+        Assert.NotNull(result);
+        Assert.Equal(0, result!.MediaWritten);
+        Assert.Single(result.Errors);
+        Assert.Contains("multiple products", result.Errors[0]);
+        Assert.Contains("CON-0007", result.Errors[0]);
+        Assert.Contains("CON-0033", result.Errors[0]);
+        Assert.Empty(await context.ProductMedia.ToListAsync());
+    }
 }
