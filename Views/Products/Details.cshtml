@@ -420,11 +420,13 @@
                                     var pc = Model.ProductColors.ElementAt(i);
                                     var isSelected = pc.Id == defaultProductColor!.Id;
                                     var fallbackImage = galleryByColorId.GetValueOrDefault(pc.Id)?.FirstOrDefault()?.GetValueOrDefault("url");
-                                    // Solid swatch color always — a photo thumbnail here (even
-                                    // the color's own swatch photo) reads as visually identical
-                                    // across colors at this size and defeats the point of a
-                                    // color picker.
-                                    var swatchStyle = $"background-color: {pc.Color?.HexCode};";
+                                    // The color's own first gallery photo as the swatch thumbnail
+                                    // — background-color stays underneath as a fallback fill for
+                                    // any color with no real photo yet (avoids a blank/transparent
+                                    // circle) and for the brief moment before the image loads.
+                                    var swatchStyle = ImagePlaceholder.IsRealImageUrl(fallbackImage)
+                                        ? $"background-image: url('{fallbackImage}'); background-color: {pc.Color?.HexCode};"
+                                        : $"background-color: {pc.Color?.HexCode};";
                                     <label class="color-swatch" style="@swatchStyle" title="@pc.Color?.Name">
                                         <input type="radio" name="color" value="@pc.Color?.Name" data-color-id="@pc.Id" data-image="@(ImagePlaceholder.IsRealImageUrl(fallbackImage) ? fallbackImage : Model.ImageUrl)" data-label="@pc.Color?.Name" required="@(i == 0 ? "required" : null)" checked="@(isSelected ? "checked" : null)" />
                                     </label>
@@ -441,7 +443,9 @@
                                 @for (int i = 0; i < colorOptions.Count; i++)
                                 {
                                     var opt = colorOptions[i];
-                                    var swatchStyle = $"background-color: {opt.Color.HexCode};";
+                                    var swatchStyle = ImagePlaceholder.IsRealImageUrl(opt.ImageUrl)
+                                        ? $"background-image: url('{opt.ImageUrl}'); background-color: {opt.Color.HexCode};"
+                                        : $"background-color: {opt.Color.HexCode};";
                                     <label class="color-swatch" style="@swatchStyle" title="@opt.Color.Name">
                                         <input type="radio" name="color" value="@opt.Color.Name" data-color-id="@opt.Color.Id" data-image="@(ImagePlaceholder.IsRealImageUrl(opt.ImageUrl) ? opt.ImageUrl : Model.ImageUrl)" data-label="@opt.Color.Name" required="@(i == 0 ? "required" : null)" checked="@(i == 0 ? "checked" : null)" />
                                     </label>
