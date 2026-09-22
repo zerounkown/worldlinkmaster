@@ -687,6 +687,22 @@ public class ProductImportController : AdminBaseController
             return touchedProductCodes;
         }
 
+        // Vendor-code fallback: media files for an already-catalogued product (Condor, Propper,
+        // ...) are named by the VENDOR's own SKU/color code, not ours — and a media-only upload
+        // has no Products/Product Colors rows of its own to populate productsBySku/
+        // productColorsByCode for these. Falls back to a DB lookup by VendorSku (product) and by
+        // "{VendorSku}-{VendorColorCode}" (color, matching the vendor's own combined naming, e.g.
+        // Condor's "101228-002" or Propper's "F5259-BLK") whenever the primary Sku/Code lookup
+        // above doesn't find a match, so re-uploading with corrected data never breaks existing
+        // Sku/Code-keyed rows.
+        var productsByVendorSku = await _context.Products
+            .Where(p => p.VendorSku != null && p.VendorSku != "")
+            .ToDictionaryAsync(p => p.VendorSku!, StringComparer.OrdinalIgnoreCase);
+        var productColorsByVendorCode = await _context.ProductColors
+            .Include(pc => pc.Product)
+            .Where(pc => pc.VendorColorCode != null && pc.VendorColorCode != "" && pc.Product!.VendorSku != null && pc.Product.VendorSku != "")
+            .ToDictionaryAsync(pc => $"{pc.Product!.VendorSku}-{pc.VendorColorCode}", StringComparer.OrdinalIgnoreCase);
+
         // Rows have no stable natural key to match against for an update, so each product
         // appearing in this sheet gets its media fully replaced by what's in the file.
         var newMediaByProduct = new Dictionary<int, List<ProductMedia>>();
@@ -711,9 +727,9 @@ public class ProductImportController : AdminBaseController
                 result.Errors.Add($"Media row {rowNum} (M004, Product {productCode}): Media URL is required.");
                 continue;
             }
-            if (!productsBySku.TryGetValue(productCode, out var product))
+            if (!productsBySku.TryGetValue(productCode, out var product) && !productsByVendorSku.TryGetValue(productCode, out product))
             {
-                result.Errors.Add($"Media row {rowNum}: Product Code '{productCode}' doesn't match any product.");
+                result.Errors.Add($"Media row {rowNum}: Product Code '{productCode}' doesn't match any product (checked internal SKU and Vendor SKU).");
                 continue;
             }
 
@@ -734,13 +750,15 @@ public class ProductImportController : AdminBaseController
                     result.Errors.Add($"Media row {rowNum} (M003, Product {productCode}): Color-scoped media needs a Product Color Code.");
                     continue;
                 }
-                if (!productColorsByCode.TryGetValue(productColorCode, out var productColor) || productColor.ProductId != product.Id)
+                var matchedByOurCode = productColorsByCode.TryGetValue(productColorCode, out var productColor) && productColor.ProductId == product.Id;
+                var matchedByVendorCode = !matchedByOurCode && productColorsByVendorCode.TryGetValue(productColorCode, out productColor) && productColor!.ProductId == product.Id;
+                if (!matchedByOurCode && !matchedByVendorCode)
                 {
                     var suggestion = FindClosestMatch(productColorCode, productColorsByCode.Keys);
-                    result.Errors.Add(WithSuggestion($"Media row {rowNum} (Product {productCode}): Product Color Code '{productColorCode}' doesn't match a color of this product.", suggestion));
+                    result.Errors.Add(WithSuggestion($"Media row {rowNum} (Product {productCode}): Product Color Code '{productColorCode}' doesn't match a color of this product (checked internal code and Vendor SKU-Vendor Color Code).", suggestion));
                     continue;
                 }
-                productColorId = productColor.Id;
+                productColorId = productColor!.Id;
             }
             else
             {
