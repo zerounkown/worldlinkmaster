@@ -64,6 +64,12 @@
     </div>
 </div>
 <div class="mb-3">
+    <label asp-for="VendorSku" class="form-label">@Localizer["Vendor SKU (optional)"]</label>
+    <input asp-for="VendorSku" class="form-control" />
+    <span asp-validation-for="VendorSku" class="text-danger"></span>
+    <span class="form-text">@Localizer["The manufacturer's own style number (e.g. Condor's \"101228\"), distinct from our internal SKU above. Leave blank for WLM own-label products with no third-party vendor code."]</span>
+</div>
+<div class="mb-3">
     <label asp-for="WholesalePrice" class="form-label">@Localizer["Wholesale Price (AED, optional)"]</label>
     <div class="input-group" style="max-width: 300px;">
         <span class="input-group-text">AED</span>

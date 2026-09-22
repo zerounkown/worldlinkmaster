@@ -2,9 +2,39 @@
 @model Product
 @{
     ViewData["Title"] = Localizer["Edit Product"];
+    var productColors = ViewBag.ProductColors as List<ProductColor> ?? new List<ProductColor>();
 }
 
 <h1>@Localizer["Edit Product"]</h1>
 <form asp-action="Edit" asp-route-id="@Model.Id" method="post">
     <partial name="_Form" />
 </form>
+
+@if (productColors.Count > 0)
+{
+    <hr class="my-4" />
+    <h2 class="h5">@Localizer["Vendor Color Codes"]</h2>
+    <p class="text-muted">@Localizer["The manufacturer's own per-color code (e.g. Condor's \"002\" for Black) — used to match incoming product photos. Leave blank for colors with no known vendor code."]</p>
+    <form asp-action="UpdateVendorColorCodes" asp-route-id="@Model.Id" method="post">
+        <table class="table table-sm align-middle" style="max-width: 500px;">
+            <thead>
+                <tr>
+                    <th>@Localizer["Color"]</th>
+                    <th>@Localizer["Vendor Color Code"]</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var pc in productColors)
+                {
+                    <tr>
+                        <td>@pc.Color?.Name</td>
+                        <td>
+                            <input type="text" name="vendorColorCodes[@pc.Id]" value="@pc.VendorColorCode" class="form-control form-control-sm" maxlength="20" />
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+        <button type="submit" class="btn btn-primary">@Localizer["Save Vendor Color Codes"]</button>
+    </form>
+}

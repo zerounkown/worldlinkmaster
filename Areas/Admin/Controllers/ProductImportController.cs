@@ -174,6 +174,7 @@ public class ProductImportController : AdminBaseController
         var seoTitleCol = FindColumn(headers, "SEO Title EN");
         var seoTitleArCol = FindColumn(headers, "SEO Title AR");
         var slugCol = FindColumn(headers, "URL Slug");
+        var vendorSkuCol = FindColumn(headers, "Vendor SKU");
 
         var productsBySku = new Dictionary<string, Product>(StringComparer.OrdinalIgnoreCase);
 
@@ -274,7 +275,13 @@ public class ProductImportController : AdminBaseController
             var seoTitleEn = GetString(sheet, rowNum, seoTitleCol);
             var seoTitleAr = GetString(sheet, rowNum, seoTitleArCol);
             var explicitSlug = GetString(sheet, rowNum, slugCol);
+            var vendorSku = GetString(sheet, rowNum, vendorSkuCol);
             var roundedPrice = Math.Round(price, 2);
+
+            if (string.IsNullOrWhiteSpace(vendorSku))
+            {
+                result.Warnings.Add($"Products row {rowNum} (SKU {code}): no Vendor SKU provided.");
+            }
 
             if (existing.TryGetValue(code, out var product))
             {
@@ -293,6 +300,7 @@ public class ProductImportController : AdminBaseController
                 product.WholesalePrice = wholesaleAvailable ? roundedPrice : null;
                 product.SeoTitleEn = seoTitleEn;
                 product.SeoTitleAr = seoTitleAr;
+                product.VendorSku = vendorSku;
                 if (explicitSlug != null && !explicitSlug.Equals(product.Slug, StringComparison.OrdinalIgnoreCase))
                 {
                     usedSlugs.Remove(product.Slug);
@@ -321,6 +329,7 @@ public class ProductImportController : AdminBaseController
                     SeoTitleEn = seoTitleEn,
                     SeoTitleAr = seoTitleAr,
                     Slug = UniqueSlug(explicitSlug ?? name, usedSlugs),
+                    VendorSku = vendorSku,
                     MerchantId = defaultMerchant.Id,
                     CreatedAt = DateTime.UtcNow
                 };
@@ -348,6 +357,7 @@ public class ProductImportController : AdminBaseController
         var defaultCol = FindColumn(headers, "Default Color");
         var swatchCol = FindColumn(headers, "Swatch Image URL");
         var activeCol = FindColumn(headers, "Active");
+        var vendorColorCodeCol = FindColumn(headers, "Vendor Color Code");
 
         var productColorsByCode = new Dictionary<string, ProductColor>(StringComparer.OrdinalIgnoreCase);
 
@@ -409,6 +419,12 @@ public class ProductImportController : AdminBaseController
             TryReadInt(sheet, rowNum, orderCol, out var displayOrder);
             var active = ReadYesNo(sheet, rowNum, activeCol, true);
             var swatchUrl = GetString(sheet, rowNum, swatchCol);
+            var vendorColorCode = GetString(sheet, rowNum, vendorColorCodeCol);
+
+            if (string.IsNullOrWhiteSpace(vendorColorCode))
+            {
+                result.Warnings.Add($"Product Colors row {rowNum} (Code {code}): no Vendor Color Code provided.");
+            }
 
             if (existing.TryGetValue(code, out var productColor))
             {
@@ -427,6 +443,7 @@ public class ProductImportController : AdminBaseController
                 productColor.DefaultColor = isDefault;
                 productColor.SwatchImageUrl = swatchUrl;
                 productColor.Active = active;
+                productColor.VendorColorCode = vendorColorCode;
                 result.ProductColorsUpdated++;
             }
             else
@@ -444,7 +461,8 @@ public class ProductImportController : AdminBaseController
                     DisplayOrder = displayOrder,
                     DefaultColor = isDefault,
                     SwatchImageUrl = swatchUrl,
-                    Active = active
+                    Active = active,
+                    VendorColorCode = vendorColorCode
                 };
                 _context.ProductColors.Add(productColor);
                 existing[code] = productColor;

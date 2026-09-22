@@ -144,6 +144,12 @@ public class ProductsController : AdminBaseController
 
         ViewBag.Categories = await _context.Categories.OrderBy(c => c.Name).ToListAsync();
         ViewBag.Subcategories = await _context.Subcategories.OrderBy(s => s.Name).ToListAsync();
+        ViewBag.ProductColors = await _context.ProductColors
+            .AsNoTracking()
+            .Include(pc => pc.Color)
+            .Where(pc => pc.ProductId == id)
+            .OrderBy(pc => pc.DisplayOrder)
+            .ToListAsync();
         return View(product);
     }
 
@@ -160,6 +166,12 @@ public class ProductsController : AdminBaseController
         {
             ViewBag.Categories = await _context.Categories.OrderBy(c => c.Name).ToListAsync();
             ViewBag.Subcategories = await _context.Subcategories.OrderBy(s => s.Name).ToListAsync();
+            ViewBag.ProductColors = await _context.ProductColors
+                .AsNoTracking()
+                .Include(pc => pc.Color)
+                .Where(pc => pc.ProductId == id)
+                .OrderBy(pc => pc.DisplayOrder)
+                .ToListAsync();
             return View(product);
         }
 
@@ -182,6 +194,7 @@ public class ProductsController : AdminBaseController
         existing.Price = product.Price;
         existing.WholesalePrice = product.WholesalePrice;
         existing.Sku = product.Sku;
+        existing.VendorSku = product.VendorSku;
         existing.StockQuantity = product.StockQuantity;
         existing.ImageUrl = product.ImageUrl;
         existing.IsFeatured = product.IsFeatured;
@@ -190,6 +203,33 @@ public class ProductsController : AdminBaseController
         await _outputCacheStore.EvictByTagAsync("products", HttpContext.RequestAborted);
         TempData["AdminMessage"] = _localizer["Product '{0}' updated.", existing.Name].Value;
         return RedirectToAction(nameof(Index));
+    }
+
+    // Separate small form/action from the main product Edit above — Vendor Color Code lives on
+    // ProductColor, not Product, and there's no existing per-color admin CRUD to hang this off
+    // of (colors are otherwise only ever created via the bulk Product Import). Keeping it as its
+    // own POST avoids entangling ProductColor updates with the main product form's model binding.
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> UpdateVendorColorCodes(int id, Dictionary<int, string?> vendorColorCodes)
+    {
+        var colors = await _context.ProductColors.Where(pc => pc.ProductId == id).ToListAsync();
+        if (colors.Count == 0)
+        {
+            return NotFound();
+        }
+
+        foreach (var color in colors)
+        {
+            if (vendorColorCodes.TryGetValue(color.Id, out var code))
+            {
+                color.VendorColorCode = string.IsNullOrWhiteSpace(code) ? null : code.Trim();
+            }
+        }
+
+        await _context.SaveChangesAsync();
+        TempData["AdminMessage"] = _localizer["Vendor color codes updated."].Value;
+        return RedirectToAction(nameof(Edit), new { id });
     }
 
     public async Task<IActionResult> Delete(int id)

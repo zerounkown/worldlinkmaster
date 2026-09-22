@@ -16,6 +16,11 @@ public class ProductImportResult
 
     public List<string> Errors { get; set; } = new();
 
+    // Non-blocking — a missing Vendor SKU/Vendor Color Code never stops an import (plenty of
+    // WLM own-label products legitimately have neither), but leaving it silent is exactly how
+    // the Condor/Propper catalogs drifted this far out of sync with their real vendor codes.
+    public List<string> Warnings { get; set; } = new();
+
     public bool HasActivity =>
         ProductsCreated + ProductsUpdated + ProductColorsCreated + ProductColorsUpdated +
         VariantsCreated + VariantsUpdated + MediaWritten + AttributesWritten + Errors.Count > 0;
