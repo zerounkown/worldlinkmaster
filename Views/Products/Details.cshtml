@@ -52,6 +52,7 @@
     ProductColor? defaultProductColor = null;
     Dictionary<int, List<Dictionary<string, string?>>> galleryByColorId = new();
     List<Dictionary<string, string?>> initialGallery = new();
+    List<Dictionary<string, string?>> colorThumbItems = new();
 
     if (hasProductColors)
     {
@@ -62,10 +63,26 @@
             .OrderBy(m => m.DisplayOrder)
             .ToList();
 
+        // Fallback source for products whose ProductColors/ProductMedia gallery has no real
+        // photo at all for a color (e.g. the Condor catalog cleanup, which sourced real images
+        // into the legacy ProductVariants.ImageUrl per color but never backfilled the newer
+        // ProductMedia rows — those are still seeded with the pending-placeholder string).
+        var variantImageByColorId = Model.Variants
+            .Where(v => v.ColorId.HasValue && ImagePlaceholder.IsRealImageUrl(v.ImageUrl))
+            .GroupBy(v => v.ColorId!.Value)
+            .ToDictionary(g => g.Key, g => g.First().ImageUrl);
+
         // Maps a media URL back to the ProductColor it represents (its own main/first photo,
         // or swatch image) — this lets a gallery thumbnail be traced back to a specific color
         // swatch even when the thumbnail came from Shared media, so clicking a thumbnail can
         // select the matching color button and keep the two controls in sync.
+        //
+        // Also builds colorThumbItems: exactly one representative (front/IsColorMain) photo per
+        // color, fixed regardless of which color is selected. The left gallery panel for
+        // multi-color products always shows these Model.ProductColors.Count items — no per-color
+        // angle swapping — with clicking one selecting that color, same as the swatches above
+        // Size. (This intentionally diverges from Media Rules M002/M003 for the Count > 1 case;
+        // single-color products are untouched and keep full multi-angle browsing below.)
         var colorIdByUrl = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
         foreach (var pc in Model.ProductColors)
         {
@@ -74,11 +91,23 @@
                 .OrderByDescending(m => m.IsColorMain)
                 .ThenBy(m => m.DisplayOrder)
                 .FirstOrDefault();
-            var ownUrl = ownMedia?.MediaUrl ?? (ImagePlaceholder.IsRealImageUrl(pc.SwatchImageUrl) ? pc.SwatchImageUrl : null);
+            var ownUrl = ownMedia?.MediaUrl
+                ?? (ImagePlaceholder.IsRealImageUrl(pc.SwatchImageUrl) ? pc.SwatchImageUrl : null)
+                ?? (variantImageByColorId.TryGetValue(pc.ColorId, out var thumbFallbackUrl) ? thumbFallbackUrl : null)
+                ?? (ImagePlaceholder.IsRealImageUrl(Model.ImageUrl) ? Model.ImageUrl : null);
             if (!string.IsNullOrEmpty(ownUrl) && !colorIdByUrl.ContainsKey(ownUrl))
             {
                 colorIdByUrl[ownUrl] = pc.Id;
             }
+
+            colorThumbItems.Add(new Dictionary<string, string?>
+            {
+                ["type"] = ownMedia?.MediaType ?? "Image",
+                ["url"] = ownUrl ?? ImagePlaceholder.DataUri,
+                ["thumb"] = ownMedia?.ThumbnailUrl ?? ownUrl ?? ImagePlaceholder.DataUri,
+                ["alt"] = pc.Color?.Name,
+                ["colorId"] = pc.Id.ToString()
+            });
         }
 
         Dictionary<string, string?> ToGalleryItem(ProductMedia m) => new()
@@ -89,15 +118,6 @@
             ["alt"] = isArabicUi ? (m.AltTextAr ?? m.AltTextEn) : (m.AltTextEn ?? m.AltTextAr),
             ["colorId"] = colorIdByUrl.TryGetValue(m.MediaUrl, out var mediaColorId) ? mediaColorId.ToString() : null
         };
-
-        // Fallback source for products whose ProductColors/ProductMedia gallery has no real
-        // photo at all for a color (e.g. the Condor catalog cleanup, which sourced real images
-        // into the legacy ProductVariants.ImageUrl per color but never backfilled the newer
-        // ProductMedia rows — those are still seeded with the pending-placeholder string).
-        var variantImageByColorId = Model.Variants
-            .Where(v => v.ColorId.HasValue && ImagePlaceholder.IsRealImageUrl(v.ImageUrl))
-            .GroupBy(v => v.ColorId!.Value)
-            .ToDictionary(g => g.Key, g => g.First().ImageUrl);
 
         foreach (var pc in Model.ProductColors)
         {
@@ -144,6 +164,7 @@
     }
 
     var galleryDataJson = JsonSerializer.Serialize(galleryByColorId);
+    var colorThumbItemsJson = JsonSerializer.Serialize(colorThumbItems);
 
     // --- Per-color size list (only meaningful when hasProductColors) — sizes must be scoped
     // to the selected color's own variants, not the product's whole variant set, or colors that
@@ -268,8 +289,10 @@
             {
                 var galleryPanelViewData = new ViewDataDictionary(ViewData);
                 galleryPanelViewData["GalleryByColorId"] = galleryByColorId;
+                galleryPanelViewData["ColorThumbItems"] = colorThumbItems;
                 <partial name="_PdpColorGallery" model="Model" view-data="galleryPanelViewData" />
                 <script type="application/json" id="colorGalleryData">@Html.Raw(galleryDataJson)</script>
+                <script type="application/json" id="colorThumbData">@Html.Raw(colorThumbItemsJson)</script>
             }
             else if (hasProductColors)
             {

@@ -6,16 +6,19 @@
     // (see Details.cshtml, the hasProductColors swatch block), not here. Scoped to multi-color
     // products only (Details.cshtml only renders this partial when Model.ProductColors.Count > 1);
     // single-color products use the near-identical inline markup directly in Details.cshtml.
-    var galleryByColorId = (Dictionary<int, List<Dictionary<string, string?>>>)ViewData["GalleryByColorId"]!;
+    //
+    // The thumb strip is a fixed, one-photo-per-color list (colorThumbItems) — it never changes
+    // when the customer picks a different color, only which item is marked active. No per-color
+    // angle browsing here; clicking a thumb selects that color, same as the swatches.
+    var colorThumbItems = (List<Dictionary<string, string?>>)ViewData["ColorThumbItems"]!;
     var defaultProductColor = Model.ProductColors.FirstOrDefault(pc => pc.DefaultColor) ?? Model.ProductColors.First();
 
-    var initialGallery = galleryByColorId.GetValueOrDefault(defaultProductColor.Id, new());
-    if (initialGallery.Count == 0)
+    var initialGallery = colorThumbItems.Count > 0 ? colorThumbItems : new List<Dictionary<string, string?>>
     {
-        initialGallery.Add(new Dictionary<string, string?> { ["type"] = "Image", ["url"] = ImagePlaceholder.DataUri, ["thumb"] = ImagePlaceholder.DataUri, ["alt"] = null });
-    }
+        new() { ["type"] = "Image", ["url"] = ImagePlaceholder.DataUri, ["thumb"] = ImagePlaceholder.DataUri, ["alt"] = null }
+    };
 
-    var initialActiveIndex = initialGallery.FindIndex(item => item.GetValueOrDefault("active") == "1");
+    var initialActiveIndex = initialGallery.FindIndex(item => item.GetValueOrDefault("colorId") == defaultProductColor.Id.ToString());
     if (initialActiveIndex < 0) { initialActiveIndex = 0; }
     var firstItem = initialGallery[initialActiveIndex];
     var firstIsVideo = firstItem["type"] == "Video";

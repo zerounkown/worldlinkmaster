@@ -40,6 +40,20 @@
         }
     }
 
+    // Fixed, one-photo-per-color thumb list for multi-color products (Details.cshtml only
+    // renders this when ProductColors.Count > 1) — always the same items regardless of which
+    // color is selected; only which one is "active" changes. Takes priority over
+    // galleryByColorId's per-color angle-swapping below when present.
+    var colorThumbDataEl = document.getElementById("colorThumbData");
+    var colorThumbItems = null;
+    if (colorThumbDataEl) {
+        try {
+            colorThumbItems = JSON.parse(colorThumbDataEl.textContent);
+        } catch (e) {
+            colorThumbItems = null;
+        }
+    }
+
     // Per-color size lists — sizes must be scoped to the selected color's own variants, since
     // colors that share size labels (S/M/L, 30/32/34, ...) would otherwise show every size from
     // every color mixed together. { "<productColorId>": ["30", "32", ...], ... }
@@ -322,12 +336,20 @@
         });
     }
 
-    // Rebuilds the thumbnail strip for a list of gallery items and shows the one flagged
-    // "active" (that color's own photo), falling back to the first item when none is flagged.
-    function renderGallery(items) {
+    // Rebuilds the thumbnail strip for a list of gallery items. If activeColorId is given
+    // (the fixed one-photo-per-color list), the active item is whichever one matches that
+    // color; otherwise falls back to the item flagged "active" (per-color angle lists), then
+    // the first item.
+    function renderGallery(items, activeColorId) {
         if (!thumbsContainer || !items || items.length === 0) return;
 
-        var activeIndex = items.findIndex(function (item) { return item.active === "1"; });
+        var activeIndex = -1;
+        if (activeColorId != null) {
+            activeIndex = items.findIndex(function (item) { return item.colorId === String(activeColorId); });
+        }
+        if (activeIndex < 0) {
+            activeIndex = items.findIndex(function (item) { return item.active === "1"; });
+        }
         if (activeIndex < 0) activeIndex = 0;
 
         thumbsContainer.innerHTML = "";
@@ -610,6 +632,11 @@
                 } else {
                     lifestylePhoto.style.display = "none";
                 }
+            }
+
+            if (colorThumbItems && colorThumbItems.length > 0) {
+                renderGallery(colorThumbItems, colorId);
+                return;
             }
 
             var items = galleryByColorId && colorId ? galleryByColorId[colorId] : null;
