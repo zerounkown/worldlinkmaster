@@ -695,13 +695,37 @@ public class ProductImportController : AdminBaseController
         // Condor's "101228-002" or Propper's "F5259-BLK") whenever the primary Sku/Code lookup
         // above doesn't find a match, so re-uploading with corrected data never breaks existing
         // Sku/Code-keyed rows.
-        var productsByVendorSku = await _context.Products
+        //
+        // VendorSku is NOT unique — a still-unmerged duplicate-product pair (a base color and a
+        // "...coyote" stub, same pattern as the rest of this session's cleanup) can legitimately
+        // share the same real vendor code until someone merges them. Grouping first, rather than
+        // ToDictionaryAsync directly, means an ambiguous vendor code fails that row with a
+        // specific "matches N products, needs dedup first" error instead of crashing the whole
+        // import or silently guessing which of the duplicates should get the photo.
+        var productsWithVendorSku = await _context.Products
             .Where(p => p.VendorSku != null && p.VendorSku != "")
-            .ToDictionaryAsync(p => p.VendorSku!, StringComparer.OrdinalIgnoreCase);
-        var productColorsByVendorCode = await _context.ProductColors
+            .ToListAsync();
+        var productVendorSkuGroups = productsWithVendorSku.GroupBy(p => p.VendorSku!, StringComparer.OrdinalIgnoreCase).ToList();
+        var productsByVendorSku = productVendorSkuGroups
+            .Where(g => g.Count() == 1)
+            .ToDictionary(g => g.Key, g => g.Single(), StringComparer.OrdinalIgnoreCase);
+        var ambiguousVendorSkus = productVendorSkuGroups
+            .Where(g => g.Count() > 1)
+            .ToDictionary(g => g.Key, g => string.Join(", ", g.Select(p => p.Sku)), StringComparer.OrdinalIgnoreCase);
+
+        var productColorsWithVendorCode = await _context.ProductColors
             .Include(pc => pc.Product)
             .Where(pc => pc.VendorColorCode != null && pc.VendorColorCode != "" && pc.Product!.VendorSku != null && pc.Product.VendorSku != "")
-            .ToDictionaryAsync(pc => $"{pc.Product!.VendorSku}-{pc.VendorColorCode}", StringComparer.OrdinalIgnoreCase);
+            .ToListAsync();
+        var productColorVendorGroups = productColorsWithVendorCode
+            .GroupBy(pc => $"{pc.Product!.VendorSku}-{pc.VendorColorCode}", StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        var productColorsByVendorCode = productColorVendorGroups
+            .Where(g => g.Count() == 1)
+            .ToDictionary(g => g.Key, g => g.Single(), StringComparer.OrdinalIgnoreCase);
+        var ambiguousVendorColorCodes = productColorVendorGroups
+            .Where(g => g.Count() > 1)
+            .ToDictionary(g => g.Key, g => string.Join(", ", g.Select(pc => pc.Product!.Sku)), StringComparer.OrdinalIgnoreCase);
 
         // Rows have no stable natural key to match against for an update, so each product
         // appearing in this sheet gets its media fully replaced by what's in the file.
@@ -729,7 +753,14 @@ public class ProductImportController : AdminBaseController
             }
             if (!productsBySku.TryGetValue(productCode, out var product) && !productsByVendorSku.TryGetValue(productCode, out product))
             {
-                result.Errors.Add($"Media row {rowNum}: Product Code '{productCode}' doesn't match any product (checked internal SKU and Vendor SKU).");
+                if (ambiguousVendorSkus.TryGetValue(productCode, out var ambiguousSkus))
+                {
+                    result.Errors.Add($"Media row {rowNum}: Vendor SKU '{productCode}' matches multiple products ({ambiguousSkus}) — these need to be merged/deduplicated before this row can be imported.");
+                }
+                else
+                {
+                    result.Errors.Add($"Media row {rowNum}: Product Code '{productCode}' doesn't match any product (checked internal SKU and Vendor SKU).");
+                }
                 continue;
             }
 
@@ -754,8 +785,15 @@ public class ProductImportController : AdminBaseController
                 var matchedByVendorCode = !matchedByOurCode && productColorsByVendorCode.TryGetValue(productColorCode, out productColor) && productColor!.ProductId == product.Id;
                 if (!matchedByOurCode && !matchedByVendorCode)
                 {
-                    var suggestion = FindClosestMatch(productColorCode, productColorsByCode.Keys);
-                    result.Errors.Add(WithSuggestion($"Media row {rowNum} (Product {productCode}): Product Color Code '{productColorCode}' doesn't match a color of this product (checked internal code and Vendor SKU-Vendor Color Code).", suggestion));
+                    if (ambiguousVendorColorCodes.TryGetValue(productColorCode, out var ambiguousSkus))
+                    {
+                        result.Errors.Add($"Media row {rowNum} (Product {productCode}): Vendor color code '{productColorCode}' matches multiple products ({ambiguousSkus}) — these need to be merged/deduplicated before this row can be imported.");
+                    }
+                    else
+                    {
+                        var suggestion = FindClosestMatch(productColorCode, productColorsByCode.Keys);
+                        result.Errors.Add(WithSuggestion($"Media row {rowNum} (Product {productCode}): Product Color Code '{productColorCode}' doesn't match a color of this product (checked internal code and Vendor SKU-Vendor Color Code).", suggestion));
+                    }
                     continue;
                 }
                 productColorId = productColor!.Id;
