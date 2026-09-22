@@ -53,6 +53,7 @@
     Dictionary<int, List<Dictionary<string, string?>>> galleryByColorId = new();
     List<Dictionary<string, string?>> initialGallery = new();
     List<Dictionary<string, string?>> colorThumbItems = new();
+    List<Dictionary<string, string?>> sharedGalleryItems = new();
 
     if (hasProductColors)
     {
@@ -118,6 +119,12 @@
             ["alt"] = isArabicUi ? (m.AltTextAr ?? m.AltTextEn) : (m.AltTextEn ?? m.AltTextAr),
             ["colorId"] = colorIdByUrl.TryGetValue(m.MediaUrl, out var mediaColorId) ? mediaColorId.ToString() : null
         };
+
+        // Fixed additional-images strip (pocket/back/side/detail shots common to every color) —
+        // shown below the color thumbnails in the multi-color gallery panel, never rebuilt on
+        // color change. Reuses the same Shared-scope media the per-color angle lists already
+        // fold in (see "combined" below) — this is a second, separate view onto the same rows.
+        sharedGalleryItems = sharedItems.Select(ToGalleryItem).ToList();
 
         foreach (var pc in Model.ProductColors)
         {
@@ -290,6 +297,7 @@
                 var galleryPanelViewData = new ViewDataDictionary(ViewData);
                 galleryPanelViewData["GalleryByColorId"] = galleryByColorId;
                 galleryPanelViewData["ColorThumbItems"] = colorThumbItems;
+                galleryPanelViewData["SharedGalleryItems"] = sharedGalleryItems;
                 <partial name="_PdpColorGallery" model="Model" view-data="galleryPanelViewData" />
                 <script type="application/json" id="colorGalleryData">@Html.Raw(galleryDataJson)</script>
                 <script type="application/json" id="colorThumbData">@Html.Raw(colorThumbItemsJson)</script>
