@@ -420,18 +420,22 @@
         // site is RTL (Arabic), and browsers don't agree on whether a scrolled-left RTL
         // container reports a negative, zero-based-reversed, or positive scrollLeft. Comparing
         // actual on-screen rectangles instead sidesteps that entirely, and works the same in
-        // LTR too. "Past boundary" = any part of firstSharedThumb currently intersects the
-        // container's own visible rect — simple overlap test, not a specific target position,
-        // since a short scroll range (e.g. only one shared photo) may never bring the target to
-        // a fixed point like the very top or exact middle.
+        // LTR too. "Past boundary" = at least HALF of firstSharedThumb is currently visible
+        // within the container's viewport — not just any overlap at all, since the strip
+        // deliberately shows a small peek of it even at the very top (so the customer can tell
+        // there's more below), and a bare overlap test would misread that peek as "already
+        // scrolled" the moment any real scroll event recomputes it (e.g. after scrolling back up).
         function isPastBoundary() {
             var axis = scrollAxis();
             if (!axis) return false;
             var containerRect = thumbsContainer.getBoundingClientRect();
             var targetRect = firstSharedThumb.getBoundingClientRect();
-            return axis === "horizontal"
-                ? targetRect.right > containerRect.left && targetRect.left < containerRect.right
-                : targetRect.bottom > containerRect.top && targetRect.top < containerRect.bottom;
+            if (axis === "horizontal") {
+                var visibleWidth = Math.min(targetRect.right, containerRect.right) - Math.max(targetRect.left, containerRect.left);
+                return visibleWidth > targetRect.width * 0.5;
+            }
+            var visibleHeight = Math.min(targetRect.bottom, containerRect.bottom) - Math.max(targetRect.top, containerRect.top);
+            return visibleHeight > targetRect.height * 0.5;
         }
 
         function setToggleState(scrolled) {
@@ -477,7 +481,7 @@
             scrollSettleTimer = window.setTimeout(function () { setToggleState(isPastBoundary()); }, 150);
         });
 
-        setToggleState(false);
+        setToggleState(isPastBoundary());
     }
 
     // Hover-to-zoom: scale the image and track cursor position as the transform origin.
