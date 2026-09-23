@@ -5071,13 +5071,17 @@ a:hover {
 
 /* Wraps the scrollable thumbnail strip with prev/next arrow buttons — the wrap, not
    .product-thumbs itself, now carries the flex sizing inherited from the old rule below, so
-   .product-thumbs can shrink inside it and still scroll. */
+   .product-thumbs can shrink inside it and still scroll. max-height is capped to fit exactly
+   this product's own color count plus a ~30px peek of whatever comes next (set inline as
+   --thumb-count by _PdpColorGallery.cshtml, since a 2-color and a 7-color product need
+   different cutoffs to get the same "peek" effect) — 520px is the fallback for the plain
+   single-strip path elsewhere that never sets the variable. */
 .product-thumbs-wrap {
   display: flex;
   flex-direction: column;
   flex: 0 0 70px;
   gap: 6px;
-  max-height: 520px;
+  max-height: min(calc(var(--thumb-count, 6) * 80px + 30px), 620px);
 }
 
 .product-thumbs {
@@ -5085,7 +5089,7 @@ a:hover {
   flex-direction: column;
   flex: 1 1 auto;
   min-height: 0;
-  gap: 10px;
+  gap: 8px;
   overflow-y: auto;
   scrollbar-width: none;
 }
@@ -5123,38 +5127,52 @@ a:hover {
 }
 
 /* Single-strip variant (_PdpColorGallery.cshtml, multi-color products): color thumbs followed
-   by the shared/detail photos, all in one scrollable .product-thumbs — #thumbsStripToggle below
-   scrolls between "top" (colors) and the first shared photo rather than hiding/showing anything
-   (see product-gallery.js). .product-thumbs shrinks to make room for the toggle within the
-   wrap's existing max-height budget. */
-.product-thumbs-wrap:has(.product-thumbs-toggle) .product-thumbs {
+   by the shared/detail photos, all in one scrollable .product-thumbs — the two small buttons
+   below scroll between "top" (colors) and the first shared photo rather than hiding/showing
+   anything (see product-gallery.js). .product-thumbs shrinks to make room for the toggle row
+   within the wrap's existing max-height budget. */
+.product-thumbs-wrap:has(.product-thumbs-toggle-row) .product-thumbs {
   flex: 1 1 auto;
   min-height: 0;
 }
 
-/* Always-visible toggle (not the JS-computed-overflow .product-thumbs-arrow.visible pattern —
-   this one has no "does it fit" question, it's a fixed scroll-to-boundary control). Only
-   rendered when a product actually has shared media. */
-.product-thumbs-toggle {
+/* Two small square buttons side by side, aligned under the thumbnail column — not a
+   full-width bar. Only one is ever the "live" direction at a time; the other is disabled and
+   faded rather than removed, so the pair always occupies the same fixed space. */
+.product-thumbs-toggle-row {
+  display: flex;
+  flex: 0 0 auto;
+  justify-content: center;
+  gap: 6px;
+}
+
+.product-thumbs-toggle-btn {
   display: flex;
   flex: 0 0 auto;
   align-items: center;
   justify-content: center;
-  width: 100%;
-  height: 24px;
-  border: 1px solid var(--wlm-sand-light);
-  border-radius: 6px;
+  width: 26px;
+  height: 26px;
+  border: 1px solid var(--wlm-ink);
+  border-radius: 4px;
   background: white;
   color: var(--wlm-ink);
   cursor: pointer;
-  font-size: 0.9rem;
+  font-size: 0.8rem;
   transition: background 0.15s ease, color 0.15s ease;
 }
 
-.product-thumbs-toggle:hover {
+.product-thumbs-toggle-btn:hover:not(:disabled) {
   background: var(--wlm-forest);
   color: white;
   border-color: var(--wlm-forest);
+}
+
+.product-thumbs-toggle-btn:disabled {
+  border-color: transparent;
+  background: transparent;
+  color: var(--wlm-sand-light);
+  cursor: default;
 }
 
 @media (max-width: 991.98px) {
@@ -5162,21 +5180,16 @@ a:hover {
     flex-direction: column-reverse;
   }
 
-  /* The wrap itself stays a column below lg (not row) so the toggle button — when present —
-     lands below the strip as a full-width bar, same as desktop; only .product-thumbs itself
-     (below) switches to a horizontal-scrolling row for the thumbnails. Wrapping thumbnails to
-     multiple rows instead leaves a lopsided trailing row (e.g. 4 thumbs then 1 alone) whenever
-     the count isn't a clean multiple of however many fit per row; a single scrollable row
-     sidesteps that regardless of count. */
+  /* The wrap itself stays a column below lg (not row) so the toggle row — when present —
+     lands below the strip, same small-square-button style as desktop, centered under the row of
+     thumbnails; only .product-thumbs itself (below) switches to a horizontal-scrolling row for
+     the thumbnails. Wrapping thumbnails to multiple rows instead leaves a lopsided trailing row
+     (e.g. 4 thumbs then 1 alone) whenever the count isn't a clean multiple of however many fit
+     per row; a single scrollable row sidesteps that regardless of count. */
   .product-thumbs-wrap {
     flex: 0 0 auto;
     max-height: none;
     width: 100%;
-  }
-
-  .product-thumbs-toggle {
-    width: 100%;
-    height: 32px;
   }
 
   .product-thumbs {
@@ -5215,6 +5228,24 @@ a:hover {
 .product-thumb.active {
   border-color: var(--wlm-forest);
   opacity: 1;
+}
+
+/* Color + shared-strip variant only (_PdpColorGallery.cshtml) — a thin 1px dark selected
+   border rather than the thicker colored ring used elsewhere on the site, and full-body color
+   photos shown uncropped (object-fit: contain, on a white ground) since they're already
+   full-frame studio shots; close-up detail photos still fill the box (object-fit: cover,
+   inherited from the base rule above) since they have no meaningful "whole subject" to contain. */
+.pdp-gallery-panel .product-thumb {
+  border-width: 1px;
+}
+
+.pdp-gallery-panel .product-thumb.active {
+  border-color: var(--wlm-ink);
+}
+
+.pdp-gallery-panel .product-thumb[data-color-id] {
+  object-fit: contain;
+  background: white;
 }
 
 .product-zoom-video {

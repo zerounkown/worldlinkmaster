@@ -29,7 +29,14 @@
 }
 <div class="pdp-gallery-panel">
     <div class="product-gallery-layout">
-        <div class="product-thumbs-wrap" id="productThumbsWrap">
+        @{
+            // Caps the visible window to "all of this product's own colors, plus a deliberate
+            // partial peek of the next photo" rather than an arbitrary fixed height — a 2-color
+            // product and a 7-color product both need a different cutoff to achieve the same
+            // "peek" effect. See --thumb-count in site.css.
+            var thumbsWrapStyle = sharedGalleryItems.Count > 0 ? $"--thumb-count: {colorThumbItems.Count};" : null;
+        }
+        <div class="product-thumbs-wrap" id="productThumbsWrap" style="@thumbsWrapStyle">
             <div class="product-thumbs" id="productThumbs">
                 @for (int i = 0; i < initialGallery.Count; i++)
                 {
@@ -64,9 +71,14 @@
             </div>
             @if (sharedGalleryItems.Count > 0)
             {
-                <button type="button" class="product-thumbs-toggle" id="thumbsStripToggle" aria-label="@Localizer["Show more photos"]" data-state="top">
-                    <i class="bi bi-chevron-down"></i>
-                </button>
+                <div class="product-thumbs-toggle-row">
+                    <button type="button" class="product-thumbs-toggle-btn" id="thumbsToggleDown" aria-label="@Localizer["Show more photos"]">
+                        <i class="bi bi-chevron-down"></i>
+                    </button>
+                    <button type="button" class="product-thumbs-toggle-btn" id="thumbsToggleUp" aria-label="@Localizer["Back to colors"]" disabled>
+                        <i class="bi bi-chevron-up"></i>
+                    </button>
+                </div>
             }
         </div>
         <div class="product-zoom-container" id="zoomContainer">
