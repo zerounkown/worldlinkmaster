@@ -28,9 +28,6 @@
     <div class="product-gallery-layout">
         <div class="product-gallery-thumbs-column">
             <div class="product-thumbs-wrap" id="productThumbsWrap">
-                <button type="button" class="product-thumbs-arrow product-thumbs-arrow-prev" id="thumbsArrowPrev" aria-label="@Localizer["Scroll thumbnails up"]">
-                    <i class="bi bi-chevron-up"></i>
-                </button>
                 <div class="product-thumbs" id="productThumbs">
                     @for (int i = 0; i < initialGallery.Count; i++)
                     {
@@ -48,16 +45,10 @@
                         </span>
                     }
                 </div>
-                <button type="button" class="product-thumbs-arrow product-thumbs-arrow-next" id="thumbsArrowNext" aria-label="@Localizer["Scroll thumbnails down"]">
-                    <i class="bi bi-chevron-down"></i>
-                </button>
             </div>
             @if (sharedGalleryItems.Count > 0)
             {
-                <div class="product-thumbs-wrap product-thumbs-wrap-shared" id="productSharedThumbsWrap">
-                    <button type="button" class="product-thumbs-arrow product-thumbs-arrow-prev" id="sharedThumbsArrowPrev" aria-label="@Localizer["Scroll additional images up"]">
-                        <i class="bi bi-chevron-up"></i>
-                    </button>
+                <div class="product-thumbs-wrap product-thumbs-wrap-shared" id="productSharedThumbsWrap" style="display: none;">
                     <div class="product-thumbs" id="productSharedThumbs">
                         @for (int i = 0; i < sharedGalleryItems.Count; i++)
                         {
@@ -75,10 +66,10 @@
                             </span>
                         }
                     </div>
-                    <button type="button" class="product-thumbs-arrow product-thumbs-arrow-next" id="sharedThumbsArrowNext" aria-label="@Localizer["Scroll additional images down"]">
-                        <i class="bi bi-chevron-down"></i>
-                    </button>
                 </div>
+                <button type="button" class="product-thumbs-toggle" id="thumbsStripToggle" aria-label="@Localizer["Show additional images"]" data-showing="colors">
+                    <i class="bi bi-chevron-down"></i>
+                </button>
             }
         </div>
         <div class="product-zoom-container" id="zoomContainer">
