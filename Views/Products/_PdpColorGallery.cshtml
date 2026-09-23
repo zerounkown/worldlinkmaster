@@ -15,7 +15,14 @@
     // anything — see #thumbsStripToggle in product-gallery.js.
     var colorThumbItems = (List<Dictionary<string, string?>>)ViewData["ColorThumbItems"]!;
     var sharedGalleryItems = (List<Dictionary<string, string?>>)ViewData["SharedGalleryItems"]!;
-    var defaultProductColor = Model.ProductColors.FirstOrDefault(pc => pc.DefaultColor) ?? Model.ProductColors.First();
+    // Mirrors Details.cshtml's own ?color=Name handling — this partial recomputes
+    // defaultProductColor independently rather than receiving it, so it needs the same logic.
+    var requestedColorName = Context.Request.Query["color"].ToString();
+    var defaultProductColor = (!string.IsNullOrEmpty(requestedColorName)
+            ? Model.ProductColors.FirstOrDefault(pc => string.Equals(pc.Color?.Name, requestedColorName, StringComparison.OrdinalIgnoreCase))
+            : null)
+        ?? Model.ProductColors.FirstOrDefault(pc => pc.DefaultColor)
+        ?? Model.ProductColors.First();
 
     var initialGallery = colorThumbItems.Count > 0 ? colorThumbItems : new List<Dictionary<string, string?>>
     {

@@ -2360,20 +2360,6 @@ a:hover {
   flex: 1 1 auto;
 }
 
-.featured-product-swatches {
-  display: flex;
-  gap: 6px;
-  margin-bottom: 8px;
-}
-
-.featured-product-swatch {
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  background: var(--swatch-color, #ccc);
-  box-shadow: 0 0 0 1px var(--wlm-sand-light);
-}
-
 .featured-product-card-body h3 {
   font-size: 0.9rem;
   font-weight: 600;
@@ -3056,11 +3042,28 @@ a:hover {
   background: white;
 }
 
+/* Explicit column counts per tier (4 desktop / 3 tablet / 2 mobile) rather than auto-fill —
+   auto-fill's column count depends on viewport width in a way that isn't pinned to a specific
+   number (it gave 5 at 1920px, would give something else at 1366/1440px), and the page size
+   (PageSize = 20 in ProductsController, 5 rows × 4 columns) is chosen to match exactly 4. */
 .product-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  grid-template-columns: repeat(4, 1fr);
   gap: 24px;
   margin-bottom: 40px;
+}
+
+@media (max-width: 991.98px) {
+  .product-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (max-width: 575.98px) {
+  .product-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+  }
 }
 
 .product-card {
@@ -3111,6 +3114,55 @@ a:hover {
 
 .product-card-body h3 a {
   color: var(--wlm-ink);
+}
+
+/* Color swatches (category/search/homepage grids, related products, favorites — anywhere
+   .product-card or .featured-product-card renders). Always present in the DOM, even with no
+   colors inside it, and given a fixed min-height — .product-card-price-row below already pins
+   itself to the bottom via margin-top: auto regardless of what's above it, but a fixed-height
+   swatch row keeps the title-to-price gap visually consistent across every card in a row, not
+   just "aligned at the bottom" of a possibly-taller stretched card. See product-card-swatches.js
+   for the hover/tap-to-preview and click-through-with-color-preselected behavior. */
+.product-card-swatches {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-height: 26px;
+  margin-bottom: 4px;
+}
+
+.product-card-swatch {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  border: none;
+  background-color: var(--swatch-color, #ccc);
+  /* Plain, barely-there ring by default — a real border here would fight with the .active
+     ring's own box-shadow on the swatch that's both at once. */
+  box-shadow: 0 0 0 1px var(--wlm-sand-light);
+  padding: 0;
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+/* The default color on page load, and whichever swatch is currently hovered/tapped — see
+   product-card-swatches.js. Two-layer ring (white gap + dark ring) rather than a thicker
+   border, so it never changes the swatch's own box size/spacing. */
+.product-card-swatch.active {
+  box-shadow: 0 0 0 2px white, 0 0 0 3px var(--wlm-ink);
+}
+
+.product-card-swatch:hover,
+.product-card-swatch:focus-visible {
+  transform: scale(1.15);
+}
+
+.product-card-swatch-more {
+  font-size: 0.72rem;
+  color: var(--wlm-ink);
+  opacity: 0.7;
 }
 
 .product-card-price-row {
