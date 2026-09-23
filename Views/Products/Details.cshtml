@@ -57,7 +57,16 @@
 
     if (hasProductColors)
     {
-        defaultProductColor = Model.ProductColors.FirstOrDefault(pc => pc.DefaultColor) ?? Model.ProductColors.First();
+        // Lets product-card swatches (category/search/homepage grids) deep-link straight to a
+        // specific color via ?color=Name — e.g. hovered/tapped a swatch, then clicked through.
+        // Falls back to the normal DefaultColor/first-color logic when absent or the name
+        // doesn't match any of this product's colors.
+        var requestedColorName = Context.Request.Query["color"].ToString();
+        defaultProductColor = (!string.IsNullOrEmpty(requestedColorName)
+                ? Model.ProductColors.FirstOrDefault(pc => string.Equals(pc.Color?.Name, requestedColorName, StringComparison.OrdinalIgnoreCase))
+                : null)
+            ?? Model.ProductColors.FirstOrDefault(pc => pc.DefaultColor)
+            ?? Model.ProductColors.First();
 
         var sharedItems = Model.Media
             .Where(m => m.ProductColorId == null && m.MediaScope == "Shared" && m.ShowInGallery && ImagePlaceholder.IsRealImageUrl(m.MediaUrl))

@@ -12,7 +12,7 @@ namespace WorldLinkMaster.Web.Controllers;
 
 public class ProductsController : Controller
 {
-    private const int PageSize = 9;
+    private const int PageSize = 20;
     private readonly ApplicationDbContext _context;
     private readonly IDbContextFactory<ApplicationDbContext> _contextFactory;
     private readonly IPromoService _promoService;

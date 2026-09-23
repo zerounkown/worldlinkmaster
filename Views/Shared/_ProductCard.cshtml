@@ -12,19 +12,33 @@
     var cardImageUrl = string.IsNullOrEmpty(Model.ImageUrl) ? ImagePlaceholder.DataUri : Model.ImageUrl;
     var hoverImageUrl = Model.GetHoverImageUrl(cardImageUrl);
 
+    // Hoisted out of the quick-add-only block below (still reused there) so swatches can gate on
+    // "2+ colors" independently of hasVariants — a product can have variants (sizes) without
+    // having 2+ colors. Same zero-extra-query data every card already carries via the
+    // Variants→Color/ProductColor includes the controller already runs for the quick-add modal.
+    var defaultCardColorId = Model.ProductColors.FirstOrDefault(pc => pc.DefaultColor)?.ColorId
+        ?? Model.ProductColors.FirstOrDefault()?.ColorId;
+    var cardColors = Model.Variants
+        .Where(v => v.Color != null)
+        .GroupBy(v => v.ColorId)
+        .Select(g => new
+        {
+            name = g.First().Color!.Name,
+            hex = g.First().Color!.HexCode,
+            image = ImagePlaceholder.IsRealImageUrl(g.First().ProductColor?.SwatchImageUrl) ? g.First().ProductColor!.SwatchImageUrl : null,
+            isDefault = g.Key == defaultCardColorId
+        })
+        // Default color first so it's never cut off by Take(6) on a product with 7+ colors —
+        // its ring needs to actually be visible on load, not just theoretically present in data.
+        .OrderByDescending(c => c.isDefault)
+        .ToList();
+    var visibleSwatchColors = cardColors.Take(6).ToList();
+    var extraSwatchCount = cardColors.Count - visibleSwatchColors.Count;
+
     string quickAddJson = "null";
     if (hasVariants)
     {
-        var colors = Model.Variants
-            .Where(v => v.Color != null)
-            .GroupBy(v => v.ColorId)
-            .Select(g => new
-            {
-                name = g.First().Color!.Name,
-                hex = g.First().Color!.HexCode,
-                image = g.First().ProductColor?.SwatchImageUrl
-            })
-            .ToList();
+        var colors = cardColors;
 
         var sizes = Model.Variants
             .Where(v => v.Size != null)
@@ -95,7 +109,7 @@
                 <i class="bi bi-heart"></i>
             </a>
         }
-        <a class="product-card-tilt @(hoverImageUrl != null ? "has-hover-image" : "")" asp-area="" asp-controller="Products" asp-action="Details" asp-route-slug="@Model.Slug">
+        <a class="product-card-tilt product-card-link @(hoverImageUrl != null ? "has-hover-image" : "")" asp-area="" asp-controller="Products" asp-action="Details" asp-route-slug="@Model.Slug">
             <img src="@cardImageUrl" alt="@Model.LocalizedName()" class="card-product-image" data-default-image="@cardImageUrl" />
             @if (hoverImageUrl != null)
             {
@@ -104,7 +118,7 @@
         </a>
     </div>
     <div class="product-card-body">
-        <h3><a asp-area="" asp-controller="Products" asp-action="Details" asp-route-slug="@Model.Slug">@Model.LocalizedName()</a></h3>
+        <h3><a class="product-card-link" asp-area="" asp-controller="Products" asp-action="Details" asp-route-slug="@Model.Slug">@Model.LocalizedName()</a></h3>
 
         <div class="product-card-price-row">
             @if (salePrice.HasValue)
@@ -115,6 +129,24 @@
             else
             {
                 <span class="price">@Model.Price.ToDisplayCurrency()</span>
+            }
+        </div>
+
+        @* Always rendered (even empty) so card heights stay aligned in the grid regardless of
+           whether this product has 2+ colors — see .product-card-swatches min-height in site.css. *@
+        <div class="product-card-swatches">
+            @if (visibleSwatchColors.Count > 1)
+            {
+                @foreach (var color in visibleSwatchColors)
+                {
+                    <button type="button" class="product-card-swatch @(color.isDefault ? "active" : "")" style="--swatch-color: @color.hex"
+                            data-color="@color.name" data-image="@color.image" data-default="@(color.isDefault ? "1" : null)"
+                            aria-label="@color.name" title="@color.name"></button>
+                }
+                @if (extraSwatchCount > 0)
+                {
+                    <span class="product-card-swatch-more">+@extraSwatchCount</span>
+                }
             }
         </div>
 
