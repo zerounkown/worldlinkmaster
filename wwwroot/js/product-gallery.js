@@ -21,10 +21,12 @@
     // Fixed additional-images photos (pocket/back/side/detail shots common to every color, see
     // _PdpColorGallery.cshtml) live in the SAME #productThumbs strip as the color thumbs,
     // appended after them and marked [data-shared] — never rebuilt on color change (renderGallery
-    // below only replaces the color portion). thumbsStripToggle scrolls between the top of the
-    // strip and firstSharedThumb rather than hiding/showing anything; only present on multi-color
-    // products that actually have Shared-scope media.
-    var thumbsStripToggle = document.getElementById("thumbsStripToggle");
+    // below only replaces the color portion). The down/up button pair scrolls between the top of
+    // the strip and firstSharedThumb rather than hiding/showing anything; only present on
+    // multi-color products that actually have Shared-scope media. Only one of the two is ever
+    // enabled at a time (the other sits there disabled/faded, not removed).
+    var thumbsToggleDown = document.getElementById("thumbsToggleDown");
+    var thumbsToggleUp = document.getElementById("thumbsToggleUp");
     var firstSharedThumb = document.getElementById("firstSharedThumb");
     var splitSizeConfigEl = document.getElementById("splitSizeConfig");
     var sizeUnitContainer = document.getElementById("sizeUnitOptionsContainer");
@@ -401,11 +403,13 @@
         thumbsContainer.scrollLeft = 0;
     }
 
-    // Single toggle: scrolls the strip between its top (color thumbs) and firstSharedThumb (the
-    // start of the shared/detail photos) — never hides or shows anything, all thumbnails stay in
-    // the same strip throughout. Works on both axes: vertical on desktop (a side column),
-    // horizontal on mobile (a row below the main image, per the CSS breakpoint).
-    if (thumbsStripToggle && thumbsContainer && firstSharedThumb) {
+    // Down/up button pair: scrolls the strip between its top (color thumbs) and firstSharedThumb
+    // (the start of the shared/detail photos) — never hides or shows anything, all thumbnails
+    // stay in the same strip throughout. Only the currently-valid direction is enabled; the other
+    // is disabled (native <button disabled>, so it's inert without extra guard logic) and styled
+    // faded. Works on both axes: vertical on desktop (a side column), horizontal on mobile (a row
+    // below the main image, per the CSS breakpoint).
+    if (thumbsToggleDown && thumbsToggleUp && thumbsContainer && firstSharedThumb) {
         function scrollAxis() {
             if (thumbsContainer.scrollHeight - thumbsContainer.clientHeight > 2) return "vertical";
             if (thumbsContainer.scrollWidth - thumbsContainer.clientWidth > 2) return "horizontal";
@@ -431,36 +435,38 @@
         }
 
         function setToggleState(scrolled) {
-            thumbsStripToggle.setAttribute("data-state", scrolled ? "scrolled" : "top");
-            thumbsStripToggle.setAttribute("aria-label", scrolled ? "Back to colors" : "Show more photos");
-            thumbsStripToggle.innerHTML = '<i class="bi bi-chevron-' + (scrolled ? "up" : "down") + '"></i>';
+            thumbsToggleDown.disabled = scrolled;
+            thumbsToggleUp.disabled = !scrolled;
         }
 
-        thumbsStripToggle.addEventListener("click", function () {
-            if (isPastBoundary()) {
-                // (0, 0) is unambiguous in any RTL/LTR scrollLeft convention — always "the start".
-                thumbsContainer.scrollTo({ top: 0, left: 0, behavior: "smooth" });
-            } else {
-                // scrollBy with a rendered-position delta rather than scrollIntoView: scrollBy is
-                // always scoped to the element it's called on, so it can never escalate to
-                // scrolling the outer page/ancestors the way scrollIntoView does when the
-                // container's own scroll room falls short of a full "start" alignment (which it
-                // does here — firstSharedThumb's natural offset is usually well past what
-                // thumbsContainer alone can scroll to). The browser still clamps the delta to
-                // the container's actual max scroll on its own.
-                var axis = scrollAxis();
-                var containerRect = thumbsContainer.getBoundingClientRect();
-                var targetRect = firstSharedThumb.getBoundingClientRect();
-                if (axis === "horizontal") {
-                    thumbsContainer.scrollBy({ left: targetRect.left - containerRect.left, behavior: "smooth" });
-                } else {
-                    thumbsContainer.scrollBy({ top: targetRect.top - containerRect.top, behavior: "smooth" });
-                }
-            }
-        });
+        function scrollToTop() {
+            // (0, 0) is unambiguous in any RTL/LTR scrollLeft convention — always "the start".
+            thumbsContainer.scrollTo({ top: 0, left: 0, behavior: "smooth" });
+        }
 
-        // Keeps the arrow's direction/label honest if the customer scrolls the strip manually
-        // (mouse wheel / touch), not just when they click the toggle itself. Smooth scrolling
+        function scrollToShared() {
+            // scrollBy with a rendered-position delta rather than scrollIntoView: scrollBy is
+            // always scoped to the element it's called on, so it can never escalate to scrolling
+            // the outer page/ancestors the way scrollIntoView does when the container's own
+            // scroll room falls short of a full "start" alignment (which it does here —
+            // firstSharedThumb's natural offset is usually well past what thumbsContainer alone
+            // can scroll to). The browser still clamps the delta to the container's actual max
+            // scroll on its own.
+            var axis = scrollAxis();
+            var containerRect = thumbsContainer.getBoundingClientRect();
+            var targetRect = firstSharedThumb.getBoundingClientRect();
+            if (axis === "horizontal") {
+                thumbsContainer.scrollBy({ left: targetRect.left - containerRect.left, behavior: "smooth" });
+            } else {
+                thumbsContainer.scrollBy({ top: targetRect.top - containerRect.top, behavior: "smooth" });
+            }
+        }
+
+        thumbsToggleDown.addEventListener("click", scrollToShared);
+        thumbsToggleUp.addEventListener("click", scrollToTop);
+
+        // Keeps the pair's enabled/disabled state honest if the customer scrolls the strip
+        // manually (mouse wheel / touch), not just when they click a button. Smooth scrolling
         // fires many scroll events mid-animation, so this also settles the state once more
         // shortly after it stops, in case the last mid-flight event landed on the wrong side of
         // the boundary just before the animation finished.
