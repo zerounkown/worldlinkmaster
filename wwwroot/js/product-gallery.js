@@ -18,14 +18,14 @@
     var lifestyleImage = document.getElementById("pdpLifestyleImage");
     var skuValueEl = document.getElementById("pdpSkuValue");
     var variantSkuDataEl = document.getElementById("variantSkuData");
-    var thumbsArrowPrev = document.getElementById("thumbsArrowPrev");
-    var thumbsArrowNext = document.getElementById("thumbsArrowNext");
     // Fixed additional-images strip (pocket/back/side/detail shots common to every color, see
     // _PdpColorGallery.cshtml) — a second, independent thumb strip that's never rebuilt on color
-    // change, only present on multi-color products that actually have Shared-scope media.
+    // change, only present on multi-color products that actually have Shared-scope media. Only
+    // one of the two strips is visible at a time, swapped via thumbsStripToggle below.
     var sharedThumbsContainer = document.getElementById("productSharedThumbs");
-    var sharedThumbsArrowPrev = document.getElementById("sharedThumbsArrowPrev");
-    var sharedThumbsArrowNext = document.getElementById("sharedThumbsArrowNext");
+    var productThumbsWrap = document.getElementById("productThumbsWrap");
+    var productSharedThumbsWrap = document.getElementById("productSharedThumbsWrap");
+    var thumbsStripToggle = document.getElementById("thumbsStripToggle");
     var splitSizeConfigEl = document.getElementById("splitSizeConfig");
     var sizeUnitContainer = document.getElementById("sizeUnitOptionsContainer");
     var sizeLengthContainer = document.getElementById("sizeLengthOptionsContainer");
@@ -409,67 +409,33 @@
         updateThumbsArrows();
     }
 
-    // The strip scrolls vertically on desktop (a side column) and horizontally on mobile (a row
-    // below the main image, per the CSS breakpoint) — whichever axis actually overflows is the
-    // one the arrows control, so the same up/down buttons work in both layouts without needing
-    // separate left/right icons for mobile. Factored out so the same behavior can be wired up
-    // independently for the color-thumbs strip and the fixed additional-images strip below it —
-    // each scrolls on its own, with its own arrow pair.
-    function createThumbScroller(container, arrowPrev, arrowNext) {
-        if (!container) return { update: function () {} };
+    // Each strip still scrolls natively (mouse wheel / touch) when its own content overflows —
+    // no arrow buttons needed for that. renderGallery still calls this after a color-triggered
+    // rebuild; kept as a no-op stub so that call site doesn't need touching.
+    function updateThumbsArrows() {}
 
-        function scrollAxis() {
-            if (container.scrollHeight - container.clientHeight > 2) return "vertical";
-            if (container.scrollWidth - container.clientWidth > 2) return "horizontal";
-            return null;
-        }
-
-        function update() {
-            if (!arrowPrev || !arrowNext) return;
-            var axis = scrollAxis();
-            if (!axis) {
-                arrowPrev.classList.remove("visible");
-                arrowNext.classList.remove("visible");
-                return;
-            }
-            var atStart, atEnd;
-            if (axis === "vertical") {
-                atStart = container.scrollTop <= 2;
-                atEnd = container.scrollTop + container.clientHeight >= container.scrollHeight - 2;
+    // Single toggle between the color-thumbs strip and the fixed additional-images strip — only
+    // one is ever visible at a time. Doesn't touch the main image or color selection, just which
+    // strip is showing; whatever was last active in either strip stays active when you switch
+    // back to it (nothing gets reset).
+    if (thumbsStripToggle && productThumbsWrap && productSharedThumbsWrap) {
+        thumbsStripToggle.addEventListener("click", function () {
+            var showingShared = thumbsStripToggle.getAttribute("data-showing") === "shared";
+            if (showingShared) {
+                productSharedThumbsWrap.style.display = "none";
+                productThumbsWrap.style.display = "";
+                thumbsStripToggle.setAttribute("data-showing", "colors");
+                thumbsStripToggle.setAttribute("aria-label", "Show additional images");
+                thumbsStripToggle.innerHTML = '<i class="bi bi-chevron-down"></i>';
             } else {
-                atStart = container.scrollLeft <= 2;
-                atEnd = container.scrollLeft + container.clientWidth >= container.scrollWidth - 2;
+                productThumbsWrap.style.display = "none";
+                productSharedThumbsWrap.style.display = "";
+                thumbsStripToggle.setAttribute("data-showing", "shared");
+                thumbsStripToggle.setAttribute("aria-label", "Show colors");
+                thumbsStripToggle.innerHTML = '<i class="bi bi-chevron-up"></i>';
             }
-            arrowPrev.classList.toggle("visible", !atStart);
-            arrowNext.classList.toggle("visible", !atEnd);
-        }
-
-        function scroll(direction) {
-            var step = 2 * (70 + 10); // ~2 thumbnails + their gap
-            var axis = scrollAxis();
-            if (axis === "horizontal") {
-                container.scrollBy({ left: direction * step, behavior: "smooth" });
-            } else {
-                container.scrollBy({ top: direction * step, behavior: "smooth" });
-            }
-        }
-
-        if (arrowPrev) {
-            arrowPrev.addEventListener("click", function () { scroll(-1); });
-        }
-        if (arrowNext) {
-            arrowNext.addEventListener("click", function () { scroll(1); });
-        }
-        container.addEventListener("scroll", update);
-        window.addEventListener("resize", update);
-        update();
-
-        return { update: update };
+        });
     }
-
-    var thumbsScroller = createThumbScroller(thumbsContainer, thumbsArrowPrev, thumbsArrowNext);
-    createThumbScroller(sharedThumbsContainer, sharedThumbsArrowPrev, sharedThumbsArrowNext);
-    function updateThumbsArrows() { thumbsScroller.update(); }
 
     // Hover-to-zoom: scale the image and track cursor position as the transform origin.
     // The container itself also tilts in 3D toward the cursor, so the photo feels

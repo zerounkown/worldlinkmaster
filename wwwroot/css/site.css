@@ -5122,29 +5122,52 @@ a:hover {
   border-color: var(--wlm-forest);
 }
 
-/* Two-strip variant (_PdpColorGallery.cshtml, multi-color products): the fixed color thumbs
-   stacked above a second, independently-scrolling strip of shared/detail photos that never
-   changes when the color changes. .product-thumbs-wrap's own flex/width rules above assume
-   it's a direct row-context child of .product-gallery-layout; nested one level deeper here
-   (inside this column) those need re-pointing at the column's vertical axis instead, hence
-   the overrides below rather than relying on the base rule as-is. */
+/* Two-strip variant (_PdpColorGallery.cshtml, multi-color products): the fixed color thumbs,
+   with a second strip of shared/detail photos hidden underneath — only one strip is visible at
+   a time, swapped via #thumbsStripToggle (see product-gallery.js), so each gets the column's
+   full height budget rather than splitting it with a permanently-visible sibling. .product-
+   thumbs-wrap's own flex/width rules above assume it's a direct row-context child of
+   .product-gallery-layout; nested one level deeper here (inside this column) those need
+   re-pointing at the column's vertical axis instead, hence the overrides below rather than
+   relying on the base rule as-is. */
 .product-gallery-thumbs-column {
   display: flex;
   flex-direction: column;
   flex: 0 0 70px;
-  gap: 16px;
+  gap: 10px;
   max-height: 520px;
 }
 
 .product-gallery-thumbs-column .product-thumbs-wrap {
-  flex: 0 0 auto;
+  flex: 1 1 auto;
   width: 70px;
-  max-height: 260px;
+  min-height: 0;
+  max-height: 486px;
 }
 
-.product-gallery-thumbs-column .product-thumbs-wrap-shared {
-  flex: 1 1 auto;
-  min-height: 0;
+/* Always-visible toggle (not the JS-computed-overflow .product-thumbs-arrow.visible pattern —
+   this one has no "does it fit" question, it's a fixed strip switcher) between the color thumbs
+   and the additional-images strip. Only rendered when a product actually has shared media. */
+.product-thumbs-toggle {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 70px;
+  height: 24px;
+  border: 1px solid var(--wlm-sand-light);
+  border-radius: 6px;
+  background: white;
+  color: var(--wlm-ink);
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.product-thumbs-toggle:hover {
+  background: var(--wlm-forest);
+  color: white;
+  border-color: var(--wlm-forest);
 }
 
 @media (max-width: 991.98px) {
@@ -5154,9 +5177,7 @@ a:hover {
 
   /* Horizontal scroll strip instead of wrapping to multiple rows — wrapping leaves a lopsided
      trailing row (e.g. 4 thumbs then 1 alone) whenever the count isn't a clean multiple of
-     however many fit per row; a single scrollable row sidesteps that regardless of count. The
-     wrap flips to a row too, so the prev/next arrows sit left/right of the strip instead of
-     above/below it — same up/down chevron icons, just scrolling the horizontal axis now. */
+     however many fit per row; a single scrollable row sidesteps that regardless of count. */
   .product-thumbs-wrap {
     flex-direction: row;
     flex: 0 0 auto;
@@ -5164,8 +5185,8 @@ a:hover {
     width: 100%;
   }
 
-  /* Below lg, both strips stack as full-width horizontal rows (each still using the
-     .product-thumbs-wrap row behavior above) instead of sharing a fixed-width vertical column. */
+  /* Below lg, the (single visible) strip stacks as a full-width horizontal row, with the
+     toggle button (when present) as a full-width bar underneath it. */
   .product-gallery-thumbs-column {
     flex-direction: column;
     flex: 0 0 auto;
@@ -5173,10 +5194,14 @@ a:hover {
     max-height: none;
   }
 
-  .product-gallery-thumbs-column .product-thumbs-wrap,
-  .product-gallery-thumbs-column .product-thumbs-wrap-shared {
+  .product-gallery-thumbs-column .product-thumbs-wrap {
     width: 100%;
     max-height: none;
+  }
+
+  .product-thumbs-toggle {
+    width: 100%;
+    height: 32px;
   }
 
   .product-thumbs {
