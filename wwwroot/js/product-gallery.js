@@ -18,14 +18,14 @@
     var lifestyleImage = document.getElementById("pdpLifestyleImage");
     var skuValueEl = document.getElementById("pdpSkuValue");
     var variantSkuDataEl = document.getElementById("variantSkuData");
-    // Fixed additional-images strip (pocket/back/side/detail shots common to every color, see
-    // _PdpColorGallery.cshtml) — a second, independent thumb strip that's never rebuilt on color
-    // change, only present on multi-color products that actually have Shared-scope media. Only
-    // one of the two strips is visible at a time, swapped via thumbsStripToggle below.
-    var sharedThumbsContainer = document.getElementById("productSharedThumbs");
-    var productThumbsWrap = document.getElementById("productThumbsWrap");
-    var productSharedThumbsWrap = document.getElementById("productSharedThumbsWrap");
+    // Fixed additional-images photos (pocket/back/side/detail shots common to every color, see
+    // _PdpColorGallery.cshtml) live in the SAME #productThumbs strip as the color thumbs,
+    // appended after them and marked [data-shared] — never rebuilt on color change (renderGallery
+    // below only replaces the color portion). thumbsStripToggle scrolls between the top of the
+    // strip and firstSharedThumb rather than hiding/showing anything; only present on multi-color
+    // products that actually have Shared-scope media.
     var thumbsStripToggle = document.getElementById("thumbsStripToggle");
+    var firstSharedThumb = document.getElementById("firstSharedThumb");
     var splitSizeConfigEl = document.getElementById("splitSizeConfig");
     var sizeUnitContainer = document.getElementById("sizeUnitOptionsContainer");
     var sizeLengthContainer = document.getElementById("sizeLengthOptionsContainer");
@@ -308,16 +308,9 @@
         }
     }
 
-    // Clears "active" across BOTH strips (color thumbs + fixed additional-images strip) before
-    // marking the given one — only ever one active thumb at a time regardless of which strip
-    // it's in, since both drive the same single main image.
     function setActiveThumb(thumb) {
-        if (thumbsContainer) {
-            thumbsContainer.querySelectorAll(".product-thumb").forEach(function (t) { t.classList.remove("active"); });
-        }
-        if (sharedThumbsContainer) {
-            sharedThumbsContainer.querySelectorAll(".product-thumb").forEach(function (t) { t.classList.remove("active"); });
-        }
+        if (!thumbsContainer) return;
+        thumbsContainer.querySelectorAll(".product-thumb").forEach(function (t) { t.classList.remove("active"); });
         if (thumb) {
             thumb.classList.add("active");
         }
@@ -349,23 +342,12 @@
         });
     }
 
-    // Shared-strip thumbs carry no color, so clicking one only swaps the main image and its own
-    // active state — the color swatches/SKU/size selection are left exactly as they were.
-    if (sharedThumbsContainer) {
-        sharedThumbsContainer.addEventListener("click", function (e) {
-            var thumb = e.target.closest(".product-thumb");
-            if (!thumb) return;
-            var full = thumb.getAttribute("data-full");
-            var type = thumb.getAttribute("data-type") || "Image";
-            showMainItem(full, type);
-            setActiveThumb(thumb);
-        });
-    }
-
-    // Rebuilds the thumbnail strip for a list of gallery items. If activeColorId is given
-    // (the fixed one-photo-per-color list), the active item is whichever one matches that
-    // color; otherwise falls back to the item flagged "active" (per-color angle lists), then
-    // the first item.
+    // Rebuilds only the COLOR portion of the strip (elements without [data-shared]) for a new
+    // active color — the shared/detail photos appended after them are never touched, so their
+    // DOM nodes (and the customer's scroll position relative to them) persist untouched across
+    // color changes. If activeColorId is given (the fixed one-photo-per-color list), the active
+    // item is whichever one matches that color; otherwise falls back to the item flagged
+    // "active" (per-color angle lists), then the first item.
     function renderGallery(items, activeColorId) {
         if (!thumbsContainer || !items || items.length === 0) return;
 
@@ -378,7 +360,11 @@
         }
         if (activeIndex < 0) activeIndex = 0;
 
-        thumbsContainer.innerHTML = "";
+        Array.prototype.slice.call(thumbsContainer.querySelectorAll(".product-thumb-item:not([data-shared])")).forEach(function (el) {
+            el.remove();
+        });
+        var sharedAnchor = thumbsContainer.querySelector(".product-thumb-item[data-shared]");
+
         items.forEach(function (item, i) {
             var wrap = document.createElement("span");
             wrap.className = "product-thumb-item";
@@ -400,41 +386,92 @@
                 wrap.appendChild(playIcon);
             }
 
-            thumbsContainer.appendChild(wrap);
+            if (sharedAnchor) {
+                thumbsContainer.insertBefore(wrap, sharedAnchor);
+            } else {
+                thumbsContainer.appendChild(wrap);
+            }
         });
 
         showMainItem(items[activeIndex].url, items[activeIndex].type || "Image");
+        // Selecting a new color brings the strip back to the top (the color thumbs), even if the
+        // customer had scrolled down into the shared/detail photos — the toggle's icon/label
+        // resync automatically via the scroll listener below.
         thumbsContainer.scrollTop = 0;
         thumbsContainer.scrollLeft = 0;
-        updateThumbsArrows();
     }
 
-    // Each strip still scrolls natively (mouse wheel / touch) when its own content overflows —
-    // no arrow buttons needed for that. renderGallery still calls this after a color-triggered
-    // rebuild; kept as a no-op stub so that call site doesn't need touching.
-    function updateThumbsArrows() {}
+    // Single toggle: scrolls the strip between its top (color thumbs) and firstSharedThumb (the
+    // start of the shared/detail photos) — never hides or shows anything, all thumbnails stay in
+    // the same strip throughout. Works on both axes: vertical on desktop (a side column),
+    // horizontal on mobile (a row below the main image, per the CSS breakpoint).
+    if (thumbsStripToggle && thumbsContainer && firstSharedThumb) {
+        function scrollAxis() {
+            if (thumbsContainer.scrollHeight - thumbsContainer.clientHeight > 2) return "vertical";
+            if (thumbsContainer.scrollWidth - thumbsContainer.clientWidth > 2) return "horizontal";
+            return null;
+        }
 
-    // Single toggle between the color-thumbs strip and the fixed additional-images strip — only
-    // one is ever visible at a time. Doesn't touch the main image or color selection, just which
-    // strip is showing; whatever was last active in either strip stays active when you switch
-    // back to it (nothing gets reset).
-    if (thumbsStripToggle && productThumbsWrap && productSharedThumbsWrap) {
+        // Rendered-position comparison rather than raw scrollLeft/scrollTop arithmetic — this
+        // site is RTL (Arabic), and browsers don't agree on whether a scrolled-left RTL
+        // container reports a negative, zero-based-reversed, or positive scrollLeft. Comparing
+        // actual on-screen rectangles instead sidesteps that entirely, and works the same in
+        // LTR too. "Past boundary" = any part of firstSharedThumb currently intersects the
+        // container's own visible rect — simple overlap test, not a specific target position,
+        // since a short scroll range (e.g. only one shared photo) may never bring the target to
+        // a fixed point like the very top or exact middle.
+        function isPastBoundary() {
+            var axis = scrollAxis();
+            if (!axis) return false;
+            var containerRect = thumbsContainer.getBoundingClientRect();
+            var targetRect = firstSharedThumb.getBoundingClientRect();
+            return axis === "horizontal"
+                ? targetRect.right > containerRect.left && targetRect.left < containerRect.right
+                : targetRect.bottom > containerRect.top && targetRect.top < containerRect.bottom;
+        }
+
+        function setToggleState(scrolled) {
+            thumbsStripToggle.setAttribute("data-state", scrolled ? "scrolled" : "top");
+            thumbsStripToggle.setAttribute("aria-label", scrolled ? "Back to colors" : "Show more photos");
+            thumbsStripToggle.innerHTML = '<i class="bi bi-chevron-' + (scrolled ? "up" : "down") + '"></i>';
+        }
+
         thumbsStripToggle.addEventListener("click", function () {
-            var showingShared = thumbsStripToggle.getAttribute("data-showing") === "shared";
-            if (showingShared) {
-                productSharedThumbsWrap.style.display = "none";
-                productThumbsWrap.style.display = "";
-                thumbsStripToggle.setAttribute("data-showing", "colors");
-                thumbsStripToggle.setAttribute("aria-label", "Show additional images");
-                thumbsStripToggle.innerHTML = '<i class="bi bi-chevron-down"></i>';
+            if (isPastBoundary()) {
+                // (0, 0) is unambiguous in any RTL/LTR scrollLeft convention — always "the start".
+                thumbsContainer.scrollTo({ top: 0, left: 0, behavior: "smooth" });
             } else {
-                productThumbsWrap.style.display = "none";
-                productSharedThumbsWrap.style.display = "";
-                thumbsStripToggle.setAttribute("data-showing", "shared");
-                thumbsStripToggle.setAttribute("aria-label", "Show colors");
-                thumbsStripToggle.innerHTML = '<i class="bi bi-chevron-up"></i>';
+                // scrollBy with a rendered-position delta rather than scrollIntoView: scrollBy is
+                // always scoped to the element it's called on, so it can never escalate to
+                // scrolling the outer page/ancestors the way scrollIntoView does when the
+                // container's own scroll room falls short of a full "start" alignment (which it
+                // does here — firstSharedThumb's natural offset is usually well past what
+                // thumbsContainer alone can scroll to). The browser still clamps the delta to
+                // the container's actual max scroll on its own.
+                var axis = scrollAxis();
+                var containerRect = thumbsContainer.getBoundingClientRect();
+                var targetRect = firstSharedThumb.getBoundingClientRect();
+                if (axis === "horizontal") {
+                    thumbsContainer.scrollBy({ left: targetRect.left - containerRect.left, behavior: "smooth" });
+                } else {
+                    thumbsContainer.scrollBy({ top: targetRect.top - containerRect.top, behavior: "smooth" });
+                }
             }
         });
+
+        // Keeps the arrow's direction/label honest if the customer scrolls the strip manually
+        // (mouse wheel / touch), not just when they click the toggle itself. Smooth scrolling
+        // fires many scroll events mid-animation, so this also settles the state once more
+        // shortly after it stops, in case the last mid-flight event landed on the wrong side of
+        // the boundary just before the animation finished.
+        var scrollSettleTimer = null;
+        thumbsContainer.addEventListener("scroll", function () {
+            setToggleState(isPastBoundary());
+            window.clearTimeout(scrollSettleTimer);
+            scrollSettleTimer = window.setTimeout(function () { setToggleState(isPastBoundary()); }, 150);
+        });
+
+        setToggleState(false);
     }
 
     // Hover-to-zoom: scale the image and track cursor position as the transform origin.
@@ -467,29 +504,27 @@
     var lightboxItems = [];
     var lightboxIndex = 0;
 
-    // Spans both strips (color thumbs + fixed additional-images strip) in DOM order, so the
-    // lightbox pages through everything currently on the page — including a shared/detail photo
-    // if that's what's active — not just whichever strip happens to be first.
-    function getAllThumbEls() {
-        var primary = thumbsContainer ? Array.prototype.slice.call(thumbsContainer.querySelectorAll(".product-thumb")) : [];
-        var shared = sharedThumbsContainer ? Array.prototype.slice.call(sharedThumbsContainer.querySelectorAll(".product-thumb")) : [];
-        return primary.concat(shared);
-    }
-
+    // The lightbox's image list is read directly from the strip's current DOM order, so it's
+    // guaranteed to include the shared/detail photos too (they're in the same #productThumbs
+    // container as the color thumbs, just appended after them).
     function getCurrentGalleryItems() {
-        var thumbs = getAllThumbEls();
+        if (!thumbsContainer) {
+            return [{ url: mainImage.src, type: "Image" }];
+        }
+        var thumbs = thumbsContainer.querySelectorAll(".product-thumb");
         if (thumbs.length === 0) {
             return [{ url: mainImage.src, type: "Image" }];
         }
-        return thumbs.map(function (t) {
+        return Array.prototype.map.call(thumbs, function (t) {
             return { url: t.getAttribute("data-full"), type: t.getAttribute("data-type") || "Image" };
         });
     }
 
     function getCurrentGalleryIndex() {
-        var thumbs = getAllThumbEls();
-        var activeThumb = thumbs.find(function (t) { return t.classList.contains("active"); });
-        var idx = activeThumb ? thumbs.indexOf(activeThumb) : -1;
+        if (!thumbsContainer) return 0;
+        var thumbs = thumbsContainer.querySelectorAll(".product-thumb");
+        var activeThumb = thumbsContainer.querySelector(".product-thumb.active");
+        var idx = activeThumb ? Array.prototype.indexOf.call(thumbs, activeThumb) : -1;
         return idx >= 0 ? idx : 0;
     }
 
@@ -524,7 +559,7 @@
         }
         updateLightboxNav();
         showMainItem(item.url, item.type);
-        var matchingThumb = getAllThumbEls().find(function (t) { return t.getAttribute("data-full") === item.url; });
+        var matchingThumb = thumbsContainer ? thumbsContainer.querySelector('.product-thumb[data-full="' + CSS.escape(item.url) + '"]') : null;
         setActiveThumb(matchingThumb);
     }
 

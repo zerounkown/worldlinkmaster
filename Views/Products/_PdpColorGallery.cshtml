@@ -7,9 +7,12 @@
     // products only (Details.cshtml only renders this partial when Model.ProductColors.Count > 1);
     // single-color products use the near-identical inline markup directly in Details.cshtml.
     //
-    // The thumb strip is a fixed, one-photo-per-color list (colorThumbItems) — it never changes
-    // when the customer picks a different color, only which item is marked active. No per-color
-    // angle browsing here; clicking a thumb selects that color, same as the swatches.
+    // One combined, always-present strip: the fixed one-photo-per-color list (colorThumbItems)
+    // first, then the shared/detail photos (sharedGalleryItems) appended after — never rebuilt
+    // when the customer picks a different color (renderGallery in product-gallery.js only
+    // touches the color portion; shared items are marked data-shared="1" so it knows to leave
+    // them alone). The toggle button scrolls between the two portions; it doesn't hide/show
+    // anything — see #thumbsStripToggle in product-gallery.js.
     var colorThumbItems = (List<Dictionary<string, string?>>)ViewData["ColorThumbItems"]!;
     var sharedGalleryItems = (List<Dictionary<string, string?>>)ViewData["SharedGalleryItems"]!;
     var defaultProductColor = Model.ProductColors.FirstOrDefault(pc => pc.DefaultColor) ?? Model.ProductColors.First();
@@ -26,48 +29,42 @@
 }
 <div class="pdp-gallery-panel">
     <div class="product-gallery-layout">
-        <div class="product-gallery-thumbs-column">
-            <div class="product-thumbs-wrap" id="productThumbsWrap">
-                <div class="product-thumbs" id="productThumbs">
-                    @for (int i = 0; i < initialGallery.Count; i++)
-                    {
-                        var item = initialGallery[i];
-                        var isVideo = item["type"] == "Video";
-                        <span class="product-thumb-item">
-                            <img src="@(item["thumb"] ?? ImagePlaceholder.DataUri)"
-                                 class="product-thumb @(i == initialActiveIndex ? "active" : "")"
-                                 data-full="@item["url"]" data-type="@item["type"]" data-color-id="@item.GetValueOrDefault("colorId")"
-                                 alt="@(item["alt"] ?? Model.LocalizedName())" />
-                            @if (isVideo)
-                            {
-                                <i class="bi bi-play-circle-fill product-thumb-play"></i>
-                            }
-                        </span>
-                    }
-                </div>
+        <div class="product-thumbs-wrap" id="productThumbsWrap">
+            <div class="product-thumbs" id="productThumbs">
+                @for (int i = 0; i < initialGallery.Count; i++)
+                {
+                    var item = initialGallery[i];
+                    var isVideo = item["type"] == "Video";
+                    <span class="product-thumb-item">
+                        <img src="@(item["thumb"] ?? ImagePlaceholder.DataUri)"
+                             class="product-thumb @(i == initialActiveIndex ? "active" : "")"
+                             data-full="@item["url"]" data-type="@item["type"]" data-color-id="@item.GetValueOrDefault("colorId")"
+                             alt="@(item["alt"] ?? Model.LocalizedName())" />
+                        @if (isVideo)
+                        {
+                            <i class="bi bi-play-circle-fill product-thumb-play"></i>
+                        }
+                    </span>
+                }
+                @for (int i = 0; i < sharedGalleryItems.Count; i++)
+                {
+                    var item = sharedGalleryItems[i];
+                    var isVideo = item["type"] == "Video";
+                    <span class="product-thumb-item" data-shared="1">
+                        <img src="@(item["thumb"] ?? ImagePlaceholder.DataUri)"
+                             class="product-thumb" id="@(i == 0 ? "firstSharedThumb" : null)"
+                             data-full="@item["url"]" data-type="@item["type"]"
+                             alt="@(item["alt"] ?? Model.LocalizedName())" />
+                        @if (isVideo)
+                        {
+                            <i class="bi bi-play-circle-fill product-thumb-play"></i>
+                        }
+                    </span>
+                }
             </div>
             @if (sharedGalleryItems.Count > 0)
             {
-                <div class="product-thumbs-wrap product-thumbs-wrap-shared" id="productSharedThumbsWrap" style="display: none;">
-                    <div class="product-thumbs" id="productSharedThumbs">
-                        @for (int i = 0; i < sharedGalleryItems.Count; i++)
-                        {
-                            var item = sharedGalleryItems[i];
-                            var isVideo = item["type"] == "Video";
-                            <span class="product-thumb-item">
-                                <img src="@(item["thumb"] ?? ImagePlaceholder.DataUri)"
-                                     class="product-thumb"
-                                     data-full="@item["url"]" data-type="@item["type"]"
-                                     alt="@(item["alt"] ?? Model.LocalizedName())" />
-                                @if (isVideo)
-                                {
-                                    <i class="bi bi-play-circle-fill product-thumb-play"></i>
-                                }
-                            </span>
-                        }
-                    </div>
-                </div>
-                <button type="button" class="product-thumbs-toggle" id="thumbsStripToggle" aria-label="@Localizer["Show additional images"]" data-showing="colors">
+                <button type="button" class="product-thumbs-toggle" id="thumbsStripToggle" aria-label="@Localizer["Show more photos"]" data-state="top">
                     <i class="bi bi-chevron-down"></i>
                 </button>
             }
