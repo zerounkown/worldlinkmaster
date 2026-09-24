@@ -2665,6 +2665,33 @@ a:hover {
   letter-spacing: 0.04em;
 }
 
+.empty-subcategory-message {
+  text-align: center;
+  background: var(--wlm-cream);
+  border: 1px solid var(--wlm-sand-light);
+  border-radius: 8px;
+  padding: 48px 24px;
+  margin-bottom: 24px;
+}
+
+.empty-subcategory-message p {
+  font-size: 1rem;
+  color: var(--wlm-charcoal, #333);
+  margin-bottom: 14px;
+}
+
+.empty-subcategory-message a {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--wlm-forest);
+  font-family: var(--font-heading);
+  font-weight: 600;
+  text-transform: uppercase;
+  font-size: 0.82rem;
+  letter-spacing: 0.04em;
+}
+
 /* Sidebar "Shop by Brand" — logo-card tiles (same white-card wordmark treatment as the
    homepage brand row), in a compact grid that scrolls internally past a handful of rows
    so it doesn't push the price filter and product grid far down the page. */

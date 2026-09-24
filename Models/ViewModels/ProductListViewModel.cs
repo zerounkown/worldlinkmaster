@@ -34,6 +34,10 @@ public class ProductListViewModel
     public List<Brand> Brands { get; set; } = new();
     public int? SelectedCategoryId { get; set; }
     public List<int> SelectedSubcategoryIds { get; set; } = new();
+    // True only when exactly one subcategory is selected and it has zero published products
+    // regardless of any other active filter — distinct from "this filter combination happens to
+    // match nothing," which keeps the generic empty-state message.
+    public bool SelectedSubcategoryIsEmpty { get; set; }
     public List<int> SelectedBrandIds { get; set; } = new();
     // Family codes (e.g. "black", "tan-coyote"), not individual color names.
     public List<string> SelectedColorFamilies { get; set; } = new();
