@@ -303,6 +303,7 @@ builder.Services.AddOutputCache(options =>
     options.AddPolicy("HomePage", new AnonymousOnlyOutputCachePolicy(TimeSpan.FromSeconds(60), "products"));
     options.AddPolicy("ProductListing", new AnonymousOnlyOutputCachePolicy(TimeSpan.FromSeconds(90), "products"));
     options.AddPolicy("ProductDetail", new AnonymousOnlyOutputCachePolicy(TimeSpan.FromSeconds(120), "products"));
+    options.AddPolicy("Sitemap", new AnonymousOnlyOutputCachePolicy(TimeSpan.FromHours(1), "products"));
 });
 
 var app = builder.Build();
