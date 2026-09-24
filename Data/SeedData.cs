@@ -30,6 +30,47 @@ public static class SeedData
         await SeedPromoEventsAsync(context);
         await SeedPromoCouponsAsync(context);
         await SeedStoresAsync(context);
+        await SeedColorFamiliesAsync(context);
+    }
+
+    // The listing-page color filter facets on family, not individual Color rows — every
+    // environment needs at least these rows to exist (including "Other", which unmapped colors
+    // fall back to) or ProductsController.Index has nothing to resolve "other" against. Adds only
+    // whatever codes are missing, so re-running this never touches an admin's edits to an
+    // existing family (name, hex, Arabic translation, swatch image).
+    private static async Task SeedColorFamiliesAsync(ApplicationDbContext context)
+    {
+        var families = new (string Code, string Name, string NameAr, string Hex, string? SwatchUrl, int Order)[]
+        {
+            ("black", "Black", "أسود", "#1c1c1c", null, 1),
+            ("tan-coyote", "Tan / Coyote", "بيج / كايوت", "#C4A77D", null, 2),
+            ("green-olive", "Green/Olive", "أخضر / زيتي", "#5C5F2E", null, 3),
+            ("navy-blue", "Navy/Blue", "كحلي / أزرق", "#1F2A44", null, 4),
+            ("grey", "Grey", "رمادي", "#808080", null, 5),
+            ("brown", "Brown", "بني", "#5B3A29", null, 6),
+            ("white", "White", "أبيض", "#F5F5F5", null, 7),
+            ("red", "Red", "أحمر", "#C8102E", null, 8),
+            ("camo", "Camo", "مموّه", "#9C9C8A", "https://wlmproductphotos.blob.core.windows.net/product-photos/family-camo-swatch.jpg", 9),
+            ("other", "Other", "أخرى", "#808080", null, 10),
+        };
+
+        var existing = await context.ColorFamilies.Select(f => f.Code).ToListAsync();
+        var toAdd = families.Where(f => !existing.Contains(f.Code)).ToList();
+        if (toAdd.Count == 0)
+        {
+            return;
+        }
+
+        context.ColorFamilies.AddRange(toAdd.Select(f => new ColorFamily
+        {
+            Code = f.Code,
+            Name = f.Name,
+            NameAr = f.NameAr,
+            HexCode = f.Hex,
+            SwatchImageUrl = f.SwatchUrl,
+            DisplayOrder = f.Order
+        }));
+        await context.SaveChangesAsync();
     }
 
     private static Color GetOrCreateColor(Dictionary<string, Color> cache, string name, string hex)

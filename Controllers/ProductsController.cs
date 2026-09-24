@@ -61,7 +61,10 @@ public class ProductsController : Controller
         var selectedColorFamilyCodes = (colors ?? Array.Empty<string>()).ToList();
         var allColorFamilies = await _context.ColorFamilies.AsNoTracking().OrderBy(f => f.DisplayOrder).ToListAsync();
         var colorFamilyByCode = allColorFamilies.ToDictionary(f => f.Code);
-        var otherFamilyId = colorFamilyByCode["other"].Id;
+        // -1 is a safe placeholder if the "Other" family row is somehow missing (e.g. the
+        // ColorFamilies seed hasn't run yet) — it can never equal a real FamilyId, so unmapped
+        // colors just don't match any selected family filter instead of crashing the whole page.
+        var otherFamilyId = colorFamilyByCode.TryGetValue("other", out var otherFamily) ? otherFamily.Id : -1;
         var selectedFamilyIds = selectedColorFamilyCodes
             .Where(c => colorFamilyByCode.ContainsKey(c))
             .Select(c => colorFamilyByCode[c].Id)
