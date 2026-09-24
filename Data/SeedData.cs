@@ -1,12 +1,21 @@
 using System.Security.Cryptography;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 using WorldLinkMaster.Web.Models;
 
 namespace WorldLinkMaster.Web.Data;
 
 public static class SeedData
 {
+    // The real production Postgres host (aws-1-ap-south-1.pooler.supabase.com, WLM-Production /
+    // app "WLM" on Azure). Hardcoded rather than read from config: the whole point of this check
+    // is to catch a MISCONFIGURATION — ASPNETCORE_ENVIRONMENT set wrong, or (the actual root cause
+    // of the 2026-09-24 incident) a local process pointed at the production connection string with
+    // Development's default environment — so it can't itself depend on the environment/config
+    // being trustworthy.
+    private const string ProductionDbHost = "aws-1-ap-south-1.pooler.supabase.com";
+
     public static async Task InitializeAsync(IServiceProvider services)
     {
         var context = services.GetRequiredService<ApplicationDbContext>();
@@ -30,8 +39,26 @@ public static class SeedData
         // has no such guard to begin with), but because it's the same class of placeholder catalog
         // data — and both the E2E test harness and local `dotnet run` explicitly run as
         // Development, so this is also what gives them something to click/buy/review.
+        //
+        // Two independent conditions, both required: IsDevelopment() alone was exactly what failed
+        // on 2026-09-24 — a local `dotnet run` (which defaults to Development) had its connection
+        // string pointed at production, and the environment check alone had no way to catch that.
+        // Checking the actual target host closes that gap regardless of how ASPNETCORE_ENVIRONMENT
+        // ends up set.
         var environment = services.GetRequiredService<IHostEnvironment>();
-        if (environment.IsDevelopment())
+        var logger = services.GetRequiredService<ILoggerFactory>().CreateLogger("SeedData");
+        var targetsProductionDatabase = IsProductionDatabase(context.Database.GetConnectionString());
+
+        if (environment.IsDevelopment() && targetsProductionDatabase)
+        {
+            logger.LogWarning(
+                "ASPNETCORE_ENVIRONMENT is 'Development' but the connection string targets the " +
+                "production database host ({Host}) — skipping demo/placeholder seeders that would " +
+                "otherwise run in Development. Fix the environment or connection string.",
+                ProductionDbHost);
+        }
+
+        if (environment.IsDevelopment() && !targetsProductionDatabase)
         {
             await SeedDemoProductsAsync(context, defaultMerchant.Id, colorCache, sizeCache);
             await SeedSubcategoriesAsync(context);
@@ -41,12 +68,32 @@ public static class SeedData
             await SeedStoresAsync(context);
         }
 
-        var seedLogger = services.GetRequiredService<ILoggerFactory>().CreateLogger("SeedData");
-        await SeedMissingVariantsAsync(context, colorCache, sizeCache, seedLogger);
+        await SeedMissingVariantsAsync(context, colorCache, sizeCache, logger);
         await SeedInternalAttributeDefinitionsAsync(context);
         await SeedApparelUseCaseAttributeDefinitionAsync(context);
         await SeedApparelSubTypeAttributeDefinitionsAsync(context);
         await SeedColorFamiliesAsync(context);
+    }
+
+    // Public and pure (no I/O) so it's directly unit-testable without a real database connection.
+    // An unparseable connection string is treated as "might be production" — refusing to seed
+    // demo data in that edge case is a far smaller problem than the alternative.
+    public static bool IsProductionDatabase(string? connectionString)
+    {
+        if (string.IsNullOrWhiteSpace(connectionString))
+        {
+            return false;
+        }
+
+        try
+        {
+            var builder = new NpgsqlConnectionStringBuilder(connectionString);
+            return string.Equals(builder.Host, ProductionDbHost, StringComparison.OrdinalIgnoreCase);
+        }
+        catch (Exception)
+        {
+            return true;
+        }
     }
 
     // The listing-page color filter facets on family, not individual Color rows — every
