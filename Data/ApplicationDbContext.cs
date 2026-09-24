@@ -56,6 +56,53 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
         configurationBuilder.Properties<DateTime?>().HaveColumnType("timestamptz");
     }
 
+    public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
+    {
+        await AutoAssignNewColorFamiliesAsync();
+        return await base.SaveChangesAsync(cancellationToken);
+    }
+
+    public override int SaveChanges()
+    {
+        AutoAssignNewColorFamiliesAsync().GetAwaiter().GetResult();
+        return base.SaveChanges();
+    }
+
+    // A brand-new Color with no family yet gets the same family as an existing, already-mapped
+    // Color whose Name matches exactly (case-insensitive) — e.g. a fresh product import creating
+    // another "Black" row from a different vendor doesn't need a human to re-map it. Runs
+    // regardless of where the Color got added (seeding, the Master Data importer, admin product
+    // creation) since it hooks SaveChanges itself rather than any one call site.
+    private async Task AutoAssignNewColorFamiliesAsync()
+    {
+        var newColors = ChangeTracker.Entries<Color>()
+            .Where(e => e.State == EntityState.Added && e.Entity.FamilyId == null)
+            .Select(e => e.Entity)
+            .ToList();
+
+        if (newColors.Count == 0)
+        {
+            return;
+        }
+
+        var mapped = await Colors
+            .Where(c => c.FamilyId != null)
+            .Select(c => new { c.Name, c.FamilyId })
+            .ToListAsync();
+
+        var familyByName = mapped
+            .GroupBy(c => c.Name, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(g => g.Key, g => g.First().FamilyId, StringComparer.OrdinalIgnoreCase);
+
+        foreach (var color in newColors)
+        {
+            if (familyByName.TryGetValue(color.Name, out var familyId))
+            {
+                color.FamilyId = familyId;
+            }
+        }
+    }
+
     protected override void OnModelCreating(ModelBuilder builder)
     {
         base.OnModelCreating(builder);
