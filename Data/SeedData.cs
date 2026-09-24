@@ -20,9 +20,7 @@ public static class SeedData
         var adminUser = await SeedRolesAndAdminAsync(services);
         var defaultMerchant = await SeedDefaultMerchantAsync(context, adminUser);
         await SeedCatalogAsync(context, defaultMerchant.Id, colorCache, sizeCache);
-        await SeedBulkExpansionAsync(context, defaultMerchant.Id, colorCache, sizeCache);
         await SeedSubcategoriesAsync(context);
-        await SeedSubcategoryPlaceholderProductsAsync(context, defaultMerchant.Id, colorCache, sizeCache);
         var seedLogger = services.GetRequiredService<ILoggerFactory>().CreateLogger("SeedData");
         await SeedMissingVariantsAsync(context, colorCache, sizeCache, seedLogger);
         await SeedFeaturesAsync(context);
@@ -767,48 +765,6 @@ public static class SeedData
         await context.SaveChangesAsync();
     }
 
-    // Large catalog expansion: jackets, hats, shoes, belts, and gear components,
-    // generated from prefix/type combinations so the storefront has a full multi-page
-    // catalog rather than just the curated 21-item launch lineup.
-    private static async Task SeedBulkExpansionAsync(ApplicationDbContext context, int defaultMerchantId, Dictionary<string, Color> colorCache, Dictionary<string, Size> sizeCache)
-    {
-        const string bulkSkuMarker = "WLM-BULK-";
-        if (await context.Products.AnyAsync(p => p.Sku.StartsWith(bulkSkuMarker)))
-        {
-            return;
-        }
-
-        var categories = await context.Categories.ToDictionaryAsync(c => c.Slug);
-        var usedSlugs = new HashSet<string>(await context.Products.Select(p => p.Slug).ToListAsync());
-        var products = new List<Product>();
-
-        products.AddRange(GenerateBulkProducts(JacketTypes, categories["tactical-apparel"], "WLM-BULK-JKT", JacketImages, JacketColorPool, ClothingSizes, 300m, 500m, 32, defaultMerchantId, usedSlugs, colorCache, sizeCache));
-        products.AddRange(GenerateBulkProducts(HatTypes, categories["tactical-apparel"], "WLM-BULK-HAT", HatImages, HatColorPool, null, 60m, 140m, 32, defaultMerchantId, usedSlugs, colorCache, sizeCache));
-        products.AddRange(GenerateBulkProducts(ShoeTypes, categories["footwear"], "WLM-BULK-SHO", ShoeImages, ShoeColorPool, ShoeSizes, 300m, 550m, 32, defaultMerchantId, usedSlugs, colorCache, sizeCache));
-        products.AddRange(GenerateBulkProducts(BeltTypes, categories["gear-and-accessories"], "WLM-BULK-BLT", BeltImages, BeltColorPool, GloveSizes, 90m, 180m, 32, defaultMerchantId, usedSlugs, colorCache, sizeCache));
-        products.AddRange(GenerateBulkProducts(ComponentTypes, categories["gear-and-accessories"], "WLM-BULK-CMP", ComponentImages, ComponentColorPool, null, 40m, 120m, 32, defaultMerchantId, usedSlugs, colorCache, sizeCache));
-
-        context.Products.AddRange(products);
-        await context.SaveChangesAsync();
-    }
-
-    private static readonly string[] BulkPrefixes =
-    {
-        "Sentinel", "Vanguard", "Recon", "Ranger", "Ridge", "Ironclad", "Summit", "Apex",
-        "Ghost", "Talon", "Falcon", "Warden", "Outrider", "Trailhawk", "Rampart", "Bastion",
-        "Frontier", "Blackwatch", "Ironside", "Nomad", "Sabre", "Wraith", "Hunter", "Sentry",
-        "Marauder", "Centurion", "Vigil", "Redline", "Ember", "Onyx", "Cipher", "Titan"
-    };
-
-    // Note: type wording is deliberately kept distinct from the launch lineup's exact
-    // product names (e.g. no "Softshell Jacket", "Combat Boot", or "Riggers Belt" here)
-    // to avoid colliding with the unique Slug constraint on already-seeded products.
-    private static readonly string[] JacketTypes = { "Combat Jacket", "Field Jacket", "Bomber Jacket", "Parka", "Windbreaker", "Rain Shell", "Shell Jacket", "Insulated Jacket" };
-    private static readonly string[] HatTypes = { "Tactical Cap", "Boonie Hat", "Beanie", "Patrol Cap", "Sun Hat", "Watch Cap" };
-    private static readonly string[] ShoeTypes = { "Trail Shoe", "Patrol Boot", "Hiking Shoe", "Tactical Sneaker", "Desert Boot", "Assault Boot" };
-    private static readonly string[] BeltTypes = { "Tactical Belt", "Gun Belt", "Duty Belt", "Web Belt", "EDC Belt" };
-    private static readonly string[] ComponentTypes = { "MOLLE Pouch", "Mag Pouch", "Admin Pouch", "Utility Pouch", "Chest Rig", "Gear Mount", "Sling Strap" };
-
     private static readonly int[] JacketImages = { 37678157, 32132582, 6368576, 18832219, 22064415, 19928303, 32039137, 669291, 7468101, 30217011, 15814566, 33648165, 34409819, 25525596, 6786309, 7416037, 9522942 };
     private static readonly int[] HatImages = { 8449785, 8443673, 8443671, 17216548, 16919435, 16047421, 17216544, 17179123, 30415388 };
     private static readonly int[] ShoeImages = { 13020558, 1047966, 32189248, 4275517, 17115801, 18236151, 4589107, 13882914, 9654860, 28991265, 7026406, 9654861, 4314202, 11280664, 6555893, 31954808, 29490907, 10781162, 35120029, 12983267, 11061924, 8729056, 5579004, 5876412, 31650335 };
@@ -819,82 +775,6 @@ public static class SeedData
         11900635, 18318640, 11726037, 27462287, 11900631, 31438937,
         18318689, 9448166, 11726029, 30407654, 16359250, 9448163
     };
-
-    private static List<Product> GenerateBulkProducts(
-        string[] types,
-        Category category,
-        string skuPrefix,
-        int[] imagePool,
-        (string Name, string Hex)[] colorPool,
-        string[]? sizes,
-        decimal minPriceAed,
-        decimal maxPriceAed,
-        int count,
-        int merchantId,
-        HashSet<string> usedSlugs,
-        Dictionary<string, Color> colorCache,
-        Dictionary<string, Size> sizeCache)
-    {
-        var result = new List<Product>();
-        var priceRange = maxPriceAed - minPriceAed;
-
-        for (int index = 0; index < count; index++)
-        {
-            var type = types[index % types.Length];
-            var prefix = BulkPrefixes[(index / types.Length) % BulkPrefixes.Length];
-            var name = $"{prefix} {type}";
-            var image = imagePool[index % imagePool.Length];
-            var price = Math.Round(minPriceAed + priceRange * ((index * 37) % 100) / 100m, 2);
-            var rating = Math.Round(4.2m + (index * 13 % 8) * 0.1m, 1);
-            var reviewCount = 15 + (index * 29 % 380);
-
-            // Defend against a generated name accidentally matching an existing product
-            // (e.g. a curated launch item) and violating the unique Slug constraint.
-            var slug = Slugify(name);
-            var dedupeSuffix = 2;
-            while (!usedSlugs.Add(slug))
-            {
-                slug = $"{Slugify(name)}-{dedupeSuffix}";
-                dedupeSuffix++;
-            }
-
-            var product = new Product
-            {
-                Name = name,
-                Slug = slug,
-                Category = category,
-                MerchantId = merchantId,
-                ShortDescription = $"{name} built to World Link Master's field-tested standard.",
-                Description = $"{name} engineered for durability and performance. Reinforced construction, tested materials, and field-ready design make this a reliable choice for operators and outdoor professionals alike.",
-                Price = price,
-                Sku = $"{skuPrefix}-{index + 1:000}",
-                StockQuantity = 10 + (index % 40),
-                IsFeatured = false,
-                Rating = rating,
-                ReviewCount = reviewCount,
-                ImageUrl = PexelsImage(image, 800, 800)
-            };
-
-            var numColors = 2 + (index % 2);
-            var selectedColors = new List<(string Name, string Hex)>();
-            for (int c = 0; c < numColors && c < colorPool.Length; c++)
-            {
-                selectedColors.Add(colorPool[(index + c) % colorPool.Length]);
-            }
-
-            BuildVariants(product, colorCache, sizeCache, selectedColors, sizes);
-
-            var altImage = imagePool[(index + 3) % imagePool.Length];
-            if (altImage != image)
-            {
-                product.Images.Add(new ProductImage { ImageUrl = PexelsImage(altImage, 800, 800), Label = "Alternate", SortOrder = 1 });
-            }
-
-            result.Add(product);
-        }
-
-        return result;
-    }
 
     private static string Slugify(string name)
     {
@@ -948,85 +828,6 @@ public static class SeedData
         ["bags-and-packs"] = (150m, 450m, BagImages, BagColorPool, null),
         ["gear-and-accessories"] = (45m, 190m, ComponentImages.Concat(BeltImages).ToArray(), ComponentColorPool, null),
     };
-
-    // Gives every subcategory (Camouflage Tape, Trolley Bags, etc.) at least a few real,
-    // purchasable products so browsing by subcategory never shows an empty page.
-    private static async Task SeedSubcategoryPlaceholderProductsAsync(ApplicationDbContext context, int defaultMerchantId, Dictionary<string, Color> colorCache, Dictionary<string, Size> sizeCache)
-    {
-        const string skuMarker = "WLM-SUB-";
-        if (await context.Products.AnyAsync(p => p.Sku.StartsWith(skuMarker)))
-        {
-            return;
-        }
-
-        var subcategories = await context.Subcategories.Include(s => s.Category).ToListAsync();
-        var usedSlugs = new HashSet<string>(await context.Products.Select(p => p.Slug).ToListAsync());
-        var products = new List<Product>();
-        var skuCounter = 1;
-
-        foreach (var subcategory in subcategories)
-        {
-            var categorySlug = subcategory.Category?.Slug;
-            if (categorySlug == null || !SubcategoryProductProfile.TryGetValue(categorySlug, out var profile))
-            {
-                continue; // e.g. Outdoor Equipment has no subcategories yet
-            }
-
-            if (await context.Products.AnyAsync(p => p.SubcategoryId == subcategory.Id))
-            {
-                continue;
-            }
-
-            for (int i = 0; i < 3; i++)
-            {
-                var prefix = BulkPrefixes[(subcategory.Id * 3 + i) % BulkPrefixes.Length];
-                var name = $"{prefix} {subcategory.Name}";
-                var slug = Slugify(name);
-                var dedupeSuffix = 2;
-                while (!usedSlugs.Add(slug))
-                {
-                    slug = $"{Slugify(name)}-{dedupeSuffix}";
-                    dedupeSuffix++;
-                }
-
-                var image = profile.Images[(subcategory.Id * 3 + i) % profile.Images.Length];
-                var price = Math.Round(profile.Min + (profile.Max - profile.Min) * ((subcategory.Id * 37 + i * 19) % 100) / 100m, 2);
-
-                var product = new Product
-                {
-                    Name = name,
-                    Slug = slug,
-                    Category = subcategory.Category,
-                    Subcategory = subcategory,
-                    MerchantId = defaultMerchantId,
-                    ShortDescription = $"{name} — field-tested {subcategory.Name.ToLowerInvariant()} from World Link Master.",
-                    Description = $"{name} built to World Link Master's field-tested standard. Reinforced construction, tested materials, and reliable performance for operators and outdoor professionals.",
-                    Price = price,
-                    Sku = $"{skuMarker}{skuCounter:0000}",
-                    StockQuantity = 10 + ((subcategory.Id + i) % 40),
-                    IsFeatured = false,
-                    Rating = Math.Round(4.2m + ((subcategory.Id + i) % 8) * 0.1m, 1),
-                    ReviewCount = 10 + ((subcategory.Id * 7 + i * 11) % 300),
-                    ImageUrl = PexelsImage(image, 800, 800)
-                };
-                skuCounter++;
-
-                var numColors = Math.Min(3, profile.Colors.Length);
-                var selectedColors = new List<(string Name, string Hex)>();
-                for (int c = 0; c < numColors; c++)
-                {
-                    selectedColors.Add(profile.Colors[(i + c) % profile.Colors.Length]);
-                }
-
-                BuildVariants(product, colorCache, sizeCache, selectedColors, profile.Sizes);
-
-                products.Add(product);
-            }
-        }
-
-        context.Products.AddRange(products);
-        await context.SaveChangesAsync();
-    }
 
     private static readonly Dictionary<string, (int[] ExtraImages, (string Name, string Hex)[] Colors, string[]? Sizes)> Variants = new()
     {
