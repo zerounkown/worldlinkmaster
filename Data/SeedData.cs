@@ -18,29 +18,35 @@ public static class SeedData
         var sizeCache = new Dictionary<string, Size>(StringComparer.OrdinalIgnoreCase);
 
         var adminUser = await SeedRolesAndAdminAsync(services);
-        await SeedDefaultMerchantAsync(context, adminUser);
+        var defaultMerchant = await SeedDefaultMerchantAsync(context, adminUser);
         await SeedCatalogAsync(context);
-        var seedLogger = services.GetRequiredService<ILoggerFactory>().CreateLogger("SeedData");
-        await SeedMissingVariantsAsync(context, colorCache, sizeCache, seedLogger);
-        await SeedInternalAttributeDefinitionsAsync(context);
-        await SeedApparelUseCaseAttributeDefinitionAsync(context);
-        await SeedApparelSubTypeAttributeDefinitionsAsync(context);
-        await SeedColorFamiliesAsync(context);
 
         // These seeders each guard themselves on "is this whole table empty" rather than a
         // narrow, specific key — safe under normal operation, but the same class of risk that let
         // WLM-BULK-/WLM-SUB- regenerate themselves after a cleanup (see git history around
         // 2026-09-24). Restricting them to Development means a table ever being fully emptied in
         // Production can't silently repopulate it with demo/placeholder data on the next restart.
+        // SeedDemoProductsAsync is here too, not because it shares that specific risk (Products
+        // has no such guard to begin with), but because it's the same class of placeholder catalog
+        // data — and both the E2E test harness and local `dotnet run` explicitly run as
+        // Development, so this is also what gives them something to click/buy/review.
         var environment = services.GetRequiredService<IHostEnvironment>();
         if (environment.IsDevelopment())
         {
+            await SeedDemoProductsAsync(context, defaultMerchant.Id, colorCache, sizeCache);
             await SeedSubcategoriesAsync(context);
             await SeedFeaturesAsync(context);
             await SeedPromoEventsAsync(context);
             await SeedPromoCouponsAsync(context);
             await SeedStoresAsync(context);
         }
+
+        var seedLogger = services.GetRequiredService<ILoggerFactory>().CreateLogger("SeedData");
+        await SeedMissingVariantsAsync(context, colorCache, sizeCache, seedLogger);
+        await SeedInternalAttributeDefinitionsAsync(context);
+        await SeedApparelUseCaseAttributeDefinitionAsync(context);
+        await SeedApparelSubTypeAttributeDefinitionsAsync(context);
+        await SeedColorFamiliesAsync(context);
     }
 
     // The listing-page color filter facets on family, not individual Color rows — every
@@ -768,6 +774,74 @@ public static class SeedData
         };
 
         context.Categories.AddRange(categories);
+        await context.SaveChangesAsync();
+    }
+
+    // The 21-item curated launch lineup — placeholder catalog data for local development and the
+    // E2E test harness (both explicitly run as Development; see E2EWebAppFactory), which has
+    // nothing else to click/buy/review in its own throwaway schema. Never runs in Production.
+    private static async Task SeedDemoProductsAsync(ApplicationDbContext context, int defaultMerchantId, Dictionary<string, Color> colorCache, Dictionary<string, Size> sizeCache)
+    {
+        const string demoSkuMarker = "WLM-APP-";
+        if (await context.Products.AnyAsync(p => p.Sku.StartsWith(demoSkuMarker)))
+        {
+            return;
+        }
+
+        var categories = await context.Categories.ToDictionaryAsync(c => c.Slug);
+        if (categories.Count == 0)
+        {
+            return;
+        }
+
+        var products = new List<Product>
+        {
+            // Tactical Apparel
+            Product("Sentinel Combat Shirt", "sentinel-combat-shirt", categories["tactical-apparel"], "Breathable ripstop combat shirt with reinforced elbows.", Aed(54.99m), "WLM-APP-001", 40, true, 18838688, 4.8m, 312),
+            Product("Ranger Field Pants", "ranger-field-pants", categories["tactical-apparel"], "Stretch-panel field pants with reinforced knees and 8 pockets.", Aed(69.99m), "WLM-APP-002", 35, true, 16983209, 4.6m, 204),
+            Product("Vanguard Softshell Jacket", "vanguard-softshell-jacket", categories["tactical-apparel"], "Wind-resistant softshell jacket with adjustable hood.", Aed(89.99m), "WLM-APP-003", 25, false, 6368576, 4.8m, 176),
+            Product("Trailblazer Base Layer", "trailblazer-base-layer", categories["tactical-apparel"], "Moisture-wicking thermal base layer for cold weather ops.", Aed(34.99m), "WLM-APP-004", 50, false, 9522942, 4.5m, 98),
+            Product("Overwatch Cargo Shorts", "overwatch-cargo-shorts", categories["tactical-apparel"], "Lightweight ripstop cargo shorts built for hot climates.", Aed(44.99m), "WLM-APP-005", 30, false, 11716436, 4.4m, 67),
+
+            // Bags & Packs
+            Product("Expedition 45L Rucksack", "expedition-45l-rucksack", categories["bags-and-packs"], "Modular 45L rucksack with MOLLE webbing and hydration port.", Aed(149.99m), "WLM-BAG-001", 20, true, 11900635, 4.9m, 415),
+            Product("Recon Sling Pack", "recon-sling-pack", categories["bags-and-packs"], "Compact sling pack for fast access to daily essentials.", Aed(59.99m), "WLM-BAG-002", 40, true, 18318640, 4.7m, 289),
+            Product("Outrider Waist Pack", "outrider-waist-pack", categories["bags-and-packs"], "Low-profile waist pack with concealed carry compartment.", Aed(39.99m), "WLM-BAG-003", 45, false, 11726037, 4.5m, 132),
+            Product("Basecamp Duffel 90L", "basecamp-duffel-90l", categories["bags-and-packs"], "Heavy-duty 90L duffel for gear transport and deployment.", Aed(119.99m), "WLM-BAG-004", 18, false, 27462287, 4.6m, 88),
+
+            // Footwear
+            Product("Summit Tactical Boot", "summit-tactical-boot", categories["footwear"], "8-inch waterproof tactical boot with reinforced toe.", Aed(129.99m), "WLM-FTW-001", 30, true, 13882914, 4.8m, 501),
+            Product("Pathfinder Trail Shoe", "pathfinder-trail-shoe", categories["footwear"], "Lightweight trail shoe with aggressive grip outsole.", Aed(94.99m), "WLM-FTW-002", 35, true, 9654860, 4.6m, 243),
+            Product("Ironclad Combat Boot", "ironclad-combat-boot", categories["footwear"], "Full-grain leather combat boot with side zip entry.", Aed(139.99m), "WLM-FTW-003", 22, false, 4589107, 4.7m, 159),
+            Product("Glacier Insulated Boot", "glacier-insulated-boot", categories["footwear"], "Insulated cold-weather boot rated to -40F.", Aed(159.99m), "WLM-FTW-004", 15, false, 6555893, 4.9m, 94),
+
+            // Gear & Accessories
+            Product("Apex Riggers Belt", "apex-riggers-belt", categories["gear-and-accessories"], "Heavy-duty nylon riggers belt with quick-release buckle.", Aed(29.99m), "WLM-GEA-001", 60, false, 7679471, 4.4m, 76),
+            Product("Sentry Tactical Gloves", "sentry-tactical-gloves", categories["gear-and-accessories"], "Knuckle-protected gloves with touchscreen fingertips.", Aed(24.99m), "WLM-GEA-002", 55, true, 13796801, 4.7m, 358),
+            Product("Nightwatch Headlamp", "nightwatch-headlamp", categories["gear-and-accessories"], "300-lumen rechargeable headlamp with red-light mode.", Aed(32.99m), "WLM-GEA-003", 40, false, 34377535, 4.5m, 121),
+            Product("Precision Compass Kit", "precision-compass-kit", categories["gear-and-accessories"], "Lensatic compass with signal mirror and lanyard.", Aed(19.99m), "WLM-GEA-004", 70, false, 9906080, 4.3m, 54),
+
+            // Outdoor Equipment
+            Product("Basecamp 2-Person Tent", "basecamp-2-person-tent", categories["outdoor-equipment"], "Weatherproof 3-season tent with quick-pitch frame.", Aed(179.99m), "WLM-OUT-001", 12, true, 4268094, 4.8m, 227),
+            Product("Trailhead Hydration Carrier", "trailhead-hydration-carrier", categories["outdoor-equipment"], "3L hydration bladder carrier with insulated hose.", Aed(42.99m), "WLM-OUT-002", 38, false, 20446198, 4.4m, 63),
+            Product("Alpine Sleep System", "alpine-sleep-system", categories["outdoor-equipment"], "Compression sleeping bag rated for freezing temps.", Aed(109.99m), "WLM-OUT-003", 20, false, 7009497, 4.6m, 142),
+            Product("Frontier Camp Stove", "frontier-camp-stove", categories["outdoor-equipment"], "Compact folding camp stove with wind-resistant burner.", Aed(49.99m), "WLM-OUT-004", 28, false, 29295215, 4.5m, 85)
+        };
+
+        foreach (var product in products)
+        {
+            product.MerchantId = defaultMerchantId;
+
+            // Enroll the featured lineup in the Trade Program at a 30% wholesale discount.
+            if (product.IsFeatured)
+            {
+                product.WholesalePrice = Math.Round(product.Price * 0.70m, 2);
+            }
+        }
+
+        ApplyVariants(products, colorCache, sizeCache);
+
+        context.Products.AddRange(products);
         await context.SaveChangesAsync();
     }
 
