@@ -374,6 +374,13 @@ public class ProductsController : Controller
         var subcategoryLookup = categories.SelectMany(c => c.Subcategories).ToDictionary(s => s.Id);
         var brandLookup = allBrands.ToDictionary(b => b.Id);
 
+        // Distinct from "0 results under the active filters" — this specifically flags a
+        // subcategory that has zero published products at all, so the view can show a friendly
+        // "nothing here yet" message with a link back to the category instead of the generic
+        // no-results text.
+        var selectedSubcategoryIsEmpty = selectedSubcategoryIds.Count == 1
+            && !await _context.Products.AnyAsync(p => p.SubcategoryId == selectedSubcategoryIds[0] && p.IsPublished);
+
         var vm = new ProductListViewModel
         {
             Products = products,
@@ -381,6 +388,7 @@ public class ProductsController : Controller
             Brands = allBrands,
             SelectedCategoryId = categoryId,
             SelectedSubcategoryIds = selectedSubcategoryIds,
+            SelectedSubcategoryIsEmpty = selectedSubcategoryIsEmpty,
             SelectedBrandIds = selectedBrandIds,
             SelectedColorFamilies = selectedColorFamilyCodes,
             SelectedSizes = selectedSizes,

@@ -24,6 +24,17 @@
     }
     var navCategories = await DbContext.Categories.Include(c => c.Subcategories.OrderBy(s => s.Name)).OrderBy(c => c.Name).ToListAsync();
 
+    // A subcategory with zero published products is a dead end everywhere it's linked from (mega-
+    // menu columns, the "More" leftover bucket, Apparel's hand-curated real-subcategory links) — so
+    // every subcategory-driven builder below filters against this set first, same "only show what
+    // actually has data" rule already applied to the attr= links further down.
+    var subcategoriesWithPublishedProducts = (await DbContext.Products
+        .Where(p => p.IsPublished && p.SubcategoryId != null)
+        .Select(p => p.SubcategoryId!.Value)
+        .Distinct()
+        .ToListAsync())
+        .ToHashSet();
+
     // Short one-line promo captions for each category dropdown's image panel — same convention as
     // Welcome.cshtml's collectionsTagBySlug (decorative marketing copy, not core category data,
     // so a small slug-keyed dictionary here beats a new database field). Always English, matching
@@ -94,7 +105,7 @@
     List<(string Header, List<Subcategory> Items)> BuildMegaColumns(Category category)
     {
         var spec = megaMenuColumnsBySlug.GetValueOrDefault(category.Slug) ?? Array.Empty<(string Header, string[] Slugs)>();
-        var bySlug = category.Subcategories.ToDictionary(s => s.Slug);
+        var bySlug = category.Subcategories.Where(s => subcategoriesWithPublishedProducts.Contains(s.Id)).ToDictionary(s => s.Slug);
         var used = new HashSet<int>();
         var columns = new List<(string, List<Subcategory>)>();
         foreach (var (header, slugs) in spec)
@@ -113,7 +124,7 @@
                 columns.Add((header, items));
             }
         }
-        var leftovers = category.Subcategories.Where(s => !used.Contains(s.Id)).ToList();
+        var leftovers = category.Subcategories.Where(s => !used.Contains(s.Id) && subcategoriesWithPublishedProducts.Contains(s.Id)).ToList();
         if (leftovers.Count > 0)
         {
             columns.Add(("More", leftovers));
@@ -227,7 +238,7 @@
     // an empty results page (see AttrItem/AttrUrl below).
     async Task<List<(string Header, List<(string? SubHeader, List<(string Label, string Href)> Items)> Groups, string? PromoImage, string? PromoCaption, string? PromoCtaText, string? PromoCtaHref)>> BuildApparelMenuAsync(Category apparelCategory)
     {
-        var bySlug = apparelCategory.Subcategories.ToDictionary(s => s.Slug);
+        var bySlug = apparelCategory.Subcategories.Where(s => subcategoriesWithPublishedProducts.Contains(s.Id)).ToDictionary(s => s.Slug);
         string ProductsUrl(object routeValues) => Url.Action("Index", "Products", routeValues)!;
 
         // Only true if a published product actually carries this attribute code+value — gates
@@ -353,7 +364,10 @@
             ("View All", ProductsUrl(new { categoryId = apparelCategory.Id }))
         };
         AddIfPresent(uniformsAndShirtsItems, "Tactical Shirts", AttrUrl("UNIFORM-TYPE", "Tactical Shirts", new { categoryId = apparelCategory.Id }));
-        uniformsAndShirtsItems.Add(("Combat Shirts", ProductsUrl(new { categoryId = apparelCategory.Id, subcategoryIds = combatShirtIds })));
+        if (combatShirtIds.Length > 0)
+        {
+            uniformsAndShirtsItems.Add(("Combat Shirts", ProductsUrl(new { categoryId = apparelCategory.Id, subcategoryIds = combatShirtIds })));
+        }
         AddIfPresent(uniformsAndShirtsItems, "Field Shirts", AttrUrl("UNIFORM-TYPE", "Field Shirts", new { categoryId = apparelCategory.Id }));
         AddIfPresent(uniformsAndShirtsItems, "Combat Uniforms", AttrUrl("UNIFORM-TYPE", "Combat Uniforms", new { categoryId = apparelCategory.Id }));
         AddIfPresent(uniformsAndShirtsItems, "Uniform Sets", AttrUrl("UNIFORM-TYPE", "Uniform Sets", new { categoryId = apparelCategory.Id }));
@@ -411,10 +425,10 @@
         return new()
         {
             ("Featured", featured, apparelCategory.ImageUrl, megaMenuPromoCaptionBySlug.GetValueOrDefault(apparelCategory.Slug, apparelCategory.LocalizedName()), $"Shop {navLabelBySlug.GetValueOrDefault(apparelCategory.Slug, apparelCategory.LocalizedName())}", Url.Action("Index", "Products", new { categoryId = apparelCategory.Id })),
-            ("T-Shirts", tShirts, PexelsPromo(15814566), "Breathable everyday tees built for the field.", "Shop T-Shirts", tShirts[0].Items[0].Href),
-            ("Pants", pants, PexelsPromo(10901963), "Durable tactical pants that move with you.", "Shop Pants", pants[0].Items[0].Href),
-            ("Jackets & Outerwear", jackets, PexelsPromo(6368576), "Weather-ready outerwear for every mission.", "Shop Jackets & Outerwear", jackets[0].Items[0].Href),
-            ("Uniforms & Shirts", uniformsAndShirts, PexelsPromo(6786309), "Mission-ready shirts and uniforms, field-tested.", "Shop Uniforms & Shirts", uniformsAndShirts[0].Items[0].Href),
+            ("T-Shirts", tShirts, PexelsPromo(15814566), "Breathable everyday tees built for the field.", "Shop T-Shirts", tShirts[0].Items.Count > 0 ? tShirts[0].Items[0].Href : ProductsUrl(new { categoryId = apparelCategory.Id })),
+            ("Pants", pants, PexelsPromo(10901963), "Durable tactical pants that move with you.", "Shop Pants", pants[0].Items.Count > 0 ? pants[0].Items[0].Href : ProductsUrl(new { categoryId = apparelCategory.Id })),
+            ("Jackets & Outerwear", jackets, PexelsPromo(6368576), "Weather-ready outerwear for every mission.", "Shop Jackets & Outerwear", jackets[0].Items.Count > 0 ? jackets[0].Items[0].Href : ProductsUrl(new { categoryId = apparelCategory.Id })),
+            ("Uniforms & Shirts", uniformsAndShirts, PexelsPromo(6786309), "Mission-ready shirts and uniforms, field-tested.", "Shop Uniforms & Shirts", uniformsAndShirts[0].Items.Count > 0 ? uniformsAndShirts[0].Items[0].Href : ProductsUrl(new { categoryId = apparelCategory.Id })),
             ("Shop by Use", shopByUse, null, null, null, null),
             ("Shop by Size", shopBySize, null, null, null, null),
             ("Colors & Brands", colorsAndBrands, null, null, null, null)

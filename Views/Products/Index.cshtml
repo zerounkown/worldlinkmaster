@@ -72,7 +72,7 @@
                             </span>
                             <span class="category-subcat-tile-label">@Localizer["All {0}", currentCategory.LocalizedName()]</span>
                         </a>
-                        @foreach (var sub in currentCategory.Subcategories.OrderBy(s => s.DisplayOrder).ThenBy(s => s.Name))
+                        @foreach (var sub in currentCategory.Subcategories.Where(s => Model.SubcategoryFacets.Any(f => f.Id == s.Id)).OrderBy(s => s.DisplayOrder).ThenBy(s => s.Name))
                         {
                             <a class="category-subcat-tile product-carousel-item" asp-action="Index" asp-route-categoryId="@currentCategory.Id" asp-route-subcategoryId="@sub.Id">
                                 <span class="category-subcat-tile-img-wrap">
@@ -325,7 +325,7 @@ else
 
             @if (currentCategory != null && currentCategory.Slug == "bags-and-packs")
             {
-                var bagSubcategories = currentCategory.Subcategories.Where(s => !string.IsNullOrWhiteSpace(s.ImageUrl)).ToList();
+                var bagSubcategories = currentCategory.Subcategories.Where(s => !string.IsNullOrWhiteSpace(s.ImageUrl) && Model.SubcategoryFacets.Any(f => f.Id == s.Id)).ToList();
                 if (bagSubcategories.Count > 0)
                 {
                     <div class="subcat-tile-row">
@@ -341,7 +341,14 @@ else
                 }
             }
 
-            @if (Model.Products.Count == 0)
+            @if (Model.SelectedSubcategoryIsEmpty && currentSubcategory != null)
+            {
+                <div class="empty-subcategory-message">
+                    <p>@Localizer["There are no products in {0} yet.", currentSubcategory.LocalizedName()]</p>
+                    <a asp-action="Index" asp-route-categoryId="@currentCategory!.Id">@Localizer["Back to {0}", currentCategory!.LocalizedName()]</a>
+                </div>
+            }
+            else if (Model.Products.Count == 0)
             {
                 <p>@Localizer["No products found. Try a different category or search term."]</p>
             }
