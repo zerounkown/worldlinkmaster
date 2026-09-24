@@ -15,7 +15,7 @@
     if (Model.SelectedCategoryId.HasValue) { stateParams.Add($"categoryId={Model.SelectedCategoryId}"); }
     foreach (var id in Model.SelectedSubcategoryIds) { stateParams.Add($"subcategoryIds={id}"); }
     foreach (var id in Model.SelectedBrandIds) { stateParams.Add($"brandIds={id}"); }
-    foreach (var c in Model.SelectedColors) { stateParams.Add($"colors={Uri.EscapeDataString(c)}"); }
+    foreach (var c in Model.SelectedColorFamilies) { stateParams.Add($"colors={Uri.EscapeDataString(c)}"); }
     foreach (var s in Model.SelectedSizes) { stateParams.Add($"sizes={Uri.EscapeDataString(s)}"); }
     foreach (var id in Model.SelectedFeatureIds) { stateParams.Add($"featureIds={id}"); }
     foreach (var a in Model.SelectedAvailability) { stateParams.Add($"availability={a}"); }
@@ -179,17 +179,26 @@ else
                     </details>
                 }
 
-                @if (Model.ColorFacets.Count > 0)
+                @if (Model.ColorFamilyFacets.Count > 0)
                 {
                     <details class="filter-accordion" open>
                         <summary class="filter-header">@Localizer["Color"] <i class="bi bi-chevron-up"></i></summary>
-                        <div class="filter-body filter-swatch-row">
-                            @foreach (var c in Model.ColorFacets)
+                        <div class="filter-body" id="colorFacetList">
+                            @{ var colorRow = 0; }
+                            @foreach (var f in Model.ColorFamilyFacets)
                             {
-                                var isColorSelected = Model.SelectedColors.Contains(c.Name);
-                                <label class="filter-swatch @(isColorSelected ? "active" : "")" style="--swatch-color: @c.HexCode" title="@c.Name (@c.Count)">
-                                    <input type="checkbox" name="colors" value="@c.Name" checked="@(isColorSelected ? "checked" : null)" />
+                                colorRow++;
+                                var isColorSelected = Model.SelectedColorFamilies.Contains(f.Code);
+                                <label class="filter-checkbox-row @(colorRow > 5 ? "filter-extra" : "")">
+                                    <input type="checkbox" name="colors" value="@f.Code" checked="@(isColorSelected ? "checked" : null)" />
+                                    <i class="filter-color-dot" aria-hidden="true" style="--swatch-color: @f.HexCode; @(f.SwatchImageUrl != null ? $"background-image:url('{f.SwatchImageUrl}')" : "")"></i>
+                                    <span>@f.LocalizedName()</span>
+                                    <span class="filter-count">(@f.Count)</span>
                                 </label>
+                            }
+                            @if (Model.ColorFamilyFacets.Count > 5)
+                            {
+                                <button type="button" class="filter-show-more" data-target="colorFacetList" data-show-less="@Localizer["Show less"]">@Localizer["Show more"]</button>
                             }
                         </div>
                     </details>

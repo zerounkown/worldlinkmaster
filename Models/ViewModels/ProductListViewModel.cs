@@ -8,10 +8,16 @@ public class FacetCount
     public int Count { get; set; }
 }
 
-public class ColorFacetCount
+// Individual vendor colors are grouped into families for the listing-page filter (product
+// pages/cards still show the specific color name — this is filter-only).
+public class ColorFamilyFacetCount
 {
+    public int Id { get; set; }
+    public string Code { get; set; } = string.Empty;
     public string Name { get; set; } = string.Empty;
-    public string HexCode { get; set; } = "#000000";
+    public string? NameAr { get; set; }
+    public string HexCode { get; set; } = "#808080";
+    public string? SwatchImageUrl { get; set; }
     public int Count { get; set; }
 }
 
@@ -29,7 +35,8 @@ public class ProductListViewModel
     public int? SelectedCategoryId { get; set; }
     public List<int> SelectedSubcategoryIds { get; set; } = new();
     public List<int> SelectedBrandIds { get; set; } = new();
-    public List<string> SelectedColors { get; set; } = new();
+    // Family codes (e.g. "black", "tan-coyote"), not individual color names.
+    public List<string> SelectedColorFamilies { get; set; } = new();
     public List<string> SelectedSizes { get; set; } = new();
     public List<int> SelectedFeatureIds { get; set; } = new();
     public List<string> SelectedAvailability { get; set; } = new();
@@ -46,7 +53,7 @@ public class ProductListViewModel
 
     public List<FacetCount> SubcategoryFacets { get; set; } = new();
     public List<FacetCount> BrandFacets { get; set; } = new();
-    public List<ColorFacetCount> ColorFacets { get; set; } = new();
+    public List<ColorFamilyFacetCount> ColorFamilyFacets { get; set; } = new();
     public List<LabelFacetCount> SizeFacets { get; set; } = new();
     public List<FacetCount> FeatureFacets { get; set; } = new();
     public int InStockCount { get; set; }
@@ -54,7 +61,7 @@ public class ProductListViewModel
     public Dictionary<int, int> RatingCounts { get; set; } = new();
 
     public bool HasActiveFilters =>
-        SelectedSubcategoryIds.Count > 0 || SelectedBrandIds.Count > 0 || SelectedColors.Count > 0 ||
+        SelectedSubcategoryIds.Count > 0 || SelectedBrandIds.Count > 0 || SelectedColorFamilies.Count > 0 ||
         SelectedSizes.Count > 0 || SelectedFeatureIds.Count > 0 || SelectedAvailability.Count > 0 ||
         MinRating.HasValue || MinPrice.HasValue || MaxPrice.HasValue;
 }

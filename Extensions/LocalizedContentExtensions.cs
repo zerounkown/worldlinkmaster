@@ -45,6 +45,9 @@ public static class LocalizedContentExtensions
     public static string LocalizedName(this FacetCount facet) =>
         IsArabic && !string.IsNullOrWhiteSpace(facet.NameAr) ? facet.NameAr! : facet.Name;
 
+    public static string LocalizedName(this ColorFamilyFacetCount facet) =>
+        IsArabic && !string.IsNullOrWhiteSpace(facet.NameAr) ? facet.NameAr! : facet.Name;
+
     public static string LocalizedTitle(this HomeBanner banner) =>
         IsArabic && !string.IsNullOrWhiteSpace(banner.TitleAr) ? banner.TitleAr! : banner.TitleEn;
 

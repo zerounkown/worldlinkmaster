@@ -21,6 +21,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
     public DbSet<OrderItem> OrderItems => Set<OrderItem>();
     public DbSet<ProductImage> ProductImages => Set<ProductImage>();
     public DbSet<Color> Colors => Set<Color>();
+    public DbSet<ColorFamily> ColorFamilies => Set<ColorFamily>();
     public DbSet<Size> Sizes => Set<Size>();
     public DbSet<Merchant> Merchants => Set<Merchant>();
     public DbSet<MerchantPayout> MerchantPayouts => Set<MerchantPayout>();
@@ -325,6 +326,13 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
         builder.Entity<Category>().HasIndex(c => c.Code).IsUnique();
         builder.Entity<Subcategory>().HasIndex(s => s.Code).IsUnique();
         builder.Entity<Color>().HasIndex(c => c.Code).IsUnique();
+        builder.Entity<ColorFamily>().HasIndex(f => f.Code).IsUnique();
+        builder.Entity<Color>()
+            .HasOne(c => c.Family)
+            .WithMany(f => f.Colors)
+            .HasForeignKey(c => c.FamilyId)
+            .IsRequired(false)
+            .OnDelete(DeleteBehavior.SetNull);
         builder.Entity<Size>().HasIndex(s => s.Code).IsUnique();
         builder.Entity<SizeGroup>().HasIndex(g => g.Code).IsUnique();
         builder.Entity<AttributeDefinition>().HasIndex(a => a.Code).IsUnique();

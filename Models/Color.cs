@@ -26,4 +26,9 @@ public class Color
     public int DisplayOrder { get; set; }
 
     public bool Active { get; set; } = true;
+
+    // Null = unmapped (falls back to the "Other" family in the listing-page filter). New colors
+    // land here until someone assigns a family; see ColorFamily.
+    public int? FamilyId { get; set; }
+    public ColorFamily? Family { get; set; }
 }

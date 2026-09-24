@@ -2832,34 +2832,16 @@ a:hover {
   cursor: pointer;
 }
 
-.filter-swatch-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-}
-
-.filter-swatch {
-  position: relative;
-  width: 26px;
-  height: 26px;
+.filter-color-dot {
+  width: 15px;
+  height: 15px;
   border-radius: 50%;
-  background: var(--swatch-color, #ccc);
-  border: 2px solid white;
+  flex-shrink: 0;
+  background-color: var(--swatch-color, #ccc);
+  background-size: cover;
+  background-position: center;
   box-shadow: 0 0 0 1px var(--wlm-sand-light);
-  cursor: pointer;
-  display: block;
-}
-
-.filter-swatch input {
-  position: absolute;
-  inset: 0;
-  opacity: 0;
-  margin: 0;
-  cursor: pointer;
-}
-
-.filter-swatch.active {
-  box-shadow: 0 0 0 2px var(--wlm-sand);
+  display: inline-block;
 }
 
 .filter-stars {

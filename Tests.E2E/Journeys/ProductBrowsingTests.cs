@@ -17,9 +17,9 @@ public class ProductBrowsingTests : E2ETestBase
         await Assertions.Expect(Page.Locator(".product-card").First).ToBeVisibleAsync();
 
         // Views/Products/Index.cshtml's filter checkboxes auto-submit the GET form on change
-        // (wwwroot/js/site.js) — apply the first available color swatch facet. (Not brand: SeedData
+        // (wwwroot/js/site.js) — apply the first available color-family facet. (Not brand: SeedData
         // never seeds any Brands, so BrandFacets is always empty and that panel never renders.)
-        var colorCheckbox = Page.Locator(".filter-swatch-row input[type='checkbox']").First;
+        var colorCheckbox = Page.Locator("#colorFacetList input[type='checkbox']").First;
         await colorCheckbox.WaitForAsync();
         await colorCheckbox.CheckAsync();
         await Page.WaitForURLAsync(url => url.Contains("colors="));
