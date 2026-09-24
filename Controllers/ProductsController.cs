@@ -55,7 +55,17 @@ public class ProductsController : Controller
             selectedBrandIds.Add(brandId.Value);
         }
 
-        var selectedColors = (colors ?? Array.Empty<string>()).ToList();
+        // "colors" carries color-FAMILY codes (e.g. "black", "tan-coyote"), not individual color
+        // names — the listing-page filter facets on families only; PDP/product-card swatches are
+        // untouched and keep showing the specific vendor color.
+        var selectedColorFamilyCodes = (colors ?? Array.Empty<string>()).ToList();
+        var allColorFamilies = await _context.ColorFamilies.AsNoTracking().OrderBy(f => f.DisplayOrder).ToListAsync();
+        var colorFamilyByCode = allColorFamilies.ToDictionary(f => f.Code);
+        var otherFamilyId = colorFamilyByCode["other"].Id;
+        var selectedFamilyIds = selectedColorFamilyCodes
+            .Where(c => colorFamilyByCode.ContainsKey(c))
+            .Select(c => colorFamilyByCode[c].Id)
+            .ToList();
         var selectedSizes = (sizes ?? Array.Empty<string>()).ToList();
         var selectedFeatureIds = (featureIds ?? Array.Empty<int>()).ToList();
         var selectedAvailability = (availability ?? Array.Empty<string>()).ToList();
@@ -142,9 +152,9 @@ public class ProductsController : Controller
                 q = q.Where(p => p.BrandId.HasValue && selectedBrandIds.Contains(p.BrandId.Value));
             }
 
-            if (!skipColor && selectedColors.Count > 0)
+            if (!skipColor && selectedFamilyIds.Count > 0)
             {
-                q = q.Where(p => p.Variants.Any(v => v.Color != null && selectedColors.Contains(v.Color.Name)));
+                q = q.Where(p => p.Variants.Any(v => v.Color != null && selectedFamilyIds.Contains(v.Color.FamilyId ?? otherFamilyId)));
             }
 
             if (!skipSize && selectedSizes.Count > 0)
@@ -290,18 +300,38 @@ public class ProductsController : Controller
             return (subcategoryCounts, brands.Select(x => (x.Id, x.Count)).ToList(), (inStock, outOfStock), ratingCounts);
         }
 
-        async Task<(List<ColorFacetCount> Colors, List<LabelFacetCount> Sizes, List<FacetCount> Features)> RunVariantFacetsAsync()
+        async Task<(List<ColorFamilyFacetCount> Colors, List<LabelFacetCount> Sizes, List<FacetCount> Features)> RunVariantFacetsAsync()
         {
             await using var facetContext = await _contextFactory.CreateDbContextAsync();
             var bq = BuildBaseQuery(facetContext);
 
-            var colors = await ApplyFacets(bq, skipColor: true)
-                .SelectMany(p => p.Variants.Where(v => v.Color != null), (p, v) => new { p.Id, v.Color!.Name, v.Color.HexCode })
-                .GroupBy(x => new { x.Name, x.HexCode })
-                .Select(g => new ColorFacetCount { Name = g.Key.Name, HexCode = g.Key.HexCode, Count = g.Select(x => x.Id).Distinct().Count() })
+            var colorFamilyCounts = await ApplyFacets(bq, skipColor: true)
+                .SelectMany(p => p.Variants.Where(v => v.Color != null), (p, v) => new { p.Id, FamilyId = v.Color!.FamilyId ?? otherFamilyId })
+                .GroupBy(x => x.FamilyId)
+                .Select(g => new { FamilyId = g.Key, Count = g.Select(x => x.Id).Distinct().Count() })
+                .ToListAsync();
+
+            // Families with 0 matching products (given the currently-active filters) are simply
+            // absent from colorFamilyCounts — nothing extra needed to "hide" them.
+            var colors = colorFamilyCounts
+                .Where(c => colorFamilyByCode.Values.Any(f => f.Id == c.FamilyId))
+                .Select(c =>
+                {
+                    var f = allColorFamilies.First(x => x.Id == c.FamilyId);
+                    return new ColorFamilyFacetCount
+                    {
+                        Id = f.Id,
+                        Code = f.Code,
+                        Name = f.Name,
+                        NameAr = f.NameAr,
+                        HexCode = f.HexCode,
+                        SwatchImageUrl = f.SwatchImageUrl,
+                        Count = c.Count
+                    };
+                })
                 .OrderByDescending(x => x.Count)
                 .ThenBy(x => x.Name)
-                .ToListAsync();
+                .ToList();
 
             var sizes = await ApplyFacets(bq, skipSize: true)
                 .SelectMany(p => p.Variants.Where(v => v.Size != null), (p, v) => new { p.Id, v.Size!.Label })
@@ -349,7 +379,7 @@ public class ProductsController : Controller
             SelectedCategoryId = categoryId,
             SelectedSubcategoryIds = selectedSubcategoryIds,
             SelectedBrandIds = selectedBrandIds,
-            SelectedColors = selectedColors,
+            SelectedColorFamilies = selectedColorFamilyCodes,
             SelectedSizes = selectedSizes,
             SelectedFeatureIds = selectedFeatureIds,
             SelectedAvailability = selectedAvailability,
@@ -373,7 +403,7 @@ public class ProductsController : Controller
                 .Select(f => new FacetCount { Id = f.Id, Name = brandLookup[f.Id].Name, NameAr = brandLookup[f.Id].NameAr, Count = f.Count })
                 .OrderByDescending(f => f.Count)
                 .ToList(),
-            ColorFacets = colorFacets,
+            ColorFamilyFacets = colorFacets,
             SizeFacets = sizeFacets,
             FeatureFacets = featureFacets,
             InStockCount = inStockCount,
