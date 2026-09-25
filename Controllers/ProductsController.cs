@@ -122,6 +122,7 @@ public class ProductsController : Controller
                     EF.Functions.ILike(p.Sku, $"%{searchTrimmed}%") ||
                     (searchIsNumericId && p.Id == searchNumericId) ||
                     p.Variants.Any(v => v.Barcode != null && EF.Functions.ILike(v.Barcode, $"%{searchTrimmed}%")) ||
+                    p.Variants.Any(v => EF.Functions.ILike(v.Sku, $"%{searchTrimmed}%")) ||
                     EF.Functions.ILike(p.Name, $"%{searchTrimmed}%") ||
                     (p.NameAr != null && EF.Functions.ILike(p.NameAr, $"%{searchTrimmed}%")) ||
                     (p.Brand != null && EF.Functions.ILike(p.Brand.Name, $"%{searchTrimmed}%")) ||
@@ -229,6 +230,7 @@ public class ProductsController : Controller
                 .OrderByDescending(p =>
                     (EF.Functions.ILike(p.Sku, searchTrimmed)
                         || (searchIsNumericId && p.Id == searchNumericId)
+                        || p.Variants.Any(v => EF.Functions.ILike(v.Sku, searchTrimmed))
                         || p.Variants.Any(v => v.Barcode != null && EF.Functions.ILike(v.Barcode, searchTrimmed)))
                         ? 100
                     : (EF.Functions.ILike(p.Name, searchTrimmed) || EF.Functions.ILike(p.Name, searchTrimmed + "%"))
