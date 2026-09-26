@@ -610,7 +610,11 @@
                             <div class="size-options" id="waistOptionsContainer">
                                 @foreach (var w in waistsByColorId[defaultProductColor.Id])
                                 {
-                                    var isDisabled = StockFor(initialCombos, $"{w}|{initialLength}") <= 0;
+                                    // Disabled only when NO length at all works for this waist — a waist with
+                                    // even one in-stock length stays selectable regardless of which length
+                                    // happens to be selected right now (see product-gallery.js for the matching
+                                    // client-side rule and the auto-switch-length-on-pick behavior).
+                                    var isDisabled = !lengthsByColorId[defaultProductColor.Id].Any(l => StockFor(initialCombos, $"{w}|{l}") > 0);
                                     <label class="size-pill @(isDisabled ? "unavailable" : "")">
                                         <input type="radio" name="waistOption" value="@w" disabled="@(isDisabled ? "disabled" : null)" required="@(w == initialWaist ? "required" : null)" checked="@(w == initialWaist ? "checked" : null)" />
                                         <span>@w</span>
@@ -623,7 +627,8 @@
                             <div class="size-options" id="lengthOptionsContainer">
                                 @foreach (var l in lengthsByColorId[defaultProductColor.Id])
                                 {
-                                    var isDisabled = StockFor(initialCombos, $"{initialWaist}|{l}") <= 0;
+                                    // Same rule mirrored for length: disabled only when NO waist works for it.
+                                    var isDisabled = !waistsByColorId[defaultProductColor.Id].Any(w => StockFor(initialCombos, $"{w}|{l}") > 0);
                                     <label class="size-pill @(isDisabled ? "unavailable" : "")">
                                         <input type="radio" name="lengthOption" value="@l" disabled="@(isDisabled ? "disabled" : null)" required="@(l == initialLength ? "required" : null)" checked="@(l == initialLength ? "checked" : null)" />
                                         <span>@l</span>
