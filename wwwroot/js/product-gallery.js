@@ -32,6 +32,14 @@
     var sizeUnitContainer = document.getElementById("sizeUnitOptionsContainer");
     var sizeLengthContainer = document.getElementById("sizeLengthOptionsContainer");
     var sizeHiddenInput = document.getElementById("pdpSizeHiddenInput");
+    var waistLengthConfigEl = document.getElementById("waistLengthConfig");
+    var waistOptionsContainer = document.getElementById("waistOptionsContainer");
+    var lengthOptionsContainer = document.getElementById("lengthOptionsContainer");
+    var waistsByColorDataEl = document.getElementById("waistsByColorData");
+    var lengthsByColorDataEl = document.getElementById("lengthsByColorData");
+    var waistLengthComboDataEl = document.getElementById("waistLengthComboData");
+    var selectedWaistLabelEl = document.getElementById("selectedWaistLabel");
+    var selectedLengthLabelEl = document.getElementById("selectedLengthLabel");
 
     if (!mainImage || !zoomContainer) {
         return;
@@ -115,13 +123,37 @@
     }
     var currentSplitLabels = [];
 
+    // Waist × Length split (server-gated per-product to clean "28x30"-style labels — see
+    // Details.cshtml). A different interaction model from the letter-suffix split above: both
+    // pill rows always show every waist/length that exists for the selected color (never trimmed
+    // to a subset), and a combination with no stock is rendered disabled + struck-through instead
+    // of removed — see buildWaistLengthRow below. The hidden #pdpSizeHiddenInput still carries
+    // name="size" with the combo's ORIGINAL Size.Label (never a reconstructed string), so
+    // CartController's lookup is exactly as unaware of this split as it is of the other one.
+    var isWaistLengthMode = false;
+    if (waistLengthConfigEl) {
+        try {
+            isWaistLengthMode = !!JSON.parse(waistLengthConfigEl.textContent).enabled;
+        } catch (e) {
+            isWaistLengthMode = false;
+        }
+    }
+    var waistsByColorId = null;
+    var lengthsByColorId = null;
+    var waistLengthComboByColorId = null;
+    if (isWaistLengthMode) {
+        try { waistsByColorId = JSON.parse(waistsByColorDataEl.textContent); } catch (e) { waistsByColorId = null; }
+        try { lengthsByColorId = JSON.parse(lengthsByColorDataEl.textContent); } catch (e) { lengthsByColorId = null; }
+        try { waistLengthComboByColorId = JSON.parse(waistLengthComboDataEl.textContent); } catch (e) { waistLengthComboByColorId = null; }
+    }
+
     function currentColorKey() {
         var checked = document.querySelector('input[name="color"]:checked');
         return (checked && checked.getAttribute("data-color-id")) || "";
     }
 
     function currentSizeLabel() {
-        if (isSplitSizeMode) {
+        if (isSplitSizeMode || isWaistLengthMode) {
             return sizeHiddenInput ? sizeHiddenInput.value : "";
         }
         var checked = sizeContainer ? sizeContainer.querySelector('input[name="size"]:checked') : null;
@@ -235,6 +267,115 @@
             var length = e.target.value;
             var selectedUnit = buildSplitPillRow(sizeUnitContainer, "sizeUnit", unitsForLength(length), currentSplitUnit());
             syncSplitSize(selectedUnit, length);
+        });
+    }
+
+    function currentWaist() {
+        var checked = waistOptionsContainer ? waistOptionsContainer.querySelector('input[name="waistOption"]:checked') : null;
+        return checked ? checked.value : null;
+    }
+
+    function currentLength() {
+        var checked = lengthOptionsContainer ? lengthOptionsContainer.querySelector('input[name="lengthOption"]:checked') : null;
+        return checked ? checked.value : null;
+    }
+
+    function waistLengthCombo(colorId, waist, length) {
+        var combos = waistLengthComboByColorId && waistLengthComboByColorId[colorId];
+        return (combos && combos[waist + "|" + length]) || null;
+    }
+
+    function waistLengthAvailable(colorId, waist, length) {
+        var combo = waistLengthCombo(colorId, waist, length);
+        return !!combo && combo.stock > 0;
+    }
+
+    // Rebuilds ALL pills for one axis (waist or length) against the other axis's current value —
+    // unlike buildSplitPillRow above, nothing is ever left out: every value that exists anywhere
+    // for this color renders every time, with an unavailable one marked disabled (native
+    // "disabled" attribute, so it can never receive :checked or fire "change") and struck through
+    // via CSS instead of being removed from the row. Returns whichever value ends up selected, so
+    // the caller can feed it straight into building/resolving the other axis.
+    function buildWaistLengthRow(container, inputName, values, otherAxisValue, isWaistRow, colorId, preferredValue) {
+        if (!container) return null;
+        container.innerHTML = "";
+
+        function available(value) {
+            if (!otherAxisValue) return true;
+            return isWaistRow ? waistLengthAvailable(colorId, value, otherAxisValue) : waistLengthAvailable(colorId, otherAxisValue, value);
+        }
+
+        var firstAvailable = values.filter(available)[0];
+        var selected = (preferredValue && values.indexOf(preferredValue) >= 0 && available(preferredValue))
+            ? preferredValue
+            : (firstAvailable || values[0]);
+
+        values.forEach(function (value) {
+            var isAvailable = available(value);
+            var pill = document.createElement("label");
+            pill.className = "size-pill" + (isAvailable ? "" : " unavailable");
+            var input = document.createElement("input");
+            input.type = "radio";
+            input.name = inputName;
+            input.value = value;
+            input.disabled = !isAvailable;
+            if (value === selected) {
+                input.checked = true;
+                input.required = true;
+            }
+            pill.appendChild(input);
+            var span = document.createElement("span");
+            span.textContent = value;
+            pill.appendChild(span);
+            container.appendChild(pill);
+        });
+
+        return selected || null;
+    }
+
+    function syncWaistLength() {
+        var waist = currentWaist();
+        var length = currentLength();
+        if (selectedWaistLabelEl) { selectedWaistLabelEl.textContent = waist || ""; }
+        if (selectedLengthLabelEl) { selectedLengthLabelEl.textContent = length || ""; }
+        if (sizeHiddenInput) {
+            var combo = waistLengthCombo(currentColorKey(), waist, length);
+            sizeHiddenInput.value = combo ? combo.label : "";
+        }
+        updateSku();
+    }
+
+    // Rebuilds both rows for a new color — the waist row is built first against the previous
+    // length selection (or unconstrained on first render), then the length row against whichever
+    // waist that resolved to, then the waist row is resolved a second time against that length so
+    // the pair that ends up selected is always a real, in-stock combo rather than whatever each
+    // axis happened to land on independently.
+    function renderWaistLength(colorId) {
+        if (!waistOptionsContainer || !lengthOptionsContainer || !waistsByColorId || !lengthsByColorId) return;
+        var waists = waistsByColorId[colorId] || [];
+        var lengths = lengthsByColorId[colorId] || [];
+        var prevWaist = currentWaist();
+        var prevLength = currentLength();
+        var selectedWaist = buildWaistLengthRow(waistOptionsContainer, "waistOption", waists, prevLength, true, colorId, prevWaist);
+        var selectedLength = buildWaistLengthRow(lengthOptionsContainer, "lengthOption", lengths, selectedWaist, false, colorId, prevLength);
+        selectedWaist = buildWaistLengthRow(waistOptionsContainer, "waistOption", waists, selectedLength, true, colorId, selectedWaist);
+        syncWaistLength();
+    }
+
+    if (isWaistLengthMode && waistOptionsContainer && lengthOptionsContainer) {
+        waistOptionsContainer.addEventListener("change", function (e) {
+            if (!e.target || e.target.name !== "waistOption") return;
+            var colorId = currentColorKey();
+            var lengths = (lengthsByColorId && lengthsByColorId[colorId]) || [];
+            buildWaistLengthRow(lengthOptionsContainer, "lengthOption", lengths, e.target.value, false, colorId, currentLength());
+            syncWaistLength();
+        });
+        lengthOptionsContainer.addEventListener("change", function (e) {
+            if (!e.target || e.target.name !== "lengthOption") return;
+            var colorId = currentColorKey();
+            var waists = (waistsByColorId && waistsByColorId[colorId]) || [];
+            buildWaistLengthRow(waistOptionsContainer, "waistOption", waists, e.target.value, true, colorId, currentWaist());
+            syncWaistLength();
         });
     }
 
@@ -660,7 +801,9 @@
 
             var colorId = input.getAttribute("data-color-id");
 
-            if (sizesByColorId && colorId) {
+            if (isWaistLengthMode && colorId) {
+                renderWaistLength(colorId);
+            } else if (sizesByColorId && colorId) {
                 if (isSplitSizeMode) {
                     renderSplitSizes(sizesByColorId[colorId] || []);
                 } else {

@@ -229,6 +229,85 @@
 
     int LengthSortRank(string length) => length switch { "S" => 0, "R" => 1, "L" => 2, _ => 3 };
 
+    // --- Waist × Length split ("28x30" style labels) ---
+    // A separate mechanism from the letter-suffix split above: different Size Group ("TR-WL"),
+    // and a deliberately separator-agnostic parser — production data currently uses an ASCII "x"
+    // between the two numbers, but nothing here assumes that specific character; matching on
+    // "any run of non-digit characters" instead means a stray "×", "-", or space in the source
+    // data still parses correctly instead of silently failing to split.
+    //
+    // Gated per-PRODUCT, not per-group: the TR-WL Size Group also holds several older,
+    // inconsistently-labeled size families (plain numbers, "N - Long" suffixes, letter sizes) from
+    // past imports that don't fit this pattern at all — this only activates when every single size
+    // this product actually offers matches cleanly, so a future product sharing the messy group
+    // falls back to the ordinary flat size row instead of rendering broken chips.
+    //
+    // The interaction model is also different from the letter-suffix split: both axes always show
+    // every value that exists anywhere for the selected color (never trimmed to a subset), and a
+    // combination that doesn't exist or has no stock is rendered disabled + struck-through instead
+    // of being removed — see buildWaistLengthRow in product-gallery.js. Like the letter-suffix
+    // split, this never touches the underlying Size row: each combo's ORIGINAL Size.Label (never a
+    // reconstructed "waist+separator+length" string) is what ends up in the hidden `size` field, so
+    // CartController's Size.Label lookup — and everything downstream of it — is unchanged.
+    var waistLengthRegex = new System.Text.RegularExpressions.Regex(@"^(\d+)\D+(\d+)$");
+    var isWaistLengthSplitProduct = productSizeGroupCode == "TR-WL"
+        && sizeOptions.Count > 0
+        && sizeOptions.All(s => waistLengthRegex.IsMatch(s.Label));
+
+    (string Waist, string Length) DecomposeWaistLength(string label)
+    {
+        var match = waistLengthRegex.Match(label);
+        return match.Success ? (match.Groups[1].Value, match.Groups[2].Value) : (label, "");
+    }
+
+    int NumericSortRank(string value) => int.TryParse(value, out var n) ? n : int.MaxValue;
+
+    int StockFor(Dictionary<string, (string Label, int Stock)> combos, string key) =>
+        combos.TryGetValue(key, out var combo) ? combo.Stock : 0;
+
+    var waistsByColorId = new Dictionary<int, List<string>>();
+    var lengthsByColorId = new Dictionary<int, List<string>>();
+    var waistLengthComboByColorId = new Dictionary<int, Dictionary<string, (string Label, int Stock)>>();
+    var initialWaist = "";
+    var initialLength = "";
+
+    if (isWaistLengthSplitProduct && hasProductColors)
+    {
+        foreach (var pc in Model.ProductColors)
+        {
+            var combos = new Dictionary<string, (string Label, int Stock)>();
+            foreach (var v in Model.Variants.Where(v => v.ProductColorId == pc.Id && v.SizeId.HasValue))
+            {
+                var (waist, length) = DecomposeWaistLength(v.Size!.Label);
+                combos[$"{waist}|{length}"] = (v.Size.Label, v.StockQuantity);
+            }
+            waistLengthComboByColorId[pc.Id] = combos;
+            waistsByColorId[pc.Id] = combos.Keys.Select(k => k.Split('|')[0]).Distinct().OrderBy(NumericSortRank).ToList();
+            lengthsByColorId[pc.Id] = combos.Keys.Select(k => k.Split('|')[1]).Distinct().OrderBy(NumericSortRank).ToList();
+        }
+
+        // Default to the first waist that has at least one in-stock length, then the first
+        // in-stock length for that waist — falls back to the very first combo at all if nothing
+        // is in stock (the page's own "Out of Stock" messaging is driven separately by the
+        // aggregate Model.StockQuantity, not this picker).
+        var defaultColorId = defaultProductColor!.Id;
+        var defaultCombos = waistLengthComboByColorId.GetValueOrDefault(defaultColorId, new());
+        var defaultWaists = waistsByColorId.GetValueOrDefault(defaultColorId, new());
+        var defaultLengths = lengthsByColorId.GetValueOrDefault(defaultColorId, new());
+        initialWaist = defaultWaists.FirstOrDefault(w => defaultLengths.Any(l => StockFor(defaultCombos, $"{w}|{l}") > 0))
+            ?? defaultWaists.FirstOrDefault() ?? "";
+        initialLength = defaultLengths.FirstOrDefault(l => StockFor(defaultCombos, $"{initialWaist}|{l}") > 0)
+            ?? defaultLengths.FirstOrDefault() ?? "";
+    }
+
+    // System.Text.Json serializes a ValueTuple by its Item1/Item2 field names, not the "Label"/
+    // "Stock" names used above for readability — projected to an anonymous type here so the JSON
+    // actually matches what product-gallery.js reads (combo.label / combo.stock).
+    var waistLengthComboDataJson = JsonSerializer.Serialize(
+        waistLengthComboByColorId.ToDictionary(
+            outer => outer.Key,
+            outer => outer.Value.ToDictionary(inner => inner.Key, inner => new { label = inner.Value.Label, stock = inner.Value.Stock })));
+
     // Maps "<colorKey>|<sizeLabel>" to that specific ProductVariant's Sku, so the SKU line can
     // follow whichever variant is currently selected instead of always showing the parent
     // Product.Sku. colorKey is the ProductColor.Id for imported products (matching the color
@@ -491,7 +570,45 @@
                         </div>
                     }
 
-                    @if (isSplitSizeProduct && initialSizeOptions.Count > 0)
+                    @if (isWaistLengthSplitProduct)
+                    {
+                        var initialCombos = waistLengthComboByColorId[defaultProductColor!.Id];
+                        var initialHiddenValue = initialCombos.TryGetValue($"{initialWaist}|{initialLength}", out var initialCombo)
+                            ? initialCombo.Label
+                            : (sizeOptions.FirstOrDefault()?.Label ?? "");
+                        <div class="mb-3">
+                            <label class="option-label">@Localizer["Waist"]: <span id="selectedWaistLabel">@initialWaist</span></label>
+                            <div class="size-options" id="waistOptionsContainer">
+                                @foreach (var w in waistsByColorId[defaultProductColor.Id])
+                                {
+                                    var isDisabled = StockFor(initialCombos, $"{w}|{initialLength}") <= 0;
+                                    <label class="size-pill @(isDisabled ? "unavailable" : "")">
+                                        <input type="radio" name="waistOption" value="@w" disabled="@(isDisabled ? "disabled" : null)" required="@(w == initialWaist ? "required" : null)" checked="@(w == initialWaist ? "checked" : null)" />
+                                        <span>@w</span>
+                                    </label>
+                                }
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="option-label">@Localizer["Length"]: <span id="selectedLengthLabel">@initialLength</span></label>
+                            <div class="size-options" id="lengthOptionsContainer">
+                                @foreach (var l in lengthsByColorId[defaultProductColor.Id])
+                                {
+                                    var isDisabled = StockFor(initialCombos, $"{initialWaist}|{l}") <= 0;
+                                    <label class="size-pill @(isDisabled ? "unavailable" : "")">
+                                        <input type="radio" name="lengthOption" value="@l" disabled="@(isDisabled ? "disabled" : null)" required="@(l == initialLength ? "required" : null)" checked="@(l == initialLength ? "checked" : null)" />
+                                        <span>@l</span>
+                                    </label>
+                                }
+                            </div>
+                        </div>
+                        <input type="hidden" name="size" id="pdpSizeHiddenInput" value="@initialHiddenValue" />
+                        <script type="application/json" id="waistLengthConfig">@Html.Raw(JsonSerializer.Serialize(new { enabled = true }))</script>
+                        <script type="application/json" id="waistsByColorData">@Html.Raw(JsonSerializer.Serialize(waistsByColorId))</script>
+                        <script type="application/json" id="lengthsByColorData">@Html.Raw(JsonSerializer.Serialize(lengthsByColorId))</script>
+                        <script type="application/json" id="waistLengthComboData">@Html.Raw(waistLengthComboDataJson)</script>
+                    }
+                    else if (isSplitSizeProduct && initialSizeOptions.Count > 0)
                     {
                         var initialDecomposed = initialSizeOptions.Select(s => DecomposeSize(s.Label)).ToList();
                         var initialUnits = initialDecomposed.Select(d => d.Unit).Distinct().ToList();

@@ -144,6 +144,7 @@
   <data name="Color" xml:space="preserve"><value>اللون</value></data>
   <data name="Size" xml:space="preserve"><value>المقاس</value></data>
   <data name="Length" xml:space="preserve"><value>الطول</value></data>
+  <data name="Waist" xml:space="preserve"><value>الخصر</value></data>
   <data name="Please select a color and size." xml:space="preserve"><value>يرجى اختيار اللون والمقاس.</value></data>
   <data name="Add To Basket" xml:space="preserve"><value>أضف إلى السلة</value></data>
 

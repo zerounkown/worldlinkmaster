@@ -202,7 +202,10 @@
 
             var label = document.createElement("label");
             label.className = "size-pill";
-            label.innerHTML = '<input type="radio" name="quickAddSize" value="' + escapeHtml(size.label) + '" ' + (index === 0 ? "checked" : "") + ' /><span>' + escapeHtml(size.label) + '</span>';
+            // value stays the raw Size.Label (matched against variants[].size for stock/price
+            // lookup below); the visible text uses displayLabel, which reformats a "28x30"-style
+            // Waist x Length label as "28 / 30" and is a no-op for every other size shape.
+            label.innerHTML = '<input type="radio" name="quickAddSize" value="' + escapeHtml(size.label) + '" ' + (index === 0 ? "checked" : "") + ' /><span>' + escapeHtml(size.displayLabel || size.label) + '</span>';
             label.addEventListener("click", function () {
                 selectedSize = size.label;
                 updatePriceAndAvailability();
