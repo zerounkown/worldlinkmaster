@@ -17,6 +17,23 @@
   transform: translateX(0);
 }
 
+/* Cart drawer slides in from the opposite edge of the side nav: reading-end (left, in RTL)
+   instead of the reading-start edge .side-nav uses. */
+.cart-drawer {
+  right: auto;
+  left: 0;
+  box-shadow: 8px 0 30px rgba(10, 10, 10, 0.4);
+  transform: translateX(-100%);
+}
+
+.cart-drawer.open {
+  transform: translateX(0);
+}
+
+.cart-drawer-row-remove {
+  padding: 0 8px 0 0;
+}
+
 .main-nav-dropdown-panel {
   left: auto;
   right: 0;

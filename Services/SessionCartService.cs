@@ -37,7 +37,7 @@ public class SessionCartService : ICartService
         return item.ProductId == productId && item.Color == color && item.Size == size;
     }
 
-    public void AddToCart(Product product, int quantity, string? color, string? size, decimal unitPrice)
+    public void AddToCart(Product product, int quantity, string? color, string? size, decimal unitPrice, string? imageUrl = null)
     {
         var cart = GetCart();
         var existing = cart.FirstOrDefault(i => Matches(i, product.Id, color, size));
@@ -52,7 +52,7 @@ public class SessionCartService : ICartService
                 ProductId = product.Id,
                 Name = product.Name,
                 UnitPrice = unitPrice,
-                ImageUrl = product.ImageUrl,
+                ImageUrl = imageUrl ?? product.ImageUrl,
                 Quantity = quantity,
                 Color = color,
                 Size = size,

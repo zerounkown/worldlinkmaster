@@ -340,6 +340,8 @@
   <!-- ===================== Cart ===================== -->
   <data name="Your Cart" xml:space="preserve"><value>سلة التسوق</value></data>
   <data name="Your cart is empty." xml:space="preserve"><value>سلة التسوق فارغة.</value></data>
+  <data name="View Cart" xml:space="preserve"><value>عرض السلة</value></data>
+  <data name="Back to product" xml:space="preserve"><value>العودة إلى المنتج</value></data>
   <data name="Product" xml:space="preserve"><value>المنتج</value></data>
   <data name="Price" xml:space="preserve"><value>السعر</value></data>
   <data name="Quantity" xml:space="preserve"><value>الكمية</value></data>
