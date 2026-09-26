@@ -18,6 +18,10 @@
     var lifestyleImage = document.getElementById("pdpLifestyleImage");
     var skuValueEl = document.getElementById("pdpSkuValue");
     var variantSkuDataEl = document.getElementById("variantSkuData");
+    var pdpPriceValueEl = document.getElementById("pdpPriceValue");
+    var variantPriceDataEl = document.getElementById("variantPriceData");
+    var qtyInputEl = document.getElementById("cartQuantityInput");
+    var pdpSavingsLineEl = document.getElementById("pdpSavingsLine");
     // Fixed additional-images photos (pocket/back/side/detail shots common to every color, see
     // _PdpColorGallery.cshtml) live in the SAME #productThumbs strip as the color thumbs,
     // appended after them and marked [data-shared] — never rebuilt on color change (renderGallery
@@ -96,6 +100,19 @@
             variantSkuByKey = JSON.parse(variantSkuDataEl.textContent);
         } catch (e) {
             variantSkuByKey = null;
+        }
+    }
+
+    // Same key shape/lookup as variantSkuByKey, but for price — { "<colorKey>|<sizeLabel>":
+    // { price, priceFormatted }, ... }. A variant with its own Price overrides the product's
+    // base price (see Details.cshtml); this is what was missing before, so the PDP always
+    // showed the base price no matter which color/size was selected.
+    var variantPriceByKey = null;
+    if (variantPriceDataEl) {
+        try {
+            variantPriceByKey = JSON.parse(variantPriceDataEl.textContent);
+        } catch (e) {
+            variantPriceByKey = null;
         }
     }
 
@@ -189,6 +206,7 @@
             sizeHiddenInput.value = (unit || "") + (length || "");
         }
         updateSku();
+        updatePrice();
     }
 
     function currentSplitUnit() {
@@ -247,6 +265,31 @@
         skuValueEl.textContent = variantSkuByKey[key] || skuValueEl.getAttribute("data-base-sku");
     }
 
+    // Falls back to the product's base price (stashed in data-base-price/-formatted, same
+    // pattern as data-base-sku above) whenever the current combo doesn't resolve to a specific
+    // variant. Dispatches "change" on the quantity input so its own listener (Details.cshtml)
+    // recomputes the quantity total from the freshly-set data-unit-price.
+    function updatePrice() {
+        if (!variantPriceByKey || !qtyInputEl) return;
+        var key = currentColorKey() + "|" + currentSizeLabel();
+        var info = variantPriceByKey[key];
+        var unitPrice = info ? info.price : qtyInputEl.getAttribute("data-base-price");
+        var formatted = info ? info.priceFormatted : qtyInputEl.getAttribute("data-base-price-formatted");
+        if (pdpPriceValueEl && formatted) {
+            pdpPriceValueEl.textContent = formatted;
+        }
+        if (unitPrice != null) {
+            qtyInputEl.setAttribute("data-unit-price", unitPrice);
+            qtyInputEl.dispatchEvent(new Event("change"));
+        }
+        if (pdpSavingsLineEl) {
+            var savingsText = info && info.savingsText ? info.savingsText : pdpSavingsLineEl.getAttribute("data-base-savings-text");
+            if (savingsText) {
+                pdpSavingsLineEl.textContent = savingsText;
+            }
+        }
+    }
+
     // Size pills are rebuilt from scratch on every color change (see renderSizes below), so a
     // delegated listener on the container — rather than binding each pill directly — is what
     // keeps working after a rebuild without needing to rebind anything.
@@ -254,6 +297,7 @@
         sizeContainer.addEventListener("change", function (e) {
             if (e.target && e.target.name === "size") {
                 updateSku();
+                updatePrice();
             }
         });
     }
@@ -671,6 +715,7 @@
             // After renderSizes (if it ran) so this reads whichever size pill just got
             // auto-checked as the new color's default, not the previous color's selection.
             updateSku();
+            updatePrice();
 
             if (lifestylePhoto && lifestyleImage && lifestyleByColorId && colorId) {
                 var lifestyleUrl = lifestyleByColorId[colorId];

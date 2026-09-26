@@ -239,6 +239,35 @@
     var variantSkuByKey = Model.Variants
         .GroupBy(v => (hasProductColors ? v.ProductColorId?.ToString() : v.ColorId?.ToString()) + "|" + (v.Size?.Label ?? ""))
         .ToDictionary(g => g.Key, g => g.First().Sku);
+
+    // Same key shape as variantSkuByKey — a variant's own Price (when set) overrides the
+    // product's base price (e.g. one colorway priced differently), but the displayed price and
+    // the quantity-total calculation only ever read Model.Price and never updated on color/size
+    // change. price is pre-formatted to the shopper's display currency and already has any
+    // active sale discount applied, exactly like _ProductCard.cshtml's quick-add variants do.
+    var variantPriceByKey = Model.Variants
+        .GroupBy(v => (hasProductColors ? v.ProductColorId?.ToString() : v.ColorId?.ToString()) + "|" + (v.Size?.Label ?? ""))
+        .ToDictionary(g => g.Key, g =>
+        {
+            var basePriceForVariant = g.First().Price ?? Model.Price;
+            var finalPrice = activeEvent != null
+                ? basePriceForVariant * (1 - activeEvent.DiscountPercent / 100m)
+                : basePriceForVariant;
+            // The "You save X (Y%)" line's percent never changes (same event for every variant),
+            // but the AED amount does when the variant's own base price differs from Model.Price
+            // — server-rendered here (not reconstructed client-side) so the localized word order
+            // stays correct in both EN and AR.
+            string? savingsText = activeEvent != null
+                ? Localizer["You save {0} ({1}%)", (basePriceForVariant - finalPrice).ToDisplayCurrency(), activeEvent.DiscountPercent.ToString("0.##")].Value
+                : null;
+            return new
+            {
+                price = finalPrice.ToDisplayCurrencyValue(),
+                priceFormatted = finalPrice.ToDisplayCurrency(),
+                savingsText
+            };
+        });
+    var variantPriceDataJson = JsonSerializer.Serialize(variantPriceByKey);
     var variantSkuDataJson = JsonSerializer.Serialize(variantSkuByKey);
 
     var initialColorKey = hasProductColors
@@ -434,7 +463,7 @@
                             <span class="sale-ribbon"><i class="bi bi-stars"></i> @activeEvent!.Name &mdash; @activeEvent.DiscountPercent.ToString("0.##")% @Localizer["OFF"]</span>
                         </div>
                     }
-                    <h2 class="pdp-price mb-1">@((salePrice ?? Model.Price).ToDisplayCurrency())</h2>
+                    <h2 class="pdp-price mb-1"><span id="pdpPriceValue">@((salePrice ?? Model.Price).ToDisplayCurrency())</span></h2>
                     @if (Model.VatRate.HasValue)
                     {
                         <p class="pdp-vat-note mb-1"><i class="bi bi-info-circle" title="@Localizer["Includes {0}% VAT", (Model.VatRate.Value * 100).ToString("0.##")]"></i> @Localizer["VAT Included"]</p>
@@ -442,7 +471,7 @@
                     @if (salePrice.HasValue)
                     {
                         var saveAmount = Model.Price - salePrice.Value;
-                        <p class="pdp-savings mb-1">@Localizer["You save {0} ({1}%)", saveAmount.ToDisplayCurrency(), activeEvent!.DiscountPercent.ToString("0.##")]</p>
+                        <p class="pdp-savings mb-1" id="pdpSavingsLine" data-base-savings-text="@Localizer["You save {0} ({1}%)", saveAmount.ToDisplayCurrency(), activeEvent!.DiscountPercent.ToString("0.##")]">@Localizer["You save {0} ({1}%)", saveAmount.ToDisplayCurrency(), activeEvent!.DiscountPercent.ToString("0.##")]</p>
                     }
                     <p class="pdp-stock-line mb-3">
                         <span class="pdp-stock-dot"></span> @Localizer["In Stock"]
@@ -551,13 +580,15 @@
                     @if (Model.Variants.Count > 0)
                     {
                         <script type="application/json" id="variantSkuData">@Html.Raw(variantSkuDataJson)</script>
+                        <script type="application/json" id="variantPriceData">@Html.Raw(variantPriceDataJson)</script>
                     }
 
                     <div class="pdp-qty-cart-row mb-2">
                         <div class="pdp-qty-stepper">
                             <button type="button" class="pdp-qty-btn" id="cartQtyDecrement" aria-label="@Localizer["Decrease quantity"]">&minus;</button>
                             <input type="number" name="quantity" id="cartQuantityInput" value="1" min="1" max="@Model.StockQuantity" class="pdp-qty-input"
-                                   data-unit-price="@effectiveUnitPrice.ToString(System.Globalization.CultureInfo.InvariantCulture)" data-currency-symbol="@currencySymbol" />
+                                   data-unit-price="@effectiveUnitPrice.ToString(System.Globalization.CultureInfo.InvariantCulture)" data-currency-symbol="@currencySymbol"
+                                   data-base-price="@effectiveUnitPrice.ToString(System.Globalization.CultureInfo.InvariantCulture)" data-base-price-formatted="@((salePrice ?? Model.Price).ToDisplayCurrency())" />
                             <button type="button" class="pdp-qty-btn" id="cartQtyIncrement" aria-label="@Localizer["Increase quantity"]">&plus;</button>
                         </div>
                         <div class="pdp-btn-row">
@@ -895,12 +926,16 @@
             var totalEl = document.getElementById("cartTotalPrice");
             if (!qtyInput || !totalEl) return;
 
-            var unitPrice = parseFloat(qtyInput.getAttribute("data-unit-price"));
             var symbol = qtyInput.getAttribute("data-currency-symbol") || "";
 
+            // Re-read data-unit-price on every call rather than capturing it once — product-
+            // gallery.js updates that attribute (and dispatches "change") whenever the selected
+            // color/size resolves to a variant with its own price, so the total stays correct
+            // across variant switches, not just quantity changes.
             function updateTotal() {
                 var qty = parseInt(qtyInput.value, 10);
                 if (!qty || qty < 1) qty = 1;
+                var unitPrice = parseFloat(qtyInput.getAttribute("data-unit-price"));
                 var total = unitPrice * qty;
                 totalEl.textContent = symbol + total.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
             }
