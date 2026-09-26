@@ -36,6 +36,7 @@
   --pdp-swatch-size: 46px;
   --pdp-swatch-border-selected: 3px;
   --pdp-swatch-border-unselected: 1px;
+  --pdp-swatch-ring-gap: 2px;
   --pdp-lightbox-arrow-size: 56px;
 }
 
@@ -5500,8 +5501,13 @@ a:hover {
   box-shadow: 0 2px 8px rgba(10, 10, 10, 0.25);
 }
 
+/* A border-color change alone (the old approach) disappears against dark swatches like Black
+   or Navy since the selected border color, --wlm-forest, is itself a near-black (#1a1a1a). A
+   white gap ring plus a dark outer ring stays visible against any swatch color; box-shadow
+   doesn't participate in box sizing, so the swatch's own dimensions never shift on selection —
+   only the border color already used for hover/unselected states.  */
 .color-swatch:has(input:checked) {
-  border: var(--pdp-swatch-border-selected) solid var(--wlm-forest);
+  box-shadow: 0 0 0 var(--pdp-swatch-ring-gap) #fff, 0 0 0 calc(var(--pdp-swatch-ring-gap) + var(--pdp-swatch-border-selected)) var(--wlm-ink);
 }
 
 .option-value {
