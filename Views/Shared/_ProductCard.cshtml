@@ -43,7 +43,7 @@
         var sizes = Model.Variants
             .Where(v => v.Size != null)
             .GroupBy(v => v.SizeId)
-            .Select(g => new { label = g.First().Size!.Label })
+            .Select(g => new { label = g.First().Size!.Label, displayLabel = g.First().Size!.Label.ToDisplaySizeLabel() })
             .ToList();
 
         var variants = Model.Variants.Select(v =>

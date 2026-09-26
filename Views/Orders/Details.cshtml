@@ -68,7 +68,7 @@
                     {
                         <tr>
                             <td>@item.ProductName</td>
-                            <td class="text-muted small">@item.Color @(!string.IsNullOrEmpty(item.Color) && !string.IsNullOrEmpty(item.Size) ? " / " : "") @item.Size</td>
+                            <td class="text-muted small">@item.Color @(!string.IsNullOrEmpty(item.Color) && !string.IsNullOrEmpty(item.Size) ? " / " : "") @item.Size.ToDisplaySizeLabel()</td>
                             <td>@item.UnitPrice.ToDisplayCurrency()</td>
                             <td>@item.Quantity</td>
                             <td>@item.LineTotal.ToDisplayCurrency()</td>

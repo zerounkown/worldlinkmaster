@@ -82,7 +82,7 @@
                                             <small class="text-muted">
                                                 @if (!string.IsNullOrEmpty(item.Color)) { <text>@Localizer["Color"]: @item.Color</text> }
                                                 @if (!string.IsNullOrEmpty(item.Color) && !string.IsNullOrEmpty(item.Size)) { <text> &middot; </text> }
-                                                @if (!string.IsNullOrEmpty(item.Size)) { <text>@Localizer["Size"]: @item.Size</text> }
+                                                @if (!string.IsNullOrEmpty(item.Size)) { <text>@Localizer["Size"]: @item.Size.ToDisplaySizeLabel()</text> }
                                             </small>
                                         }
                                         @if (!string.IsNullOrEmpty(stockInfo?.Sku))
