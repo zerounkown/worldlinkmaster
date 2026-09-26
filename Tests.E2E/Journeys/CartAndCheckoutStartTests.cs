@@ -33,4 +33,23 @@ public class CartAndCheckoutStartTests : E2ETestBase
         await Page.WaitForURLAsync(url => url.Contains("/Checkout"));
         await Assertions.Expect(Page.Locator("#checkout-wizard-root")).ToBeVisibleAsync();
     }
+
+    // Regression test for a bug where items added via the AJAX cart-drawer flow (PR #142) never
+    // made it into /Cart for anonymous visitors. Deliberately does NOT call AuthPages.RegisterAsync
+    // -- E2ETestBase hands each test class a fresh IBrowserContext with no auth cookies, so this
+    // is already a genuinely cookie-less, anonymous session. The drawer's own AJAX refresh isn't
+    // enough evidence the cart persisted -- the assertion has to survive a real top-level
+    // navigation to /Cart, which is exactly what was broken.
+    [Fact]
+    public async Task AnonymousSession_AddToCartViaDrawer_PersistsAcrossFullPageNavigation()
+    {
+        await OpenFirstProductDetailAsync();
+        var pdp = new ProductDetailPage(Page);
+        await pdp.AddToCartAsync();
+        await Assertions.Expect(Page.Locator("#cartDrawer.open")).ToBeVisibleAsync();
+
+        await Page.GotoAsync(Url("Cart"));
+        var cart = new CartPage(Page);
+        await Assertions.Expect(cart.QuantityValue).ToHaveTextAsync("1");
+    }
 }

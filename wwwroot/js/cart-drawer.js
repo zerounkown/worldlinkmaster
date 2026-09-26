@@ -71,6 +71,7 @@
         params.set("__RequestVerificationToken", getToken());
         return fetch(url, {
             method: "POST",
+            credentials: "same-origin",
             headers: { "X-Requested-With": "XMLHttpRequest" },
             body: params
         }).then(function (resp) { return resp.json(); });
@@ -153,6 +154,7 @@
                 var formData = new FormData(addToCartForm);
                 fetch(addToCartForm.getAttribute("action") || "/Cart/Add", {
                     method: "POST",
+                    credentials: "same-origin",
                     headers: { "X-Requested-With": "XMLHttpRequest" },
                     body: formData
                 })

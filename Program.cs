@@ -314,6 +314,28 @@ if (!jwtKeyConfigured)
         "Jwt:Key is not configured; using an ephemeral signing key. Set the Jwt__Key environment variable so issued tokens survive restarts and are valid across instances.");
 }
 
+// Session (carts, applied coupons) and Data Protection keys fall back to per-instance in-memory
+// storage when Redis isn't configured (see the cache setup above). That's fine for a single node,
+// but on a scaled-out deployment a request can land on a different instance than the one that
+// wrote the session -- e.g. a visitor's Add to Cart lands on instance A, then their next page
+// load is routed to instance B, which has never seen that session and shows an empty cart. This
+// is exactly what happened in production: App Service ran 2 instances with ARR (session)
+// affinity OFF. Affinity is now ON as a stopgap so a visitor keeps hitting the same instance, but
+// that's a workaround, not a fix -- it doesn't survive an instance recycle/deploy mid-session,
+// and it stops working the moment affinity is (re-)disabled or a 3rd instance is added. This
+// warning exists so a missing Redis connection shows up in the logs instead of silently looking
+// like a cart bug again.
+if (!app.Environment.IsDevelopment() && string.IsNullOrWhiteSpace(redisConnection))
+{
+    app.Logger.LogWarning(
+        "ConnectionStrings:Redis is not configured outside Development. Session state and Data Protection keys " +
+        "are using the in-memory fallback, which is NOT shared across instances. If this app is scaled to more " +
+        "than one instance, carts/coupons/logins can appear to randomly disappear depending on which instance " +
+        "handles a given request. Session (ARR) affinity in Azure App Service is currently being used as a " +
+        "stopgap workaround for this, but it is not a substitute for shared session storage -- set the " +
+        "ConnectionStrings__Redis app setting as the long-term fix for any multi-instance deployment.");
+}
+
 // ---------------------------------------------------------------------------
 // HTTP request pipeline.
 // ---------------------------------------------------------------------------
