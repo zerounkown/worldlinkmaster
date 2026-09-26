@@ -303,41 +303,50 @@
         return (combos && combos[waist + "|" + length]) || null;
     }
 
-    function waistLengthAvailable(colorId, waist, length) {
+    function waistLengthStock(colorId, waist, length) {
         var combo = waistLengthCombo(colorId, waist, length);
-        return !!combo && combo.stock > 0;
+        return combo ? combo.stock : 0;
     }
 
-    // Rebuilds ALL pills for one axis (waist or length) against the other axis's current value —
-    // unlike buildSplitPillRow above, nothing is ever left out: every value that exists anywhere
-    // for this color renders every time, with an unavailable one marked disabled (native
-    // "disabled" attribute, so it can never receive :checked or fire "change") and struck through
-    // via CSS instead of being removed from the row. Returns whichever value ends up selected, so
-    // the caller can feed it straight into building/resolving the other axis.
-    function buildWaistLengthRow(container, inputName, values, otherAxisValue, isWaistRow, colorId, preferredValue) {
-        if (!container) return null;
+    // A waist/length is disabled only when NONE of its combinations on the other axis have stock
+    // — not just the one currently selected. E.g. if Black 44x30 is out of stock but 44x32 isn't,
+    // waist 44 stays selectable for Black; picking it then auto-switches length to 32 (see the
+    // change handlers below). This is why disabled state, once computed per color, never changes
+    // again on a waist/length click — only which pill is *checked* does.
+    function waistHasStock(colorId, waist, lengths) {
+        return lengths.some(function (l) { return waistLengthStock(colorId, waist, l) > 0; });
+    }
+
+    function lengthHasStock(colorId, length, waists) {
+        return waists.some(function (w) { return waistLengthStock(colorId, w, length) > 0; });
+    }
+
+    function firstAvailableLength(colorId, waist, lengths) {
+        return lengths.filter(function (l) { return waistLengthStock(colorId, waist, l) > 0; })[0] || lengths[0];
+    }
+
+    function firstAvailableWaist(colorId, length, waists) {
+        return waists.filter(function (w) { return waistLengthStock(colorId, w, length) > 0; })[0] || waists[0];
+    }
+
+    // Builds every pill for one axis exactly once per color — unlike buildSplitPillRow above,
+    // nothing is ever left out or rebuilt on a same-color click: disabledFn is evaluated per
+    // value up front (see waistHasStock/lengthHasStock) and a disabled pill uses the native
+    // "disabled" attribute (can't receive :checked or fire "change") plus the .unavailable
+    // strikethrough style.
+    function buildWaistLengthRow(container, inputName, values, disabledFn, selectedValue) {
+        if (!container) return;
         container.innerHTML = "";
-
-        function available(value) {
-            if (!otherAxisValue) return true;
-            return isWaistRow ? waistLengthAvailable(colorId, value, otherAxisValue) : waistLengthAvailable(colorId, otherAxisValue, value);
-        }
-
-        var firstAvailable = values.filter(available)[0];
-        var selected = (preferredValue && values.indexOf(preferredValue) >= 0 && available(preferredValue))
-            ? preferredValue
-            : (firstAvailable || values[0]);
-
         values.forEach(function (value) {
-            var isAvailable = available(value);
+            var isDisabled = disabledFn(value);
             var pill = document.createElement("label");
-            pill.className = "size-pill" + (isAvailable ? "" : " unavailable");
+            pill.className = "size-pill" + (isDisabled ? " unavailable" : "");
             var input = document.createElement("input");
             input.type = "radio";
             input.name = inputName;
             input.value = value;
-            input.disabled = !isAvailable;
-            if (value === selected) {
+            input.disabled = isDisabled;
+            if (value === selectedValue) {
                 input.checked = true;
                 input.required = true;
             }
@@ -347,8 +356,6 @@
             pill.appendChild(span);
             container.appendChild(pill);
         });
-
-        return selected || null;
     }
 
     function syncWaistLength() {
@@ -361,22 +368,27 @@
             sizeHiddenInput.value = combo ? combo.label : "";
         }
         updateSku();
+        updatePrice();
     }
 
-    // Rebuilds both rows for a new color — the waist row is built first against the previous
-    // length selection (or unconstrained on first render), then the length row against whichever
-    // waist that resolved to, then the waist row is resolved a second time against that length so
-    // the pair that ends up selected is always a real, in-stock combo rather than whatever each
-    // axis happened to land on independently.
-    function renderWaistLength(colorId) {
+    // Rebuilds both rows for a color: each pill's disabled state is fixed for that color (see
+    // waistHasStock/lengthHasStock), then a selected pair is picked — preferring the previous
+    // selection where it's still valid, otherwise the first enabled waist and the first
+    // in-stock length for it.
+    function renderWaistLength(colorId, preferredWaist, preferredLength) {
         if (!waistOptionsContainer || !lengthOptionsContainer || !waistsByColorId || !lengthsByColorId) return;
         var waists = waistsByColorId[colorId] || [];
         var lengths = lengthsByColorId[colorId] || [];
-        var prevWaist = currentWaist();
-        var prevLength = currentLength();
-        var selectedWaist = buildWaistLengthRow(waistOptionsContainer, "waistOption", waists, prevLength, true, colorId, prevWaist);
-        var selectedLength = buildWaistLengthRow(lengthOptionsContainer, "lengthOption", lengths, selectedWaist, false, colorId, prevLength);
-        selectedWaist = buildWaistLengthRow(waistOptionsContainer, "waistOption", waists, selectedLength, true, colorId, selectedWaist);
+
+        var selectedWaist = (preferredWaist && waists.indexOf(preferredWaist) >= 0 && waistHasStock(colorId, preferredWaist, lengths))
+            ? preferredWaist
+            : (waists.filter(function (w) { return waistHasStock(colorId, w, lengths); })[0] || waists[0]);
+        var selectedLength = (preferredLength && lengths.indexOf(preferredLength) >= 0 && waistLengthStock(colorId, selectedWaist, preferredLength) > 0)
+            ? preferredLength
+            : firstAvailableLength(colorId, selectedWaist, lengths);
+
+        buildWaistLengthRow(waistOptionsContainer, "waistOption", waists, function (w) { return !waistHasStock(colorId, w, lengths); }, selectedWaist);
+        buildWaistLengthRow(lengthOptionsContainer, "lengthOption", lengths, function (l) { return !lengthHasStock(colorId, l, waists); }, selectedLength);
         syncWaistLength();
     }
 
@@ -384,15 +396,27 @@
         waistOptionsContainer.addEventListener("change", function (e) {
             if (!e.target || e.target.name !== "waistOption") return;
             var colorId = currentColorKey();
+            var waist = e.target.value;
             var lengths = (lengthsByColorId && lengthsByColorId[colorId]) || [];
-            buildWaistLengthRow(lengthOptionsContainer, "lengthOption", lengths, e.target.value, false, colorId, currentLength());
+            var length = currentLength();
+            if (!length || waistLengthStock(colorId, waist, length) <= 0) {
+                length = firstAvailableLength(colorId, waist, lengths);
+                var lengthInput = lengthOptionsContainer.querySelector('input[name="lengthOption"][value="' + length + '"]');
+                if (lengthInput) { lengthInput.checked = true; }
+            }
             syncWaistLength();
         });
         lengthOptionsContainer.addEventListener("change", function (e) {
             if (!e.target || e.target.name !== "lengthOption") return;
             var colorId = currentColorKey();
+            var length = e.target.value;
             var waists = (waistsByColorId && waistsByColorId[colorId]) || [];
-            buildWaistLengthRow(waistOptionsContainer, "waistOption", waists, e.target.value, true, colorId, currentWaist());
+            var waist = currentWaist();
+            if (!waist || waistLengthStock(colorId, waist, length) <= 0) {
+                waist = firstAvailableWaist(colorId, length, waists);
+                var waistInput = waistOptionsContainer.querySelector('input[name="waistOption"][value="' + waist + '"]');
+                if (waistInput) { waistInput.checked = true; }
+            }
             syncWaistLength();
         });
     }
@@ -846,7 +870,7 @@
             var colorId = input.getAttribute("data-color-id");
 
             if (isWaistLengthMode && colorId) {
-                renderWaistLength(colorId);
+                renderWaistLength(colorId, currentWaist(), currentLength());
             } else if (sizesByColorId && colorId) {
                 if (isSplitSizeMode) {
                     renderSplitSizes(sizesByColorId[colorId] || []);
