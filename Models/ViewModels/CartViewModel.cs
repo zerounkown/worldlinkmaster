@@ -18,10 +18,17 @@ public class CartViewModel
 
     // Per-line enrichment not stored on CartItem itself (looked up from ProductVariant)
     public Dictionary<string, CartLineStockInfo> StockInfoByLineKey { get; set; } = new();
+
+    // The most recently added line (by cart insertion order — AddToCart appends genuinely new
+    // lines to the end, only mutating an existing line's Quantity in place), used by the "Back
+    // to product" link on the cart page. Null when the cart is empty.
+    public string? LastAddedProductSlug { get; set; }
+    public string? LastAddedColor { get; set; }
 }
 
 public class CartLineStockInfo
 {
     public string? Sku { get; set; }
     public int StockQuantity { get; set; }
+    public string? Slug { get; set; }
 }

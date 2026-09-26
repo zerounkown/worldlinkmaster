@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Localization;
 using WorldLinkMaster.Web.Data;
+using WorldLinkMaster.Web.Extensions;
 using WorldLinkMaster.Web.Models;
 using WorldLinkMaster.Web.Models.ViewModels;
 using WorldLinkMaster.Web.Resources;
@@ -91,8 +92,19 @@ public class CartController : Controller
             vm.StockInfoByLineKey[lineKey] = new CartLineStockInfo
             {
                 Sku = !string.IsNullOrEmpty(variant?.Sku) ? variant.Sku : product.Sku,
-                StockQuantity = variant?.StockQuantity ?? product.StockQuantity
+                StockQuantity = variant?.StockQuantity ?? product.StockQuantity,
+                Slug = product.Slug
             };
+        }
+
+        if (items.Count > 0)
+        {
+            var lastItem = items[^1];
+            if (products.TryGetValue(lastItem.ProductId, out var lastProduct))
+            {
+                vm.LastAddedProductSlug = lastProduct.Slug;
+                vm.LastAddedColor = lastItem.Color;
+            }
         }
 
         await ApplyStoredCouponAsync(vm);
@@ -129,6 +141,8 @@ public class CartController : Controller
         var product = await _context.Products
             .Include(p => p.Variants).ThenInclude(v => v.Color)
             .Include(p => p.Variants).ThenInclude(v => v.Size)
+            .Include(p => p.ProductColors).ThenInclude(pc => pc.Color)
+            .Include(p => p.ProductColors).ThenInclude(pc => pc.Media)
             .FirstOrDefaultAsync(p => p.Id == productId);
         if (product == null)
         {
@@ -187,7 +201,8 @@ public class CartController : Controller
             }
         }
 
-        _cartService.AddToCart(product, quantity < 1 ? 1 : quantity, color, size, unitPrice);
+        var cartImageUrl = ResolveColorImageUrl(product, color, variant);
+        _cartService.AddToCart(product, quantity < 1 ? 1 : quantity, color, size, unitPrice, cartImageUrl);
         var message = saleMessage ?? (wholesaleEligible
             ? _localizer["{0} added to your cart at your wholesale price.", product.Name].Value
             : _localizer["{0} added to your cart.", product.Name].Value);
@@ -207,6 +222,52 @@ public class CartController : Controller
         }
 
         return RedirectToAction("Details", "Products", new { slug = product.Slug });
+    }
+
+    // Resolves the image for the specific color just added — the product's own gallery photo
+    // for that ProductColor (imported products), else its swatch image, else the legacy
+    // per-variant ImageUrl, else the product's default image. Mirrors the same fallback chain
+    // Details.cshtml already uses for its own color gallery, just without the shared/color-scope
+    // merging that page's full gallery needs (a cart thumbnail only ever shows one photo).
+    private static string? ResolveColorImageUrl(Product product, string? color, ProductVariant? variant)
+    {
+        if (string.IsNullOrEmpty(color))
+        {
+            return product.ImageUrl;
+        }
+
+        var productColor = product.ProductColors.FirstOrDefault(pc => string.Equals(pc.Color?.Name, color, StringComparison.OrdinalIgnoreCase));
+        var ownMedia = productColor?.Media
+            .Where(m => m.ShowInGallery && ImagePlaceholder.IsRealImageUrl(m.MediaUrl))
+            .OrderByDescending(m => m.IsColorMain)
+            .ThenBy(m => m.DisplayOrder)
+            .FirstOrDefault();
+        if (ownMedia != null)
+        {
+            return ownMedia.MediaUrl;
+        }
+
+        if (ImagePlaceholder.IsRealImageUrl(productColor?.SwatchImageUrl))
+        {
+            return productColor!.SwatchImageUrl;
+        }
+
+        if (ImagePlaceholder.IsRealImageUrl(variant?.ImageUrl))
+        {
+            return variant!.ImageUrl;
+        }
+
+        return product.ImageUrl;
+    }
+
+    // Fetched via AJAX right after a successful Add, so the drawer never needs a full page
+    // reload — reuses the exact same BuildCartViewModelAsync() as the cart page itself, so
+    // stock/SKU/price enrichment and coupon state are always consistent between the two.
+    [HttpGet]
+    public async Task<IActionResult> Drawer()
+    {
+        var vm = await BuildCartViewModelAsync();
+        return PartialView("_CartDrawer", vm);
     }
 
     private bool IsAjax() => Request.Headers["X-Requested-With"] == "XMLHttpRequest";
@@ -241,9 +302,30 @@ public class CartController : Controller
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public IActionResult Remove(int productId, string? color = null, string? size = null)
+    public async Task<IActionResult> Remove(int productId, string? color = null, string? size = null)
     {
         _cartService.RemoveFromCart(productId, color, size);
+
+        // Existing plain-form callers (the cart page's own remove button) are unaffected — this
+        // branch is only reached by the cart drawer, which sends the AJAX header, exactly like
+        // UpdateQuantityAjax's dual-mode pattern above.
+        if (IsAjax())
+        {
+            var vm = await BuildCartViewModelAsync();
+            return Json(new
+            {
+                success = true,
+                subtotal = vm.Subtotal,
+                shippingCost = vm.ShippingCost,
+                total = vm.Total,
+                amountAwayFromFreeShipping = vm.AmountAwayFromFreeShipping,
+                qualifiesForFreeShipping = vm.QualifiesForFreeShipping,
+                couponDiscountAmount = vm.CouponDiscountAmount,
+                itemCount = _cartService.GetItemCount(),
+                isEmpty = vm.Items.Count == 0
+            });
+        }
+
         return RedirectToAction(nameof(Index));
     }
 

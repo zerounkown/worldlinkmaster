@@ -810,6 +810,21 @@
         </nav>
     </aside>
 
+    @* Side cart drawer — shell lives here so it's present on every page, but its only current
+       trigger is a successful Add to Cart on the product detail page (see cart-drawer.js), which
+       fetches Cart/Drawer's rendered content into #cartDrawerBody before opening it. Structurally
+       mirrors .side-nav/.side-nav-overlay just above (reuses that overlay class outright), but
+       opens from the opposite edge — see .cart-drawer in site.css / site-rtl.css. *@
+    <div class="side-nav-overlay" id="cartDrawerOverlay"></div>
+    <aside class="cart-drawer" id="cartDrawer" aria-hidden="true" role="dialog" aria-label="@Localizer["Your Cart"]">
+        @Html.AntiForgeryToken()
+        <div class="cart-drawer-header">
+            <span class="cart-drawer-title">@Localizer["Your Cart"]</span>
+            <button type="button" class="cart-drawer-close" id="cartDrawerClose" aria-label="@Localizer["Close"]">&times;</button>
+        </div>
+        <div class="cart-drawer-body" id="cartDrawerBody"></div>
+    </aside>
+
     <main class="site-main">
         @RenderBody()
     </main>
@@ -933,6 +948,7 @@
     <script src="~/js/product-quick-add.js" asp-append-version="true"></script>
     <script src="~/js/product-card-swatches.js" asp-append-version="true"></script>
     <script src="~/js/cart-count-refresh.js" asp-append-version="true"></script>
+    <script src="~/js/cart-drawer.js" asp-append-version="true"></script>
     <script src="~/js/delete-button.js" asp-append-version="true"></script>
     <script src="~/js/main-nav-dropdown.js" asp-append-version="true"></script>
     <script src="~/js/currency-switch.js" asp-append-version="true"></script>

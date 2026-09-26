@@ -1,0 +1,112 @@
+@using WorldLinkMaster.Web.Models.ViewModels
+@using WorldLinkMaster.Web.Services
+@model CartViewModel
+@{
+    var currencySymbol = CurrencyContext.Current == "USD" ? "$" : "AED ";
+}
+
+@if (Model.Items.Count == 0)
+{
+    <p class="cart-drawer-empty">@Localizer["Your cart is empty."]</p>
+}
+else
+{
+    <div class="cart-drawer-items">
+        @for (int i = 0; i < Model.Items.Count; i++)
+        {
+            var item = Model.Items[i];
+            var lineKey = $"{item.ProductId}|{item.Color}|{item.Size}";
+            var unitPriceValue = item.UnitPrice.ToDisplayCurrencyValue();
+            var stockInfo = Model.StockInfoByLineKey.TryGetValue(lineKey, out var si) ? si : null;
+            var stock = stockInfo?.StockQuantity ?? 0;
+            var productUrl = !string.IsNullOrEmpty(stockInfo?.Slug)
+                ? Url.Action("Details", "Products", new { slug = stockInfo!.Slug, color = item.Color })
+                : null;
+            <div class="cart-line-row cart-drawer-row" data-line-key="@lineKey" data-product-id="@item.ProductId" data-color="@item.Color" data-size="@item.Size"
+                 data-unit-price="@unitPriceValue.ToString(System.Globalization.CultureInfo.InvariantCulture)" data-stock="@stock">
+                @if (productUrl != null)
+                {
+                    <a href="@productUrl" class="cart-drawer-row-image">
+                        <img src="@item.ImageUrl" alt="@item.Name" />
+                    </a>
+                }
+                else
+                {
+                    <span class="cart-drawer-row-image">
+                        <img src="@item.ImageUrl" alt="@item.Name" />
+                    </span>
+                }
+                <div class="cart-drawer-row-details">
+                    @if (productUrl != null)
+                    {
+                        <a href="@productUrl" class="cart-drawer-row-name">@item.Name</a>
+                    }
+                    else
+                    {
+                        <span class="cart-drawer-row-name">@item.Name</span>
+                    }
+                    @{
+                        var isWaistLength = item.Size.TryGetWaistLength(out var waist, out var length);
+                    }
+                    @if (!string.IsNullOrEmpty(item.Color) || !string.IsNullOrEmpty(item.Size))
+                    {
+                        <small class="text-muted cart-drawer-row-options">
+                            @if (!string.IsNullOrEmpty(item.Color)) { <text>@Localizer["Color"]: @item.Color</text> }
+                            @if (!string.IsNullOrEmpty(item.Color) && !string.IsNullOrEmpty(item.Size)) { <text> &middot; </text> }
+                            @if (isWaistLength)
+                            {
+                                <text>@Localizer["Waist"]: @waist &middot; @Localizer["Length"]: @length</text>
+                            }
+                            else if (!string.IsNullOrEmpty(item.Size))
+                            {
+                                <text>@Localizer["Size"]: @item.Size</text>
+                            }
+                        </small>
+                    }
+                    <div class="cart-drawer-row-bottom">
+                        <div class="qty-stepper cart-qty-stepper">
+                            <button type="button" class="qty-btn cart-qty-minus" aria-label="@Localizer["Decrease quantity"]">&minus;</button>
+                            <span class="cart-qty-value">@item.Quantity</span>
+                            <button type="button" class="qty-btn cart-qty-plus" aria-label="@Localizer["Increase quantity"]">&plus;</button>
+                        </div>
+                        <span class="cart-line-total" data-currency-symbol="@currencySymbol">@item.LineTotal.ToDisplayCurrency()</span>
+                    </div>
+                </div>
+                <button type="button" class="cart-drawer-row-remove" aria-label="@Localizer["Remove"]">&times;</button>
+            </div>
+        }
+    </div>
+
+    <div class="cart-drawer-summary">
+        <div class="free-shipping-bar mb-3" id="cartDrawerFreeShippingBar"
+             data-threshold="@CartViewModel.FreeShippingThreshold.ToString(System.Globalization.CultureInfo.InvariantCulture)"
+             data-currency-symbol="@currencySymbol">
+            <div class="free-shipping-bar-track">
+                <div class="free-shipping-bar-fill" id="cartDrawerFreeShippingBarFill" style="width: @(Math.Min(100, Model.Subtotal / CartViewModel.FreeShippingThreshold * 100).ToString("0.##", System.Globalization.CultureInfo.InvariantCulture))%;"></div>
+            </div>
+            <div class="free-shipping-bar-label">
+                <span><i class="bi bi-truck"></i> @Localizer["Free Shipping"] <span class="text-muted">(@currencySymbol@CartViewModel.FreeShippingThreshold.ToString("0.##"))</span></span>
+                <span id="cartDrawerFreeShippingBarStatus" class="@(Model.QualifiesForFreeShipping ? "free-shipping-qualified" : "")"
+                      data-qualified-text="@Localizer["You are eligible for free shipping!"]"
+                      data-away-text="@Localizer["{0} away from free shipping"]">
+                    @if (Model.QualifiesForFreeShipping)
+                    {
+                        <text><i class="bi bi-check-circle-fill"></i> @Localizer["You are eligible for free shipping!"]</text>
+                    }
+                    else
+                    {
+                        <text>@Localizer["{0} away from free shipping", currencySymbol + Model.AmountAwayFromFreeShipping.ToString("0.##")]</text>
+                    }
+                </span>
+            </div>
+        </div>
+
+        <div class="d-flex justify-content-between fw-bold mb-3">
+            <span>@Localizer["Subtotal"]</span>
+            <span id="cartDrawerSubtotal" data-currency-symbol="@currencySymbol">@Model.Subtotal.ToDisplayCurrency()</span>
+        </div>
+
+        <a class="btn-wlm-outline-dark w-100 text-center d-block mb-2" asp-controller="Cart" asp-action="Index">@Localizer["View Cart"]</a>
+        <a class="btn-wlm-black w-100 text-center d-block" asp-controller="Checkout" asp-action="Index">@Localizer["Checkout"]</a>
+    </div>
+}

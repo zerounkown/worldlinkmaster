@@ -48,6 +48,14 @@
         .OrderBy(s => s.SortOrder)
         .ToList();
 
+    // Lets product-card swatches, the cart drawer/page, and the "Back to product" link all
+    // deep-link straight to a specific color via ?color=Name — e.g. hovered/tapped a swatch, then
+    // clicked through, or came back from the cart for the color they just added. Falls back to
+    // the normal DefaultColor/first-color logic when absent or the name doesn't match any of this
+    // product's colors. Shared by both the imported (hasProductColors) and legacy color pickers
+    // below, so it works the same way regardless of which one a given product uses.
+    var requestedColorName = Context.Request.Query["color"].ToString();
+
     // --- New per-color gallery (only meaningful when hasProductColors) ---
     ProductColor? defaultProductColor = null;
     Dictionary<int, List<Dictionary<string, string?>>> galleryByColorId = new();
@@ -57,11 +65,6 @@
 
     if (hasProductColors)
     {
-        // Lets product-card swatches (category/search/homepage grids) deep-link straight to a
-        // specific color via ?color=Name — e.g. hovered/tapped a swatch, then clicked through.
-        // Falls back to the normal DefaultColor/first-color logic when absent or the name
-        // doesn't match any of this product's colors.
-        var requestedColorName = Context.Request.Query["color"].ToString();
         defaultProductColor = (!string.IsNullOrEmpty(requestedColorName)
                 ? Model.ProductColors.FirstOrDefault(pc => string.Equals(pc.Color?.Name, requestedColorName, StringComparison.OrdinalIgnoreCase))
                 : null)
@@ -533,7 +536,7 @@
 
             @if (Model.StockQuantity > 0)
             {
-                <form asp-controller="Cart" asp-action="Add" method="post">
+                <form asp-controller="Cart" asp-action="Add" method="post" id="pdpAddToCartForm">
                     <input type="hidden" name="productId" value="@Model.Id" />
 
                     @if (salePrice.HasValue)
@@ -583,6 +586,9 @@
                     }
                     else if (!hasProductColors && colorOptions.Count > 0)
                     {
+                        var defaultLegacyColorIndex = !string.IsNullOrEmpty(requestedColorName)
+                            ? Math.Max(0, colorOptions.FindIndex(o => string.Equals(o.Color.Name, requestedColorName, StringComparison.OrdinalIgnoreCase)))
+                            : 0;
                         <div class="mb-3">
                             <label class="option-label">@Localizer["Color"]</label>
                             <div class="color-options">
@@ -591,11 +597,11 @@
                                     var opt = colorOptions[i];
                                     var swatchStyle = $"background-color: {opt.Color.HexCode};";
                                     <label class="color-swatch" style="@swatchStyle" title="@opt.Color.Name">
-                                        <input type="radio" name="color" value="@opt.Color.Name" data-color-id="@opt.Color.Id" data-image="@(ImagePlaceholder.IsRealImageUrl(opt.ImageUrl) ? opt.ImageUrl : Model.ImageUrl)" data-label="@opt.Color.Name" required="@(i == 0 ? "required" : null)" checked="@(i == 0 ? "checked" : null)" />
+                                        <input type="radio" name="color" value="@opt.Color.Name" data-color-id="@opt.Color.Id" data-image="@(ImagePlaceholder.IsRealImageUrl(opt.ImageUrl) ? opt.ImageUrl : Model.ImageUrl)" data-label="@opt.Color.Name" required="@(i == 0 ? "required" : null)" checked="@(i == defaultLegacyColorIndex ? "checked" : null)" />
                                     </label>
                                 }
                             </div>
-                            <span class="option-value" id="selectedColorLabel">@colorOptions[0].Color.Name</span>
+                            <span class="option-value" id="selectedColorLabel">@colorOptions[defaultLegacyColorIndex].Color.Name</span>
                         </div>
                     }
 
@@ -714,10 +720,11 @@
                             <button type="button" class="pdp-qty-btn" id="cartQtyIncrement" aria-label="@Localizer["Increase quantity"]">&plus;</button>
                         </div>
                         <div class="pdp-btn-row">
-                            <button type="submit" class="pdp-btn-cart"><i class="bi bi-cart3"></i> @Localizer["Add to Cart"]</button>
+                            <button type="submit" class="pdp-btn-cart" id="pdpAddToCartBtn"><i class="bi bi-cart3"></i> @Localizer["Add to Cart"]</button>
                             <button type="submit" name="redirectToCheckout" value="true" class="pdp-btn-buynow">@Localizer["Buy Now"]</button>
                         </div>
                     </div>
+                    <div class="checkout-step-error" id="pdpCartError" data-generic-error="@Localizer["Something went wrong. Please try again."]"></div>
                     @if (User.Identity?.IsAuthenticated == true)
                     {
                         <button type="button" class="pdp-btn-wishlist js-favorite-toggle @(detailIsFavorite ? "active" : "")" data-product-id="@Model.Id"

@@ -70,12 +70,29 @@
                             var stockInfo = Model.StockInfoByLineKey.TryGetValue(lineKey, out var si) ? si : null;
                             var stock = stockInfo?.StockQuantity ?? 0;
                             var isFavorite = User.Identity?.IsAuthenticated == true && await FavoriteService.IsFavoriteAsync(item.ProductId);
+                            var itemProductUrl = !string.IsNullOrEmpty(stockInfo?.Slug)
+                                ? Url.Action("Details", "Products", new { slug = stockInfo!.Slug, color = item.Color })
+                                : null;
                             <tr class="cart-line-row" data-line-key="@lineKey" data-product-id="@item.ProductId" data-color="@item.Color" data-size="@item.Size"
                                 data-unit-price="@unitPriceValue.ToString(System.Globalization.CultureInfo.InvariantCulture)" data-stock="@stock">
                                 <td class="d-flex align-items-center gap-3">
-                                    <img src="@item.ImageUrl" alt="@item.Name" style="width:60px;height:60px;object-fit:cover;border-radius:4px;" />
+                                    @if (itemProductUrl != null)
+                                    {
+                                        <a href="@itemProductUrl"><img src="@item.ImageUrl" alt="@item.Name" style="width:60px;height:60px;object-fit:cover;border-radius:4px;" /></a>
+                                    }
+                                    else
+                                    {
+                                        <img src="@item.ImageUrl" alt="@item.Name" style="width:60px;height:60px;object-fit:cover;border-radius:4px;" />
+                                    }
                                     <span>
-                                        @item.Name
+                                        @if (itemProductUrl != null)
+                                        {
+                                            <a href="@itemProductUrl" class="cart-line-name-link">@item.Name</a>
+                                        }
+                                        else
+                                        {
+                                            @item.Name
+                                        }
                                         @if (!string.IsNullOrEmpty(item.Color) || !string.IsNullOrEmpty(item.Size))
                                         {
                                             <br />
@@ -148,6 +165,14 @@
                         <button type="submit" class="btn btn-sm btn-outline-danger">@Localizer["Clear Cart"]</button>
                     </form>
                 </div>
+                @if (!string.IsNullOrEmpty(Model.LastAddedProductSlug))
+                {
+                    <div class="mt-2">
+                        <a class="btn btn-sm btn-outline-secondary" id="cartBackToProductLink" asp-controller="Products" asp-action="Details" asp-route-slug="@Model.LastAddedProductSlug" asp-route-color="@Model.LastAddedColor">
+                            <i class="bi bi-box-arrow-in-left"></i> @Localizer["Back to product"]
+                        </a>
+                    </div>
+                }
             </div>
             <div class="col-12 col-md-4">
                 <div class="summary-box" id="cartSummaryBox">
