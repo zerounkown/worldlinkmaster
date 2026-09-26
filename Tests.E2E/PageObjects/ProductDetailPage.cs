@@ -4,9 +4,10 @@ namespace WorldLinkMaster.E2E.PageObjects;
 
 /// <summary>
 /// Views/Products/Details.cshtml. Color/size (when present) default to a pre-checked radio, so
-/// "add to cart" needs no explicit variant selection. Add-to-cart is a real full-page POST to
-/// Cart/Add (not AJAX). The inline review form (Views/Products/Details.cshtml ~L584-603) only
-/// renders for authenticated users.
+/// "add to cart" needs no explicit variant selection. Add-to-cart is an AJAX call intercepted by
+/// wwwroot/js/cart-drawer.js (no page navigation) that opens the side cart drawer on success. The
+/// inline review form (Views/Products/Details.cshtml ~L584-603) only renders for authenticated
+/// users.
 /// </summary>
 public class ProductDetailPage
 {
