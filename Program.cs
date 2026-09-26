@@ -314,6 +314,22 @@ if (!jwtKeyConfigured)
         "Jwt:Key is not configured; using an ephemeral signing key. Set the Jwt__Key environment variable so issued tokens survive restarts and are valid across instances.");
 }
 
+// Session (carts, applied coupons) and Data Protection keys fall back to per-instance in-memory
+// storage when Redis isn't configured (see the cache setup above). That's fine for a single node,
+// but on a scaled-out deployment a request can land on a different instance than the one that
+// wrote the session -- e.g. a visitor's Add to Cart lands on instance A, then their next page
+// load is routed to instance B, which has never seen that session and shows an empty cart. This
+// warning exists so that failure mode shows up in the logs instead of silently looking like a
+// cart bug.
+if (!app.Environment.IsDevelopment() && string.IsNullOrWhiteSpace(redisConnection))
+{
+    app.Logger.LogWarning(
+        "ConnectionStrings:Redis is not configured outside Development. Session state and Data Protection keys " +
+        "are using the in-memory fallback, which is NOT shared across instances. If this app is scaled to more " +
+        "than one instance, carts/coupons/logins can appear to randomly disappear depending on which instance " +
+        "handles a given request. Set the ConnectionStrings__Redis app setting for any multi-instance deployment.");
+}
+
 // ---------------------------------------------------------------------------
 // HTTP request pipeline.
 // ---------------------------------------------------------------------------
