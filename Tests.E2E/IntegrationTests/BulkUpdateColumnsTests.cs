@@ -54,10 +54,15 @@ public class BulkUpdateColumnsTests : IAsyncLifetime
 
     public async Task InitializeAsync()
     {
-        await PostgresTestSchema.ResetAsync(ConnectionString, SchemaName);
+        // See PostgresTestSchema's remarks: resolves to "bulk_update_columns_test" alone the
+        // first time anything in this database creates pg_trgm, or to
+        // "bulk_update_columns_test,<whichever schema won that>" once something else already has
+        // — e.g. E2EWebAppFactory's Migrate(), which this test's E2ETestCollection membership
+        // guarantees runs (and fully commits) before this test does.
+        var searchPath = await PostgresTestSchema.BuildSearchPathAsync(ConnectionString, SchemaName, "pg_trgm");
 
         var options = new DbContextOptionsBuilder<ApplicationDbContext>()
-            .UseNpgsql($"{ConnectionString};Search Path={SchemaName}", npgsql =>
+            .UseNpgsql($"{ConnectionString};Search Path={searchPath}", npgsql =>
             {
                 npgsql.EnableRetryOnFailure(maxRetryCount: 5, maxRetryDelay: TimeSpan.FromSeconds(10), errorCodesToAdd: null);
                 npgsql.CommandTimeout(60);
@@ -65,13 +70,17 @@ public class BulkUpdateColumnsTests : IAsyncLifetime
             .Options;
 
         _context = new ApplicationDbContext(options);
-        await _context.Database.EnsureCreatedAsync();
+
+        // Not EnsureCreatedAsync() — see PostgresTestSchema's remarks for why its own "does this
+        // already exist" check can't be trusted once another schema in this same database already
+        // has a full set of same-named tables.
+        await PostgresTestSchema.CreateSchemaAsync(_context, ConnectionString, SchemaName);
     }
 
     public async Task DisposeAsync()
     {
         await _context.DisposeAsync();
-        await PostgresTestSchema.DropAsync(ConnectionString, SchemaName);
+        await PostgresTestSchema.DropSchemaAsync(ConnectionString, SchemaName);
     }
 
     private static ProductsController CreateController(ApplicationDbContext context)
