@@ -156,6 +156,25 @@
             }
         });
 
+        // Root cause of "clicking a result does nothing": mousedown on a result shifts focus
+        // away from the (still-focused) input before the click event fires — on mobile that also
+        // closes the on-screen keyboard, which resizes the viewport and can shift the dropdown
+        // out from under the pointer between mousedown and mouseup, so the browser never fires
+        // click on it at all (click requires mouseup to land on/in the same element mousedown
+        // did). preventDefault on pointerdown/mousedown stops the browser's default
+        // focus-shift/blur behavior for that press without blocking the subsequent click (or
+        // therefore the <a>'s own navigation) — the standard fix for this class of bug in
+        // dropdown/autocomplete widgets. Covers mouse AND touch: pointerdown fires for both in
+        // every browser this site supports, with mousedown kept as a fallback for the rare
+        // browser without Pointer Events.
+        function guardAgainstBlur(e) {
+            if (e.target.closest(".instant-search-item, .instant-search-view-all")) {
+                e.preventDefault();
+            }
+        }
+        dropdown.addEventListener("pointerdown", guardAgainstBlur);
+        dropdown.addEventListener("mousedown", guardAgainstBlur);
+
         document.addEventListener("click", function (e) {
             if (!input.contains(e.target) && !dropdown.contains(e.target)) {
                 closeDropdown();

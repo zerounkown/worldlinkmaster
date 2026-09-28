@@ -855,6 +855,7 @@ a:hover {
   align-items: center;
   gap: 12px;
   padding: 8px 14px;
+  border-inline-start: 3px solid transparent;
   text-decoration: none;
   color: var(--wlm-ink);
   border-bottom: 1px solid var(--wlm-sand-light);
@@ -864,9 +865,16 @@ a:hover {
   border-bottom: none;
 }
 
+/* A plain var(--wlm-sand-light) fill here used to read as barely-there against the dropdown's
+   own white background (both are near-white) — a visible gold accent bar plus a tinted fill
+   (same accent color used for hover states elsewhere on the site, e.g. .main-nav-link:hover)
+   gives mouse hover and keyboard ArrowUp/ArrowDown selection (.active, set by
+   header-instant-search.js) the same clearly-visible highlight. border-inline-start (not
+   left/right) so the accent bar lands on the correct side under the Arabic RTL layout too. */
 .instant-search-item:hover,
 .instant-search-item.active {
-  background: var(--wlm-sand-light);
+  background: rgba(192, 136, 58, 0.16);
+  border-inline-start-color: var(--wlm-sand);
 }
 
 .instant-search-item-image {
