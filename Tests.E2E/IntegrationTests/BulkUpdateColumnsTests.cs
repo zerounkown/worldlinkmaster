@@ -447,8 +447,8 @@ public class BulkUpdateColumnsTests : IAsyncLifetime
     }
 
     // Old exports (no "Price+VAT" column at all) meant "Price (AED)" as the VAT-INCLUSIVE price
-    // directly — that meaning has to be preserved exactly, never reinterpreted as the new
-    // excl.-VAT column of the same name.
+    // directly, on BOTH sheets — that meaning has to be preserved exactly, never reinterpreted as
+    // the new excl.-VAT column of the same name.
     [Fact]
     public async Task BulkUpdate_OldFormatFile_NoPriceVatColumnAtAll_TreatsPriceAedAsAlreadyVatInclusive()
     {
@@ -464,7 +464,7 @@ public class BulkUpdateColumnsTests : IAsyncLifetime
         productsSheet.Cell(2, 1).Value = "152";
         productsSheet.Cell(2, 2).Value = "Field Pants";
         productsSheet.Cell(2, 3).Value = "Tactical Apparel";
-        productsSheet.Cell(2, 4).Value = 100m;
+        productsSheet.Cell(2, 4).Value = 130m; // old semantics: already VAT-inclusive
         productsSheet.Cell(2, 6).Value = 0;
 
         var variantsSheet = workbook.Worksheets.Add("Variants");
@@ -484,9 +484,48 @@ public class BulkUpdateColumnsTests : IAsyncLifetime
 
         Assert.Null(model.FatalError);
         Assert.Empty(model.Errors);
-        var variant = await FreshContext().ProductVariants.AsNoTracking().FirstAsync(v => v.Sku == "152-OLD");
+        var freshContext = FreshContext();
+        var variant = await freshContext.ProductVariants.AsNoTracking().FirstAsync(v => v.Sku == "152-OLD");
         // Must NOT be 105 x 1.05 = 110.25 — that would be double-applying VAT.
         Assert.Equal(105.00m, variant.Price);
+        var reloadedProduct = await freshContext.Products.AsNoTracking().FirstAsync(p => p.Sku == "152");
+        // Must NOT be 130 x 1.05 = 136.50, same reasoning.
+        Assert.Equal(130.00m, reloadedProduct.Price);
+    }
+
+    // Both sheets used to disagree about what a bare "Price (AED)" column meant — excl. VAT on
+    // Variants, incl. VAT on Products — which was genuinely dangerous: a new product's Price
+    // (AED) cell, filled in with the excl.-VAT figure out of habit from the Variants sheet, would
+    // have silently become the site's stored (and charged) price. They now always mean the same
+    // thing on both sheets.
+    [Fact]
+    public async Task BulkUpdate_ProductPriceColumnsDisagree_FailsTheRowAndSavesNothing()
+    {
+        await SeedCategoryAndMerchantAsync();
+
+        using var workbook = new XLWorkbook();
+        var productsSheet = workbook.Worksheets.Add("Products");
+        string[] productHeaders = { "Sku", "Name", "Category", "Price (AED)", "Price+VAT", "Stock Quantity" };
+        for (var i = 0; i < productHeaders.Length; i++) productsSheet.Cell(1, i + 1).Value = productHeaders[i];
+        productsSheet.Cell(2, 1).Value = "NEW-VAT-MISMATCH";
+        productsSheet.Cell(2, 2).Value = "New Product";
+        productsSheet.Cell(2, 3).Value = "Tactical Apparel";
+        productsSheet.Cell(2, 4).Value = 100m; // excl. VAT -> 105.00 expected
+        productsSheet.Cell(2, 5).Value = 999m; // well outside the 0.01 tolerance
+        productsSheet.Cell(2, 6).Value = 10;
+
+        var file = ToFormFile(workbook);
+        var controller = CreateController(_context);
+
+        var actionResult = await controller.BulkUpdate(file);
+        var viewResult = Assert.IsType<ViewResult>(actionResult);
+        var model = Assert.IsType<BulkImportResult>(viewResult.Model);
+
+        Assert.Null(model.FatalError);
+        Assert.Single(model.Errors);
+        Assert.Contains("doesn't match", model.Errors[0]);
+        Assert.Equal(0, model.CreatedCount);
+        Assert.False(await FreshContext().Products.AnyAsync(p => p.Sku == "NEW-VAT-MISMATCH"));
     }
 
     // A brand-new DbContext against the same schema, so assertions read back what was actually
