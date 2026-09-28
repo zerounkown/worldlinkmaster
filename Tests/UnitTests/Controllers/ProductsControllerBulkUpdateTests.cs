@@ -283,4 +283,232 @@ public class ProductsControllerBulkUpdateTests
         var newVariant = await context.ProductVariants.AsNoTracking().FirstAsync(v => v.Sku == "152-NEW-3032");
         Assert.Equal(existingSize.Id, newVariant.SizeId);
     }
+
+    private static XLWorkbook NewWorkbookWithHeaders()
+    {
+        var workbook = new XLWorkbook();
+        var productsSheet = workbook.Worksheets.Add("Products");
+        string[] productHeaders =
+        {
+            "Sku", "Name", "Category", "Price (AED)", "Wholesale Price (AED)", "Stock Quantity", "Image URL",
+            "Name (Arabic)", "Brand", "Subcategory", "Size Group", "Published"
+        };
+        for (var i = 0; i < productHeaders.Length; i++) productsSheet.Cell(1, i + 1).Value = productHeaders[i];
+
+        var variantsSheet = workbook.Worksheets.Add("Variants");
+        string[] variantHeaders =
+        {
+            "Product Sku (Parent)", "Variant Sku", "Color", "Size", "Price (AED)", "Wholesale Price (AED)", "Stock Quantity", "Image URL",
+            "Barcode"
+        };
+        for (var i = 0; i < variantHeaders.Length; i++) variantsSheet.Cell(1, i + 1).Value = variantHeaders[i];
+
+        return workbook;
+    }
+
+    // Leaves a cell truly blank when the corresponding argument is null — matching how ClosedXML
+    // represents an untouched cell (IsEmpty() == true), not an empty string.
+    private static void WriteProductRow(
+        IXLWorksheet sheet, int row, string sku, string name, string category, decimal price, int stock,
+        decimal? wholesale = null, string? nameAr = null, string? brand = null, string? subcategory = null,
+        string? sizeGroup = null, string? published = null)
+    {
+        sheet.Cell(row, 1).Value = sku;
+        sheet.Cell(row, 2).Value = name;
+        sheet.Cell(row, 3).Value = category;
+        sheet.Cell(row, 4).Value = price;
+        if (wholesale.HasValue) sheet.Cell(row, 5).Value = wholesale.Value;
+        sheet.Cell(row, 6).Value = stock;
+        if (nameAr != null) sheet.Cell(row, 8).Value = nameAr;
+        if (brand != null) sheet.Cell(row, 9).Value = brand;
+        if (subcategory != null) sheet.Cell(row, 10).Value = subcategory;
+        if (sizeGroup != null) sheet.Cell(row, 11).Value = sizeGroup;
+        if (published != null) sheet.Cell(row, 12).Value = published;
+    }
+
+    private static void WriteVariantRow(IXLWorksheet sheet, int row, string parentSku, string variantSku, int stock, string? barcode = null)
+    {
+        sheet.Cell(row, 1).Value = parentSku;
+        sheet.Cell(row, 2).Value = variantSku;
+        sheet.Cell(row, 7).Value = stock;
+        if (barcode != null) sheet.Cell(row, 9).Value = barcode;
+    }
+
+    // Fast SQLite-backed smoke test for the supplier-catalog columns/rules (see the Postgres-
+    // backed BulkUpdateColumnsTests in Tests.E2E for the full, real-database-constraint-backed
+    // coverage — Barcode's uniqueness is enforced by a real Postgres unique index that SQLite
+    // can't be relied on to validate identically).
+    [Fact]
+    public async Task BulkUpdate_BlankCellsLeaveExistingValuesUnchanged_NonBlankCellsApply()
+    {
+        var (context, connection) = CreateContext();
+        using var _ = connection;
+        using var __ = context;
+
+        var (category, merchant) = SeedCategoryAndMerchant(context);
+        var brand = new Brand { Name = "Condor", Slug = "condor" };
+        context.Brands.Add(brand);
+        var product = new Product
+        {
+            Sku = "152", Name = "Field Pants", Slug = "field-pants", Price = 100m, WholesalePrice = 25m,
+            StockQuantity = 50, CategoryId = category.Id, MerchantId = merchant.Id, IsPublished = true
+        };
+        context.Products.Add(product);
+        context.SaveChanges();
+
+        using var workbook = NewWorkbookWithHeaders();
+        // Wholesale Price, Subcategory, Size Group, and Published are all left blank — none of
+        // them should change. Name (Arabic) and Brand ARE provided and should apply.
+        WriteProductRow(workbook.Worksheet("Products"), 2, "152", "Field Pants", "Tactical Apparel", 110m, 999,
+            nameAr: "بنطال ميداني", brand: "Condor");
+
+        var controller = CreateController(context);
+        var actionResult = await controller.BulkUpdate(ToFormFile(workbook));
+        var model = Assert.IsType<BulkImportResult>(Assert.IsType<ViewResult>(actionResult).Model);
+
+        Assert.Null(model.FatalError);
+        Assert.Empty(model.Errors);
+
+        var reloaded = await context.Products.AsNoTracking().FirstAsync(p => p.Sku == "152");
+        Assert.Equal(110m, reloaded.Price);
+        Assert.Equal(25m, reloaded.WholesalePrice); // untouched — blank cell
+        Assert.Equal("بنطال ميداني", reloaded.NameAr);
+        Assert.Equal(brand.Id, reloaded.BrandId);
+        Assert.Null(reloaded.SubcategoryId);
+        Assert.True(reloaded.IsPublished);
+        Assert.Equal(999, reloaded.StockQuantity); // no variants on this product — cell value applies
+    }
+
+    [Fact]
+    public async Task BulkUpdate_UnrecognizedBrand_FailsThatRowWithoutTouchingTheProduct()
+    {
+        var (context, connection) = CreateContext();
+        using var _ = connection;
+        using var __ = context;
+
+        var (category, merchant) = SeedCategoryAndMerchant(context);
+        var product = new Product
+        {
+            Sku = "152", Name = "Field Pants", Slug = "field-pants", Price = 100m,
+            StockQuantity = 50, CategoryId = category.Id, MerchantId = merchant.Id
+        };
+        context.Products.Add(product);
+        context.SaveChanges();
+
+        using var workbook = NewWorkbookWithHeaders();
+        WriteProductRow(workbook.Worksheet("Products"), 2, "152", "Field Pants", "Tactical Apparel", 200m, 999, brand: "NoSuchBrand");
+
+        var controller = CreateController(context);
+        var actionResult = await controller.BulkUpdate(ToFormFile(workbook));
+        var model = Assert.IsType<BulkImportResult>(Assert.IsType<ViewResult>(actionResult).Model);
+
+        Assert.Null(model.FatalError);
+        Assert.Equal(0, model.UpdatedCount);
+        Assert.Single(model.Errors);
+        Assert.Contains("unrecognized Brand", model.Errors[0]);
+
+        var reloaded = await context.Products.AsNoTracking().FirstAsync(p => p.Sku == "152");
+        Assert.Equal(100m, reloaded.Price); // the whole row was skipped, not just the Brand part
+        Assert.Equal(0, await context.Brands.CountAsync()); // never auto-created
+    }
+
+    [Fact]
+    public async Task BulkUpdate_DuplicateBarcode_FailsThatRowWithoutCrashing()
+    {
+        var (context, connection) = CreateContext();
+        using var _ = connection;
+        using var __ = context;
+
+        var (category, merchant) = SeedCategoryAndMerchant(context);
+        var product = new Product
+        {
+            Sku = "152", Name = "Field Pants", Slug = "field-pants", Price = 100m,
+            StockQuantity = 0, CategoryId = category.Id, MerchantId = merchant.Id
+        };
+        context.Products.Add(product);
+        context.SaveChanges();
+        var variantA = new ProductVariant { ProductId = product.Id, Sku = "152-A", StockQuantity = 1, Barcode = "1111111111" };
+        var variantB = new ProductVariant { ProductId = product.Id, Sku = "152-B", StockQuantity = 2, Barcode = null };
+        context.ProductVariants.AddRange(variantA, variantB);
+        context.SaveChanges();
+
+        using var workbook = NewWorkbookWithHeaders();
+        WriteProductRow(workbook.Worksheet("Products"), 2, "152", "Field Pants", "Tactical Apparel", 100m, 0);
+        // Try to give variant B the barcode variant A already has.
+        WriteVariantRow(workbook.Worksheet("Variants"), 2, "152", "152-B", 2, barcode: "1111111111");
+
+        var controller = CreateController(context);
+        var actionResult = await controller.BulkUpdate(ToFormFile(workbook));
+        var model = Assert.IsType<BulkImportResult>(Assert.IsType<ViewResult>(actionResult).Model);
+
+        Assert.Null(model.FatalError);
+        Assert.Single(model.Errors);
+        Assert.Contains("already belongs to variant '152-A'", model.Errors[0]);
+
+        var reloadedB = await context.ProductVariants.AsNoTracking().FirstAsync(v => v.Sku == "152-B");
+        Assert.Null(reloadedB.Barcode);
+    }
+
+    [Fact]
+    public async Task BulkUpdate_ProductWithVariants_StockQuantityIsAlwaysTheSumOfVariantStock()
+    {
+        var (context, connection) = CreateContext();
+        using var _ = connection;
+        using var __ = context;
+
+        var (category, merchant) = SeedCategoryAndMerchant(context);
+        var product = new Product
+        {
+            Sku = "152", Name = "Field Pants", Slug = "field-pants", Price = 100m,
+            StockQuantity = 999, // deliberately stale — must get overridden
+            CategoryId = category.Id, MerchantId = merchant.Id
+        };
+        context.Products.Add(product);
+        context.SaveChanges();
+        // Neither variant is mentioned in the uploaded file below.
+        context.ProductVariants.AddRange(
+            new ProductVariant { ProductId = product.Id, Sku = "152-A", StockQuantity = 3 },
+            new ProductVariant { ProductId = product.Id, Sku = "152-B", StockQuantity = 4 });
+        context.SaveChanges();
+
+        using var workbook = NewWorkbookWithHeaders();
+        // Stock Quantity cell says 50 — must be ignored in favor of the variant sum (7).
+        WriteProductRow(workbook.Worksheet("Products"), 2, "152", "Field Pants", "Tactical Apparel", 100m, 50);
+
+        var controller = CreateController(context);
+        var actionResult = await controller.BulkUpdate(ToFormFile(workbook));
+        var model = Assert.IsType<BulkImportResult>(Assert.IsType<ViewResult>(actionResult).Model);
+
+        Assert.Null(model.FatalError);
+        Assert.Empty(model.Errors);
+
+        var reloaded = await context.Products.AsNoTracking().FirstAsync(p => p.Sku == "152");
+        Assert.Equal(7, reloaded.StockQuantity);
+    }
+
+    [Fact]
+    public async Task BulkUpdate_NewProduct_DefaultsToUnpublished_UnlessPublishedColumnSaysYes()
+    {
+        var (context, connection) = CreateContext();
+        using var _ = connection;
+        using var __ = context;
+
+        SeedCategoryAndMerchant(context);
+
+        using var workbook = NewWorkbookWithHeaders();
+        var productsSheet = workbook.Worksheet("Products");
+        WriteProductRow(productsSheet, 2, "NEW-001", "Unpublished By Default", "Tactical Apparel", 50m, 10); // Published left blank
+        WriteProductRow(productsSheet, 3, "NEW-002", "Published Explicitly", "Tactical Apparel", 60m, 20, published: "Yes");
+
+        var controller = CreateController(context);
+        var actionResult = await controller.BulkUpdate(ToFormFile(workbook));
+        var model = Assert.IsType<BulkImportResult>(Assert.IsType<ViewResult>(actionResult).Model);
+
+        Assert.Null(model.FatalError);
+        Assert.Empty(model.Errors);
+        Assert.Equal(2, model.CreatedCount);
+
+        Assert.False((await context.Products.AsNoTracking().FirstAsync(p => p.Sku == "NEW-001")).IsPublished);
+        Assert.True((await context.Products.AsNoTracking().FirstAsync(p => p.Sku == "NEW-002")).IsPublished);
+    }
 }
