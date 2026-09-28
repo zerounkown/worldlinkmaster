@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Localization;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
-using Npgsql;
+using WorldLinkMaster.E2E.Infrastructure;
 using WorldLinkMaster.Web.Areas.Admin.Controllers;
 using WorldLinkMaster.Web.Data;
 using WorldLinkMaster.Web.Models;
@@ -57,18 +57,11 @@ public class BulkUpdateExecutionStrategyTests : IAsyncLifetime
 
     public async Task InitializeAsync()
     {
-        await using (var admin = new NpgsqlConnection(ConnectionString))
-        {
-            await admin.OpenAsync();
-            await using (var drop = new NpgsqlCommand($"DROP SCHEMA IF EXISTS {SchemaName} CASCADE", admin))
-            {
-                await drop.ExecuteNonQueryAsync();
-            }
-            await using (var create = new NpgsqlCommand($"CREATE SCHEMA {SchemaName}", admin))
-            {
-                await create.ExecuteNonQueryAsync();
-            }
-        }
+        // See PostgresTestSchema's remarks: this also pre-creates the pg_trgm extension in a way
+        // that tolerates racing against a sibling Postgres-backed test class's own setup (or
+        // E2EWebAppFactory's Migrate()) — without it, EnsureCreatedAsync() below could
+        // intermittently throw before creating a single table.
+        await PostgresTestSchema.ResetAsync(ConnectionString, SchemaName);
 
         var options = new DbContextOptionsBuilder<ApplicationDbContext>()
             .UseNpgsql($"{ConnectionString};Search Path={SchemaName}", npgsql =>
@@ -95,11 +88,7 @@ public class BulkUpdateExecutionStrategyTests : IAsyncLifetime
     public async Task DisposeAsync()
     {
         await _context.DisposeAsync();
-
-        await using var admin = new NpgsqlConnection(ConnectionString);
-        await admin.OpenAsync();
-        await using var drop = new NpgsqlCommand($"DROP SCHEMA IF EXISTS {SchemaName} CASCADE", admin);
-        await drop.ExecuteNonQueryAsync();
+        await PostgresTestSchema.DropAsync(ConnectionString, SchemaName);
     }
 
     private static ProductsController CreateController(ApplicationDbContext context)
