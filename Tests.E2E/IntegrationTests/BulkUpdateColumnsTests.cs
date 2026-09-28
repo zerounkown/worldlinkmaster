@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Localization;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
-using Npgsql;
+using WorldLinkMaster.E2E.Infrastructure;
 using WorldLinkMaster.Web.Areas.Admin.Controllers;
 using WorldLinkMaster.Web.Data;
 using WorldLinkMaster.Web.Models;
@@ -29,7 +29,14 @@ namespace WorldLinkMaster.E2E.IntegrationTests;
 /// can exercise but can't meaningfully validate (no retrying strategy to get wrong), and Barcode
 /// uniqueness is also enforced by a real Postgres unique index (see ApplicationDbContext) that
 /// these tests rely on as a backstop.
+///
+/// Joins E2ETestCollection (see PostgresTestSchema's remarks) purely for sequencing: it doesn't
+/// use the Browser/BaseUrl those fixtures provide, but being in that collection makes xUnit run
+/// this test only after E2EWebAppFactory's own Migrate() has already fully committed, and never
+/// concurrently with a sibling Postgres-backed test class's EnsureCreatedAsync() — both of which,
+/// left concurrent, raced over the database-wide "CREATE EXTENSION IF NOT EXISTS pg_trgm" step.
 /// </summary>
+[Collection(E2ETestCollection.Name)]
 public class BulkUpdateColumnsTests : IAsyncLifetime
 {
     private static readonly string ConnectionString =
@@ -47,21 +54,15 @@ public class BulkUpdateColumnsTests : IAsyncLifetime
 
     public async Task InitializeAsync()
     {
-        await using (var admin = new NpgsqlConnection(ConnectionString))
-        {
-            await admin.OpenAsync();
-            await using (var drop = new NpgsqlCommand($"DROP SCHEMA IF EXISTS {SchemaName} CASCADE", admin))
-            {
-                await drop.ExecuteNonQueryAsync();
-            }
-            await using (var create = new NpgsqlCommand($"CREATE SCHEMA {SchemaName}", admin))
-            {
-                await create.ExecuteNonQueryAsync();
-            }
-        }
+        // See PostgresTestSchema's remarks: resolves to "bulk_update_columns_test" alone the
+        // first time anything in this database creates pg_trgm, or to
+        // "bulk_update_columns_test,<whichever schema won that>" once something else already has
+        // — e.g. E2EWebAppFactory's Migrate(), which this test's E2ETestCollection membership
+        // guarantees runs (and fully commits) before this test does.
+        var searchPath = await PostgresTestSchema.BuildSearchPathAsync(ConnectionString, SchemaName, "pg_trgm");
 
         var options = new DbContextOptionsBuilder<ApplicationDbContext>()
-            .UseNpgsql($"{ConnectionString};Search Path={SchemaName}", npgsql =>
+            .UseNpgsql($"{ConnectionString};Search Path={searchPath}", npgsql =>
             {
                 npgsql.EnableRetryOnFailure(maxRetryCount: 5, maxRetryDelay: TimeSpan.FromSeconds(10), errorCodesToAdd: null);
                 npgsql.CommandTimeout(60);
@@ -69,17 +70,17 @@ public class BulkUpdateColumnsTests : IAsyncLifetime
             .Options;
 
         _context = new ApplicationDbContext(options);
-        await _context.Database.EnsureCreatedAsync();
+
+        // Not EnsureCreatedAsync() — see PostgresTestSchema's remarks for why its own "does this
+        // already exist" check can't be trusted once another schema in this same database already
+        // has a full set of same-named tables.
+        await PostgresTestSchema.CreateSchemaAsync(_context, ConnectionString, SchemaName);
     }
 
     public async Task DisposeAsync()
     {
         await _context.DisposeAsync();
-
-        await using var admin = new NpgsqlConnection(ConnectionString);
-        await admin.OpenAsync();
-        await using var drop = new NpgsqlCommand($"DROP SCHEMA IF EXISTS {SchemaName} CASCADE", admin);
-        await drop.ExecuteNonQueryAsync();
+        await PostgresTestSchema.DropSchemaAsync(ConnectionString, SchemaName);
     }
 
     private static ProductsController CreateController(ApplicationDbContext context)
@@ -382,7 +383,11 @@ public class BulkUpdateColumnsTests : IAsyncLifetime
         var otherCategory = new Category { Code = "FTW", Name = "Footwear", Slug = "footwear" };
         _context.Categories.Add(otherCategory);
         var rightSubcategory = new Subcategory { Name = "Trousers", Slug = "trousers", CategoryId = category.Id };
-        var wrongSubcategory = new Subcategory { Name = "Boots", Slug = "boots", CategoryId = otherCategory.Id };
+        // otherCategory hasn't been saved yet at this point, so its .Id is still the unassigned
+        // default (0) — capturing that into CategoryId directly would violate the FK constraint.
+        // The Category navigation property, not the CategoryId scalar, lets EF's own fixup assign
+        // the real FK once both entities save together below.
+        var wrongSubcategory = new Subcategory { Name = "Boots", Slug = "boots", Category = otherCategory };
         _context.Subcategories.AddRange(rightSubcategory, wrongSubcategory);
         await _context.SaveChangesAsync();
 

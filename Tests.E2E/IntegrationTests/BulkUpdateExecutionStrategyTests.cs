@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Localization;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
-using Npgsql;
+using WorldLinkMaster.E2E.Infrastructure;
 using WorldLinkMaster.Web.Areas.Admin.Controllers;
 using WorldLinkMaster.Web.Data;
 using WorldLinkMaster.Web.Models;
@@ -36,8 +36,15 @@ namespace WorldLinkMaster.E2E.IntegrationTests;
 /// Tests.E2E already requires (see .github/workflows/_e2e-tests.yml and E2EWebAppFactory), never
 /// against the shared Supabase instance. Uses its own dedicated "bulk_update_retry_test" schema
 /// (built directly from the current EF model via EnsureCreatedAsync, not migrations) so it can't
-/// collide with the "e2e_test" schema the Playwright journeys use, even when both run at once.
+/// collide with the "e2e_test" schema the Playwright journeys use.
+///
+/// Joins E2ETestCollection (see PostgresTestSchema's remarks) purely for sequencing: it doesn't
+/// use the Browser/BaseUrl those fixtures provide, but being in that collection makes xUnit run
+/// this test only after E2EWebAppFactory's own Migrate() has already fully committed, and never
+/// concurrently with a sibling Postgres-backed test class's EnsureCreatedAsync() — both of which,
+/// left concurrent, raced over the database-wide "CREATE EXTENSION IF NOT EXISTS pg_trgm" step.
 /// </summary>
+[Collection(E2ETestCollection.Name)]
 public class BulkUpdateExecutionStrategyTests : IAsyncLifetime
 {
     private static readonly string ConnectionString =
@@ -57,21 +64,15 @@ public class BulkUpdateExecutionStrategyTests : IAsyncLifetime
 
     public async Task InitializeAsync()
     {
-        await using (var admin = new NpgsqlConnection(ConnectionString))
-        {
-            await admin.OpenAsync();
-            await using (var drop = new NpgsqlCommand($"DROP SCHEMA IF EXISTS {SchemaName} CASCADE", admin))
-            {
-                await drop.ExecuteNonQueryAsync();
-            }
-            await using (var create = new NpgsqlCommand($"CREATE SCHEMA {SchemaName}", admin))
-            {
-                await create.ExecuteNonQueryAsync();
-            }
-        }
+        // See PostgresTestSchema's remarks: this resolves to "bulk_update_retry_test" alone the
+        // first time anything in this database creates pg_trgm, or to
+        // "bulk_update_retry_test,<whichever schema won that>" once something else already has —
+        // e.g. E2EWebAppFactory's Migrate(), which this test's E2ETestCollection membership
+        // guarantees runs (and fully commits) before this test does.
+        var searchPath = await PostgresTestSchema.BuildSearchPathAsync(ConnectionString, SchemaName, "pg_trgm");
 
         var options = new DbContextOptionsBuilder<ApplicationDbContext>()
-            .UseNpgsql($"{ConnectionString};Search Path={SchemaName}", npgsql =>
+            .UseNpgsql($"{ConnectionString};Search Path={searchPath}", npgsql =>
             {
                 // Mirrors Program.cs's ConfigureNpgsql exactly — the entire point of this test is
                 // exercising the REAL NpgsqlRetryingExecutionStrategy production runs under, not
@@ -83,23 +84,16 @@ public class BulkUpdateExecutionStrategyTests : IAsyncLifetime
 
         _context = new ApplicationDbContext(options);
 
-        // EnsureCreated (not Migrate): builds the schema straight from the current EF model into
-        // this fresh, guaranteed-empty schema. Migrate() is deliberately avoided here — Npgsql's
-        // migrations-history-table existence check always looks at the "public" schema regardless
-        // of Search Path (see E2EWebAppFactory's ResetSchemaAsync for the full explanation), which
-        // this test has no need to work around: it isn't testing that migrations apply correctly,
-        // only that the import commits under a real retrying execution strategy.
-        await _context.Database.EnsureCreatedAsync();
+        // Not Migrate(), and not EnsureCreatedAsync() either — see PostgresTestSchema's remarks
+        // for why EnsureCreatedAsync()'s own "does this already exist" check can't be trusted once
+        // another schema in this same database already has a full set of same-named tables.
+        await PostgresTestSchema.CreateSchemaAsync(_context, ConnectionString, SchemaName);
     }
 
     public async Task DisposeAsync()
     {
         await _context.DisposeAsync();
-
-        await using var admin = new NpgsqlConnection(ConnectionString);
-        await admin.OpenAsync();
-        await using var drop = new NpgsqlCommand($"DROP SCHEMA IF EXISTS {SchemaName} CASCADE", admin);
-        await drop.ExecuteNonQueryAsync();
+        await PostgresTestSchema.DropSchemaAsync(ConnectionString, SchemaName);
     }
 
     private static ProductsController CreateController(ApplicationDbContext context)
