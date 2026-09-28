@@ -497,9 +497,10 @@
                 </a>
             </div>
 
-            <form class="header-search-inline" asp-area="" asp-controller="Products" asp-action="Index" method="get">
-                <input type="text" name="search" placeholder="@Localizer["SEARCH STORE..."]" aria-label="@Localizer["Search"]" />
+            <form class="header-search-inline" asp-area="" asp-controller="Products" asp-action="Index" method="get" autocomplete="off">
+                <input type="text" name="search" class="js-instant-search-input" placeholder="@Localizer["SEARCH STORE..."]" aria-label="@Localizer["Search"]" />
                 <button type="submit" aria-label="@Localizer["Search"]"><i class="bi bi-search"></i></button>
+                <div class="instant-search-dropdown" data-no-results-text="@Localizer["No results"]" data-search-for-text="@Localizer["Search for"]"></div>
             </form>
 
             <div class="header-col header-col-end">
@@ -581,9 +582,10 @@
                 <span>@Localizer["What are you looking for?"]</span>
                 <button type="button" class="header-search-close" id="headerSearchClose" aria-label="@Localizer["Close"]">&times;</button>
             </div>
-            <form class="header-search-form" asp-area="" asp-controller="Products" asp-action="Index" method="get">
-                <input type="text" name="search" class="header-search-input" placeholder="@Localizer["Search products..."]" />
+            <form class="header-search-form" asp-area="" asp-controller="Products" asp-action="Index" method="get" autocomplete="off">
+                <input type="text" name="search" class="header-search-input js-instant-search-input" placeholder="@Localizer["Search products..."]" />
                 <button type="submit" class="header-search-submit"><i class="bi bi-search"></i></button>
+                <div class="instant-search-dropdown" data-no-results-text="@Localizer["No results"]" data-search-for-text="@Localizer["Search for"]"></div>
             </form>
         </div>
     </div>
@@ -953,6 +955,7 @@
     <script src="~/js/main-nav-dropdown.js" asp-append-version="true"></script>
     <script src="~/js/currency-switch.js" asp-append-version="true"></script>
     <script src="~/js/header-search.js" asp-append-version="true"></script>
+    <script src="~/js/header-instant-search.js" asp-append-version="true"></script>
     <script src="~/js/sticky-header.js" asp-append-version="true"></script>
     @if (showChatWidget)
     {
