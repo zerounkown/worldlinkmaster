@@ -29,7 +29,14 @@ namespace WorldLinkMaster.E2E.IntegrationTests;
 /// can exercise but can't meaningfully validate (no retrying strategy to get wrong), and Barcode
 /// uniqueness is also enforced by a real Postgres unique index (see ApplicationDbContext) that
 /// these tests rely on as a backstop.
+///
+/// Joins E2ETestCollection (see PostgresTestSchema's remarks) purely for sequencing: it doesn't
+/// use the Browser/BaseUrl those fixtures provide, but being in that collection makes xUnit run
+/// this test only after E2EWebAppFactory's own Migrate() has already fully committed, and never
+/// concurrently with a sibling Postgres-backed test class's EnsureCreatedAsync() — both of which,
+/// left concurrent, raced over the database-wide "CREATE EXTENSION IF NOT EXISTS pg_trgm" step.
 /// </summary>
+[Collection(E2ETestCollection.Name)]
 public class BulkUpdateColumnsTests : IAsyncLifetime
 {
     private static readonly string ConnectionString =
@@ -47,10 +54,6 @@ public class BulkUpdateColumnsTests : IAsyncLifetime
 
     public async Task InitializeAsync()
     {
-        // See PostgresTestSchema's remarks: this also pre-creates the pg_trgm extension in a way
-        // that tolerates racing against a sibling Postgres-backed test class's own setup (or
-        // E2EWebAppFactory's Migrate()) — without it, EnsureCreatedAsync() below could
-        // intermittently throw before creating a single table.
         await PostgresTestSchema.ResetAsync(ConnectionString, SchemaName);
 
         var options = new DbContextOptionsBuilder<ApplicationDbContext>()

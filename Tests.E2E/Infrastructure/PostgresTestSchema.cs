@@ -3,40 +3,33 @@ using Npgsql;
 namespace WorldLinkMaster.E2E.Infrastructure;
 
 /// <summary>
-/// Shared setup for tests that build their own throwaway Postgres schema and
-/// <c>ApplicationDbContext</c> directly (rather than going through the real app process, the way
-/// <see cref="E2EWebAppFactory"/> does for the Playwright journeys) — currently
+/// Shared drop/create-schema boilerplate for tests that build their own throwaway Postgres schema
+/// and <c>ApplicationDbContext</c> directly (rather than going through the real app process, the
+/// way <see cref="E2EWebAppFactory"/> does for the Playwright journeys) — currently
 /// BulkUpdateExecutionStrategyTests and BulkUpdateColumnsTests.
 ///
-/// Root-caused from CI: adding a second such test class alongside the first made
-/// "CREATE EXTENSION IF NOT EXISTS pg_trgm" (see ApplicationDbContext.OnModelCreating) start
-/// failing intermittently with "23505: duplicate key value violates unique constraint
-/// 'pg_extension_name_index'". Postgres extensions are database-wide, not schema-scoped, and
-/// IF NOT EXISTS isn't safe against concurrent callers: xUnit runs different test classes'
-/// IAsyncLifetime.InitializeAsync concurrently by default, so two (or, counting
-/// E2EWebAppFactory's own Migrate() call, three) sessions can all see "doesn't exist" and all try
-/// to create it before any of them commits — exactly the kind of race that got more likely to
-/// actually hit once a second Postgres-backed test class was added. The loser's EF
-/// EnsureCreatedAsync() call then throws that exception and aborts entirely, before creating a
-/// single table — which is why the failure cascaded into "relation \"AspNetUsers\" does not
-/// exist" for every query the affected test then made.
-///
-/// EnsureTrgmExtensionAsync pre-creates the extension in its own statement, outside of
-/// EnsureCreatedAsync, and tolerates exactly that race: a 23505 there means the extension is now
-/// guaranteed to exist, because Postgres only reports a unique-constraint conflict after the
-/// other, conflicting transaction has committed (unique checks wait for the competing transaction
-/// to resolve, then re-check) — so losing this race is a success case, not a real failure. Calling
-/// it before EnsureCreatedAsync() means that call's own redundant internal
-/// "CREATE EXTENSION IF NOT EXISTS" finds the extension already durably committed, a genuine
-/// no-op instead of a second roll of the same dice.
+/// Both of those join <see cref="E2ETestCollection"/> specifically so xUnit serializes them
+/// against each other AND against the Playwright journeys, and initializes E2EWebAppFactory (and
+/// therefore runs its Migrate()) before any of them starts. That's not just about avoiding wasted
+/// CI time — it sidesteps a real bug this suite hit once two independent EnsureCreatedAsync()
+/// callers existed and ran concurrently with each other and with Migrate(): all three issue
+/// "CREATE EXTENSION IF NOT EXISTS pg_trgm" (see ApplicationDbContext.OnModelCreating), which
+/// Postgres extensions being database-wide (not schema-scoped) makes racy in more than one way —
+/// concurrent callers can both see "doesn't exist" and both try to create it (one throws
+/// "23505: duplicate key value violates unique constraint 'pg_extension_name_index'", aborting
+/// EnsureCreatedAsync()/Migrate() entirely before a single table exists), and even a "successful"
+/// IF NOT EXISTS no-op on one connection doesn't guarantee a DIFFERENT, already-open connection's
+/// cached type/operator-class info reflects it yet, which surfaced as
+/// "42704: operator class 'gin_trgm_ops' does not exist for access method 'gin'" when a fix
+/// attempt here tried to pre-create the extension from a separate, unscoped connection instead of
+/// serializing. Running these one at a time, only after Migrate() has already fully committed,
+/// avoids both failure modes by construction rather than by chance.
 /// </summary>
 internal static class PostgresTestSchema
 {
-    /// <summary>Drops and recreates <paramref name="schemaName"/> as an empty schema, having first ensured pg_trgm exists.</summary>
+    /// <summary>Drops and recreates <paramref name="schemaName"/> as an empty schema.</summary>
     public static async Task ResetAsync(string connectionString, string schemaName)
     {
-        await EnsureTrgmExtensionAsync(connectionString);
-
         await using var admin = new NpgsqlConnection(connectionString);
         await admin.OpenAsync();
         await using (var drop = new NpgsqlCommand($"DROP SCHEMA IF EXISTS {schemaName} CASCADE", admin))
@@ -55,20 +48,5 @@ internal static class PostgresTestSchema
         await admin.OpenAsync();
         await using var drop = new NpgsqlCommand($"DROP SCHEMA IF EXISTS {schemaName} CASCADE", admin);
         await drop.ExecuteNonQueryAsync();
-    }
-
-    public static async Task EnsureTrgmExtensionAsync(string connectionString)
-    {
-        await using var conn = new NpgsqlConnection(connectionString);
-        await conn.OpenAsync();
-        try
-        {
-            await using var cmd = new NpgsqlCommand("CREATE EXTENSION IF NOT EXISTS pg_trgm", conn);
-            await cmd.ExecuteNonQueryAsync();
-        }
-        catch (PostgresException ex) when (ex.SqlState == PostgresErrorCodes.UniqueViolation)
-        {
-            // See the class-level remarks — this means a concurrent caller already committed it.
-        }
     }
 }
