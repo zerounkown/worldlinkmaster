@@ -138,8 +138,8 @@ public class BulkUpdateColumnsTests : IAsyncLifetime
         var variantsSheet = workbook.Worksheets.Add("Variants");
         string[] variantHeaders =
         {
-            "Product Sku (Parent)", "Variant Sku", "Color", "Size", "Price (AED)", "Wholesale Price (AED)", "Stock Quantity", "Image URL",
-            "Barcode"
+            "Product Sku (Parent)", "Internal Barcode", "Variant Sku", "Color", "Size", "Length",
+            "Price (AED)", "Price+VAT", "Wholesale Price (AED)", "Stock Quantity", "Image URL"
         };
         for (var i = 0; i < variantHeaders.Length; i++) variantsSheet.Cell(1, i + 1).Value = variantHeaders[i];
 
@@ -167,12 +167,20 @@ public class BulkUpdateColumnsTests : IAsyncLifetime
     }
 
     private static void WriteVariantRow(
-        IXLWorksheet sheet, int row, string parentSku, string variantSku, int stock, string? barcode = null)
+        IXLWorksheet sheet, int row, string parentSku, string variantSku, int stock,
+        string? barcode = null, string? color = null, string? size = null, string? length = null,
+        decimal? priceExclVat = null, decimal? priceInclVat = null, decimal? wholesale = null)
     {
         sheet.Cell(row, 1).Value = parentSku;
-        sheet.Cell(row, 2).Value = variantSku;
-        sheet.Cell(row, 7).Value = stock;
-        if (barcode != null) sheet.Cell(row, 9).Value = barcode;
+        if (barcode != null) sheet.Cell(row, 2).Value = barcode;
+        sheet.Cell(row, 3).Value = variantSku;
+        if (color != null) sheet.Cell(row, 4).Value = color;
+        if (size != null) sheet.Cell(row, 5).Value = size;
+        if (length != null) sheet.Cell(row, 6).Value = length;
+        if (priceExclVat.HasValue) sheet.Cell(row, 7).Value = priceExclVat.Value;
+        if (priceInclVat.HasValue) sheet.Cell(row, 8).Value = priceInclVat.Value;
+        if (wholesale.HasValue) sheet.Cell(row, 9).Value = wholesale.Value;
+        sheet.Cell(row, 10).Value = stock;
     }
 
     [Fact]
@@ -402,6 +410,78 @@ public class BulkUpdateColumnsTests : IAsyncLifetime
         Assert.False(await freshContext.Products.AnyAsync(p => p.Sku == "NEW-003"));
         var succeeded = await freshContext.Products.AsNoTracking().FirstAsync(p => p.Sku == "NEW-004");
         Assert.Equal(rightSubcategory.Id, succeeded.SubcategoryId);
+    }
+
+    // The site stores prices INCLUDING 5% VAT (ProductVariant.Price). "Price (AED)" is the
+    // excl.-VAT price, "Price+VAT" the already-inclusive one — see TryResolveVariantPrice.
+    [Fact]
+    public async Task BulkUpdate_VariantPriceColumnsDisagree_FailsTheRowAndSavesNothing()
+    {
+        var (category, merchant) = await SeedCategoryAndMerchantAsync();
+        var product = new Product { Sku = "152", Name = "Field Pants", Slug = "field-pants", Price = 100m, StockQuantity = 0, CategoryId = category.Id, MerchantId = merchant.Id };
+        _context.Products.Add(product);
+        await _context.SaveChangesAsync();
+
+        using var workbook = NewWorkbookWithHeaders();
+        WriteProductRow(workbook.Worksheet("Products"), 2, "152", "Field Pants", "Tactical Apparel", 100m, 0);
+        // 100 x 1.05 = 105.00, but Price+VAT says 999 — well outside the 0.01 tolerance.
+        WriteVariantRow(workbook.Worksheet("Variants"), 2, "152", "152-VAT-MISMATCH", 5, priceExclVat: 100m, priceInclVat: 999m);
+
+        var file = ToFormFile(workbook);
+        var controller = CreateController(_context);
+
+        var actionResult = await controller.BulkUpdate(file);
+        var viewResult = Assert.IsType<ViewResult>(actionResult);
+        var model = Assert.IsType<BulkImportResult>(viewResult.Model);
+
+        Assert.Null(model.FatalError);
+        Assert.Single(model.Errors);
+        Assert.Contains("doesn't match", model.Errors[0]);
+        Assert.Equal(0, model.VariantsCreatedCount);
+        Assert.False(await FreshContext().ProductVariants.AnyAsync(v => v.Sku == "152-VAT-MISMATCH"));
+    }
+
+    // Old exports (no "Price+VAT" column at all) meant "Price (AED)" as the VAT-INCLUSIVE price
+    // directly — that meaning has to be preserved exactly, never reinterpreted as the new
+    // excl.-VAT column of the same name.
+    [Fact]
+    public async Task BulkUpdate_OldFormatFile_NoPriceVatColumnAtAll_TreatsPriceAedAsAlreadyVatInclusive()
+    {
+        var (category, merchant) = await SeedCategoryAndMerchantAsync();
+        var product = new Product { Sku = "152", Name = "Field Pants", Slug = "field-pants", Price = 100m, StockQuantity = 0, CategoryId = category.Id, MerchantId = merchant.Id };
+        _context.Products.Add(product);
+        await _context.SaveChangesAsync();
+
+        using var workbook = new XLWorkbook();
+        var productsSheet = workbook.Worksheets.Add("Products");
+        string[] productHeaders = { "Sku", "Name", "Category", "Price (AED)", "Wholesale Price (AED)", "Stock Quantity", "Image URL" };
+        for (var i = 0; i < productHeaders.Length; i++) productsSheet.Cell(1, i + 1).Value = productHeaders[i];
+        productsSheet.Cell(2, 1).Value = "152";
+        productsSheet.Cell(2, 2).Value = "Field Pants";
+        productsSheet.Cell(2, 3).Value = "Tactical Apparel";
+        productsSheet.Cell(2, 4).Value = 100m;
+        productsSheet.Cell(2, 6).Value = 0;
+
+        var variantsSheet = workbook.Worksheets.Add("Variants");
+        string[] variantHeaders = { "Product Sku (Parent)", "Variant Sku", "Color", "Size", "Price (AED)", "Wholesale Price (AED)", "Stock Quantity", "Image URL" };
+        for (var i = 0; i < variantHeaders.Length; i++) variantsSheet.Cell(1, i + 1).Value = variantHeaders[i];
+        variantsSheet.Cell(2, 1).Value = "152";
+        variantsSheet.Cell(2, 2).Value = "152-OLD";
+        variantsSheet.Cell(2, 5).Value = 105m; // old semantics: already VAT-inclusive
+        variantsSheet.Cell(2, 7).Value = 5;
+
+        var file = ToFormFile(workbook);
+        var controller = CreateController(_context);
+
+        var actionResult = await controller.BulkUpdate(file);
+        var viewResult = Assert.IsType<ViewResult>(actionResult);
+        var model = Assert.IsType<BulkImportResult>(viewResult.Model);
+
+        Assert.Null(model.FatalError);
+        Assert.Empty(model.Errors);
+        var variant = await FreshContext().ProductVariants.AsNoTracking().FirstAsync(v => v.Sku == "152-OLD");
+        // Must NOT be 105 x 1.05 = 110.25 — that would be double-applying VAT.
+        Assert.Equal(105.00m, variant.Price);
     }
 
     // A brand-new DbContext against the same schema, so assertions read back what was actually

@@ -281,10 +281,14 @@ public class ProductsController : AdminBaseController
         "Sku", "Name", "Category", "Price (AED)", "Wholesale Price (AED)", "Stock Quantity", "Image URL",
         "Name (Arabic)", "Brand", "Subcategory", "Size Group", "Published"
     };
+    // Matches the supplier reference format exactly, column-for-column — this is the layout a
+    // new supplier's own spreadsheet already comes in, not just our own export/re-import shape.
+    // See ImportVariantsSheet for what each column means (Internal Barcode, Size+Length, and the
+    // Price (AED)/Price+VAT pair all have rules of their own).
     private static readonly string[] VariantExcelHeaders =
     {
-        "Product Sku (Parent)", "Variant Sku", "Color", "Size", "Price (AED)", "Wholesale Price (AED)", "Stock Quantity", "Image URL",
-        "Barcode"
+        "Product Sku (Parent)", "Internal Barcode", "Variant Sku", "Color", "Size", "Length",
+        "Price (AED)", "Price+VAT", "Wholesale Price (AED)", "Stock Quantity", "Image URL"
     };
 
     /// <summary>Downloads the full catalog as an .xlsx (Products + Variants sheets) — the same file layout <see cref="BulkUpdate(IFormFile?)"/> expects back.</summary>
@@ -351,20 +355,31 @@ public class ProductsController : AdminBaseController
         foreach (var variant in variants)
         {
             variantSheet.Cell(vRow, 1).Value = variant.Product?.Sku;
-            variantSheet.Cell(vRow, 2).Value = variant.Sku;
-            variantSheet.Cell(vRow, 3).Value = variant.Color?.Name;
-            variantSheet.Cell(vRow, 4).Value = variant.Size?.Label;
+            variantSheet.Cell(vRow, 2).Value = variant.Barcode;
+            variantSheet.Cell(vRow, 3).Value = variant.Sku;
+            variantSheet.Cell(vRow, 4).Value = variant.Color?.Name;
+            if (variant.Size != null)
+            {
+                var (sizePart, lengthPart) = SplitSizeLabel(variant.Size.Label);
+                variantSheet.Cell(vRow, 5).Value = sizePart;
+                if (lengthPart != null)
+                {
+                    variantSheet.Cell(vRow, 6).Value = lengthPart;
+                }
+            }
             if (variant.Price.HasValue)
             {
-                variantSheet.Cell(vRow, 5).Value = variant.Price.Value;
+                // Stored value is VAT-inclusive (see ImportVariantsSheet) — both columns are
+                // filled on export so either one alone still round-trips through a re-import.
+                variantSheet.Cell(vRow, 7).Value = Math.Round(variant.Price.Value / 1.05m, 2);
+                variantSheet.Cell(vRow, 8).Value = variant.Price.Value;
             }
             if (variant.WholesalePrice.HasValue)
             {
-                variantSheet.Cell(vRow, 6).Value = variant.WholesalePrice.Value;
+                variantSheet.Cell(vRow, 9).Value = variant.WholesalePrice.Value;
             }
-            variantSheet.Cell(vRow, 7).Value = variant.StockQuantity;
-            variantSheet.Cell(vRow, 8).Value = variant.ImageUrl;
-            variantSheet.Cell(vRow, 9).Value = variant.Barcode;
+            variantSheet.Cell(vRow, 10).Value = variant.StockQuantity;
+            variantSheet.Cell(vRow, 11).Value = variant.ImageUrl;
             vRow++;
         }
 
@@ -827,13 +842,15 @@ public class ProductsController : AdminBaseController
 
     /// <summary>
     /// Matches rows to variants by Variant Sku (column B). An existing Variant Sku gets its
-    /// Stock Quantity, and any non-blank cell among Price / Wholesale Price / Barcode, updated —
-    /// a blank cell leaves that field unchanged, never wipes it. A new Variant Sku is created and
-    /// attached to the product named in Product Sku (Parent) (column A) — which must already
-    /// exist, including any product just created earlier in the same upload. Color/Size names
-    /// that don't exist yet are created on the fly. Barcode, when provided, must be unique across
-    /// every variant — a duplicate within this same file, or one that already belongs to a
-    /// different variant in the database, fails just that row.
+    /// Stock Quantity, and any non-blank cell among Price / Wholesale Price / Internal Barcode,
+    /// updated — a blank cell leaves that field unchanged, never wipes it. A new Variant Sku is
+    /// created and attached to the product named in Product Sku (Parent) (column A) — which must
+    /// already exist, including any product just created earlier in the same upload. Color/Size
+    /// names that don't exist yet are created on the fly (Size is combined from the Size + Length
+    /// columns — see CombineSizeAndLength). Internal Barcode, when provided, must be unique
+    /// across every variant — a duplicate within this same file, or one that already belongs to
+    /// a different variant in the database, fails just that row. Price (AED) / Price+VAT are
+    /// resolved to the single VAT-inclusive value actually stored — see TryResolveVariantPrice.
     /// </summary>
     private async Task ImportVariantsSheet(IXLWorksheet sheet, Dictionary<string, Product> productsBySku, BulkImportResult result)
     {
@@ -842,11 +859,20 @@ public class ProductsController : AdminBaseController
         var variantSkuCol = FindColumn(headers, "Variant Sku", "SKU المتغير");
         var colorCol = FindColumn(headers, "Color", "اللون");
         var sizeCol = FindColumn(headers, "Size", "المقاس");
-        var priceCol = FindColumn(headers, "Price (AED)", "Price", "السعر");
+        var lengthCol = FindColumn(headers, "Length", "الطول");
+        var priceExclVatCol = FindColumn(headers, "Price (AED)", "Price", "السعر");
+        var priceInclVatCol = FindColumn(headers, "Price+VAT", "Price + VAT", "Price Incl. VAT", "السعر شامل الضريبة");
         var wholesaleCol = FindColumn(headers, "Wholesale Price (AED)", "Wholesale Price", "سعر الجملة");
         var stockCol = FindColumn(headers, "Stock Quantity", "Stock", "الكمية");
         var imageCol = FindColumn(headers, "Image URL", "Image");
-        var barcodeCol = FindColumn(headers, "Barcode", "الباركود");
+        var barcodeCol = FindColumn(headers, "Internal Barcode", "Barcode", "الباركود الداخلي", "الباركود");
+
+        // No "Price+VAT" column anywhere in the sheet at all — not just blank on this row — means
+        // this is the older export shape, where "Price (AED)" held the VAT-INCLUSIVE price
+        // directly (there was no VAT split at all). That old meaning has to be preserved exactly,
+        // never reinterpreted as the new excl.-VAT column of the same name — see
+        // TryResolveVariantPrice, which branches on this flag before reading either price cell.
+        var isOldPriceFormat = priceInclVatCol == null;
 
         if (parentSkuCol == null || variantSkuCol == null || stockCol == null)
         {
@@ -902,19 +928,15 @@ public class ProductsController : AdminBaseController
                 continue;
             }
 
-            // hasPriceCell/hasWholesaleCell: a blank cell must leave the existing value alone on
-            // an update, not wipe it — same reasoning as the Products sheet above.
-            var hasPriceCell = priceCol != null && !row.Cell(priceCol.Value).IsEmpty();
-            decimal? price = null;
-            if (hasPriceCell)
+            // hasWholesaleCell: a blank cell must leave the existing value alone on an update,
+            // not wipe it — same reasoning as the Products sheet above. Price itself goes through
+            // TryResolveVariantPrice instead (it has two source columns to reconcile).
+            if (!TryResolveVariantPrice(row, priceExclVatCol, priceInclVatCol, isOldPriceFormat, out var hasPriceCell, out var priceValue, out var priceError))
             {
-                if (!TryReadDecimal(row.Cell(priceCol!.Value), out var p) || p < 0)
-                {
-                    result.Errors.Add($"Variants row {rowNum} (SKU {variantSku}): invalid Price value.");
-                    continue;
-                }
-                price = Math.Round(p, 2);
+                result.Errors.Add($"Variants row {rowNum} (SKU {variantSku}): {priceError}");
+                continue;
             }
+            decimal? price = hasPriceCell ? priceValue : null;
 
             var hasWholesaleCell = wholesaleCol != null && !row.Cell(wholesaleCol.Value).IsEmpty();
             decimal? wholesale = null;
@@ -992,8 +1014,10 @@ public class ProductsController : AdminBaseController
             }
 
             Size? size = null;
-            var sizeLabel = sizeCol == null ? string.Empty : row.Cell(sizeCol.Value).GetString().Trim();
-            if (!string.IsNullOrWhiteSpace(sizeLabel))
+            var sizeText = sizeCol == null || row.Cell(sizeCol.Value).IsEmpty() ? null : row.Cell(sizeCol.Value).GetString().Trim();
+            var lengthText = lengthCol == null || row.Cell(lengthCol.Value).IsEmpty() ? null : row.Cell(lengthCol.Value).GetString().Trim();
+            var sizeLabel = string.IsNullOrWhiteSpace(sizeText) ? null : CombineSizeAndLength(sizeText, string.IsNullOrWhiteSpace(lengthText) ? null : lengthText);
+            if (sizeLabel != null)
             {
                 var sizeKey = NormalizeSizeKey(sizeLabel);
                 if (!sizesByKey.TryGetValue(sizeKey, out size))
@@ -1047,6 +1071,106 @@ public class ProductsController : AdminBaseController
 
     private static string NormalizeSizeKey(string label) =>
         SizeSeparatorPattern.Replace(label.Trim(), "x").ToLowerInvariant();
+
+    // The Variants sheet's Size/Length columns are the split-apart form of a stored Size label:
+    // waist/inseam-style sizes ("30x32") are two numbers, everything else (letter sizes, a bare
+    // shoe size, "One Size") is just one. Combine (import) joins Size+Length back into the same
+    // "NxN" shape NormalizeSizeKey already understands, so a combined "28"+"30" matches (and
+    // never duplicates) an existing "28x30" Size exactly like a single-column "28x30" always did.
+    private static string CombineSizeAndLength(string size, string? length) =>
+        length == null ? size : $"{size}x{length}";
+
+    // Split (export) is the inverse: only a label that IS exactly "<number>x<number>" (whole
+    // string, either separator, any case) splits into two columns — a letter size or anything
+    // else that doesn't fit that shape exports as Size alone, Length blank, so it reads back
+    // through Combine unchanged.
+    private static readonly System.Text.RegularExpressions.Regex SizeLengthSplitPattern = new(
+        @"^(\d+(?:\.\d+)?)\s*[x×]\s*(\d+(?:\.\d+)?)$",
+        System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.Compiled);
+
+    private static (string Size, string? Length) SplitSizeLabel(string label)
+    {
+        var match = SizeLengthSplitPattern.Match(label.Trim());
+        return match.Success ? (match.Groups[1].Value, match.Groups[2].Value) : (label, null);
+    }
+
+    // Resolves the Variants sheet's Price (AED) / Price+VAT cells into the single VAT-inclusive
+    // value ProductVariant.Price actually stores (the site stores prices INCLUDING 5% VAT).
+    // `hasValue` distinguishes "both cells blank — nothing to apply, leave any existing price
+    // unchanged" from a resolved `value`; a `false` return means the row itself is invalid — the
+    // caller adds `error` to the results and skips the whole row, same as any other bad cell.
+    //
+    // isOldPriceFormat (no "Price+VAT" column anywhere in the sheet, not just blank on this row)
+    // preserves the older export's meaning exactly: "Price (AED)" WAS the VAT-inclusive price
+    // there (there was no VAT split at all), so it's read as-is — never multiplied by 1.05, which
+    // would silently double-apply VAT to a value that already had it.
+    private static bool TryResolveVariantPrice(
+        IXLRow row, int? priceExclVatCol, int? priceInclVatCol, bool isOldPriceFormat,
+        out bool hasValue, out decimal value, out string? error)
+    {
+        hasValue = false;
+        value = 0;
+        error = null;
+
+        if (isOldPriceFormat)
+        {
+            if (priceExclVatCol == null || row.Cell(priceExclVatCol.Value).IsEmpty())
+            {
+                return true;
+            }
+            if (!TryReadDecimal(row.Cell(priceExclVatCol.Value), out var oldPrice) || oldPrice < 0)
+            {
+                error = "invalid Price (AED) value.";
+                return false;
+            }
+            hasValue = true;
+            value = Math.Round(oldPrice, 2);
+            return true;
+        }
+
+        var hasExcl = priceExclVatCol != null && !row.Cell(priceExclVatCol.Value).IsEmpty();
+        var hasIncl = priceInclVatCol != null && !row.Cell(priceInclVatCol.Value).IsEmpty();
+        if (!hasExcl && !hasIncl)
+        {
+            return true;
+        }
+
+        decimal excl = 0, incl = 0;
+        if (hasExcl && (!TryReadDecimal(row.Cell(priceExclVatCol!.Value), out excl) || excl < 0))
+        {
+            error = "invalid Price (AED) value.";
+            return false;
+        }
+        if (hasIncl && (!TryReadDecimal(row.Cell(priceInclVatCol!.Value), out incl) || incl < 0))
+        {
+            error = "invalid Price+VAT value.";
+            return false;
+        }
+
+        if (hasExcl && hasIncl)
+        {
+            var computed = Math.Round(excl * 1.05m, 2);
+            if (Math.Abs(computed - incl) > 0.01m)
+            {
+                error = $"Price (AED) {excl} × 1.05 = {computed}, which doesn't match Price+VAT {incl} (must agree within 0.01).";
+                return false;
+            }
+            hasValue = true;
+            value = Math.Round(incl, 2);
+            return true;
+        }
+
+        if (hasExcl)
+        {
+            hasValue = true;
+            value = Math.Round(excl * 1.05m, 2);
+            return true;
+        }
+
+        hasValue = true;
+        value = Math.Round(incl, 2);
+        return true;
+    }
 
     // Tolerates "Yes"/"No", "True"/"False", and "1"/"0" — anything else (including a typo) is
     // unrecognized, not an error: the caller treats an unrecognized Published cell the same as a

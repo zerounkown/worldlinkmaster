@@ -58,7 +58,7 @@
     <div class="col-12 col-md-6">
         <div class="summary-box">
             <h4>@Localizer["1. Download the current catalog"]</h4>
-            <p>@Localizer["Get an Excel file with two sheets: Products (SKU, name, Arabic name, category, subcategory, brand, size group, price, wholesale price, stock, published status, image URL) and Variants (per color/size combo price, stock, barcode, image URL)."]</p>
+            <p>@Localizer["Get an Excel file with two sheets: Products (SKU, name, Arabic name, category, subcategory, brand, size group, price, wholesale price, stock, published status, image URL) and Variants (internal barcode, size, length, price excl. and incl. VAT, wholesale price, stock, image URL, per color/size combo)."]</p>
             <a class="btn btn-outline-primary" asp-action="ExportExcel"><i class="bi bi-download"></i> @Localizer["Download Products.xlsx"]</a>
         </div>
     </div>
@@ -78,7 +78,16 @@
             </p>
             <p>
                 @Localizer["On the Variants sheet, keep an existing Variant Sku unchanged to update its price/stock/barcode, or add a new row with a new Variant Sku and a Product Sku (Parent) to create a new color/size combo — unknown color or size names are created automatically."]
-                @Localizer["Barcode, if provided, must be unique — the same barcode on two rows, or one that already belongs to a different variant, fails that row."]
+                @Localizer["Internal Barcode, if provided, must be unique — the same barcode on two rows, or one that already belongs to a different variant, fails that row."]
+            </p>
+            <p>
+                @Localizer["Size is the waist or main size; Length is optional. Fill both for a waist/inseam-style size (e.g. Size 28, Length 30, matching the existing \"28x30\" size — matched on the numbers, so it's never duplicated no matter which separator or case the original used). Leave Length blank for sizes that are just one value, like S/M/L or a shoe size."]
+            </p>
+            <p>
+                @Localizer["Prices on this sheet are given two ways: "] <strong>@Localizer["Price (AED)"]</strong> @Localizer["is the price EXCLUDING VAT, and"] <strong>@Localizer["Price+VAT"]</strong> @Localizer["is the price INCLUDING VAT — this is the value actually saved. Fill in either one, or both (if both are given, they must agree — Price × 1.05 has to match Price+VAT to within 0.01 — or that row fails with an error and nothing is saved for it)."]
+            </p>
+            <p class="text-muted">
+                @Localizer["Older exports (from before this sheet had a Price+VAT column) still import correctly — their single Price (AED) column is read as the VAT-inclusive price, exactly as it always meant, not multiplied by 1.05 again."]
             </p>
             <p class="text-muted">
                 @Localizer["For any product that has variants, its Stock Quantity is always set to the sum of its variants' stock after the import — the Products sheet's Stock Quantity value for that product is ignored."]
