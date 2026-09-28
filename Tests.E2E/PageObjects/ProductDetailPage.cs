@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using Microsoft.Playwright;
 
 namespace WorldLinkMaster.E2E.PageObjects;
@@ -26,6 +27,28 @@ public class ProductDetailPage
     public ILocator ReviewSubmitButton => _page.Locator("button.pdp-review-submit");
 
     public ILocator StarButton(int stars) => _page.Locator($"#reviewStarInput .pdp-star-input-btn[data-value='{stars}']");
+
+    // Gallery: main image + its own prev/next arrows, the lightbox opened by clicking it (with
+    // its own prev/next pair, wrap-around, counter), the thumbnail strip, the color swatches,
+    // and the "COLOR: <name>" label that tracks whichever color is currently selected.
+    public ILocator MainImage => _page.Locator("#mainProductImage");
+    public ILocator MainImageArrowPrev => _page.Locator("#mainImageArrowPrev");
+    public ILocator MainImageArrowNext => _page.Locator("#mainImageArrowNext");
+    public ILocator ActiveThumb => _page.Locator(".product-thumb.active");
+    public ILocator Thumbs => _page.Locator(".product-thumb");
+    public ILocator ColorSwatches => _page.Locator(".color-swatch");
+    public ILocator SelectedColorLabel => _page.Locator("#selectedColorLabel");
+    public ILocator Lightbox => _page.Locator("#zoomLightbox");
+    public ILocator LightboxImage => _page.Locator("#zoomLightboxImage");
+    public ILocator LightboxPrev => _page.Locator("#zoomLightboxPrev");
+    public ILocator LightboxNext => _page.Locator("#zoomLightboxNext");
+    public ILocator LightboxCounter => _page.Locator("#zoomLightboxCounter");
+
+    public async Task OpenLightboxAsync()
+    {
+        await MainImage.ClickAsync();
+        await Assertions.Expect(Lightbox).ToHaveClassAsync(new Regex("open"));
+    }
 
     public async Task AddToCartAsync()
     {

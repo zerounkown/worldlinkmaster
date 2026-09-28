@@ -232,6 +232,8 @@
   <data name="See All Best Sellers" xml:space="preserve"><value>عرض كل الأكثر مبيعاً</value></data>
   <data name="Previous" xml:space="preserve"><value>السابق</value></data>
   <data name="Next" xml:space="preserve"><value>التالي</value></data>
+  <data name="Previous image" xml:space="preserve"><value>الصورة السابقة</value></data>
+  <data name="Next image" xml:space="preserve"><value>الصورة التالية</value></data>
   <data name="Trending Now" xml:space="preserve"><value>الأكثر رواجاً الآن</value></data>
   <data name="Delivery Across the UAE" xml:space="preserve"><value>التوصيل في جميع أنحاء الإمارات</value></data>
   <data name="We deliver to all seven emirates, with free shipping on orders over AED 365 and tracked delivery on every order." xml:space="preserve"><value>نوصل إلى جميع الإمارات السبع، مع شحن مجاني للطلبات التي تزيد عن 365 درهم وتتبع للشحنة مع كل طلب.</value></data>

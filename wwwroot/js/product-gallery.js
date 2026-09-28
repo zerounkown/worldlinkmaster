@@ -9,6 +9,8 @@
     var lightboxPrevBtn = document.getElementById("zoomLightboxPrev");
     var lightboxNextBtn = document.getElementById("zoomLightboxNext");
     var lightboxCounter = document.getElementById("zoomLightboxCounter");
+    var mainArrowPrevBtn = document.getElementById("mainImageArrowPrev");
+    var mainArrowNextBtn = document.getElementById("mainImageArrowNext");
     var colorLabel = document.getElementById("selectedColorLabel");
     var galleryDataEl = document.getElementById("colorGalleryData");
     var sizeDataEl = document.getElementById("sizesByColorData");
@@ -527,6 +529,20 @@
         }
     }
 
+    // Selects the color swatch a thumbnail belongs to (via data-color-id) so the picture shown
+    // and the selected color stay in sync — used both by direct thumbnail clicks and by the
+    // main-image/lightbox prev-next arrows, which can land on a different color's photo too.
+    function syncColorFromThumb(thumb) {
+        if (!thumb) return;
+        var colorId = thumb.getAttribute("data-color-id");
+        if (!colorId) return;
+        var matchingInput = document.querySelector('input[name="color"][data-color-id="' + colorId + '"]');
+        if (matchingInput && !matchingInput.checked) {
+            matchingInput.checked = true;
+            matchingInput.dispatchEvent(new Event("change", { bubbles: true }));
+        }
+    }
+
     // Event delegation so thumbs rebuilt after a color swap keep working without rebinding.
     // Clicking a thumbnail also selects the matching color button (when the thumbnail is
     // traceable to one, via data-color-id) so the picture shown and the selected color stay
@@ -541,15 +557,7 @@
             var type = thumb.getAttribute("data-type") || "Image";
             showMainItem(full, type);
             setActiveThumb(thumb);
-
-            var colorId = thumb.getAttribute("data-color-id");
-            if (colorId) {
-                var matchingInput = document.querySelector('input[name="color"][data-color-id="' + colorId + '"]');
-                if (matchingInput && !matchingInput.checked) {
-                    matchingInput.checked = true;
-                    matchingInput.dispatchEvent(new Event("change", { bubbles: true }));
-                }
-            }
+            syncColorFromThumb(thumb);
         });
     }
 
@@ -605,6 +613,7 @@
         });
 
         showMainItem(items[activeIndex].url, items[activeIndex].type || "Image");
+        updateMainArrowsVisibility();
         // Selecting a new color brings the strip back to the top (the color thumbs), even if the
         // customer had scrolled down into the shared/detail photos — the toggle's icon/label
         // resync automatically via the scroll listener below.
@@ -747,15 +756,58 @@
         return idx >= 0 ? idx : 0;
     }
 
+    // Shows/hides the main-image arrow pair based on the CURRENT gallery's item count, not a
+    // fixed count computed once at page load — a color change can swap in a gallery with a
+    // different number of photos (renderGallery), so this is re-run after every such swap
+    // rather than only on initial page load.
+    function updateMainArrowsVisibility() {
+        var hasMultiple = getCurrentGalleryItems().length > 1;
+        if (mainArrowPrevBtn) mainArrowPrevBtn.style.display = hasMultiple ? "" : "none";
+        if (mainArrowNextBtn) mainArrowNextBtn.style.display = hasMultiple ? "" : "none";
+    }
+
+    // Cycles the main product image itself (not just the lightbox) forward/back through the
+    // current gallery, wrapping last -> first and first -> last. Keeps the active thumbnail
+    // and selected color swatch in sync, same as clicking a thumbnail directly.
+    function navigateMain(direction) {
+        var items = getCurrentGalleryItems();
+        if (items.length <= 1) return;
+        var currentIndex = getCurrentGalleryIndex();
+        var nextIndex = ((currentIndex + direction) % items.length + items.length) % items.length;
+        var item = items[nextIndex];
+        showMainItem(item.url, item.type);
+        var matchingThumb = thumbsContainer ? thumbsContainer.querySelector('.product-thumb[data-full="' + CSS.escape(item.url) + '"]') : null;
+        setActiveThumb(matchingThumb);
+        syncColorFromThumb(matchingThumb);
+    }
+
+    if (mainArrowPrevBtn) {
+        mainArrowPrevBtn.addEventListener("click", function (e) {
+            e.stopPropagation();
+            navigateMain(-1);
+        });
+    }
+    if (mainArrowNextBtn) {
+        mainArrowNextBtn.addEventListener("click", function (e) {
+            e.stopPropagation();
+            navigateMain(1);
+        });
+    }
+    updateMainArrowsVisibility();
+
+    // Navigation wraps around (last -> first, first -> last) rather than stopping at the
+    // ends, so both arrows stay enabled at all times; the pair is hidden entirely (not
+    // disabled) when the gallery only has one item, matching the main-image arrows.
     function updateLightboxNav() {
         if (lightboxCounter) {
             lightboxCounter.textContent = lightboxItems.length ? (lightboxIndex + 1) + " / " + lightboxItems.length : "";
         }
+        var hasMultiple = lightboxItems.length > 1;
         if (lightboxPrevBtn) {
-            lightboxPrevBtn.disabled = lightboxIndex <= 0;
+            lightboxPrevBtn.style.display = hasMultiple ? "" : "none";
         }
         if (lightboxNextBtn) {
-            lightboxNextBtn.disabled = lightboxIndex >= lightboxItems.length - 1;
+            lightboxNextBtn.style.display = hasMultiple ? "" : "none";
         }
     }
 
@@ -783,8 +835,8 @@
     }
 
     function lightboxGoTo(index) {
-        if (index < 0 || index >= lightboxItems.length || index === lightboxIndex) return;
-        lightboxIndex = index;
+        if (lightboxItems.length === 0 || index === lightboxIndex) return;
+        lightboxIndex = ((index % lightboxItems.length) + lightboxItems.length) % lightboxItems.length;
         renderLightboxImage(true);
     }
 
