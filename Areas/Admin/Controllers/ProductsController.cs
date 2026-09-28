@@ -19,12 +19,14 @@ public class ProductsController : AdminBaseController
     private readonly ApplicationDbContext _context;
     private readonly IStringLocalizer<SharedResource> _localizer;
     private readonly IOutputCacheStore _outputCacheStore;
+    private readonly ILogger<ProductsController> _logger;
 
-    public ProductsController(ApplicationDbContext context, IStringLocalizer<SharedResource> localizer, IOutputCacheStore outputCacheStore)
+    public ProductsController(ApplicationDbContext context, IStringLocalizer<SharedResource> localizer, IOutputCacheStore outputCacheStore, ILogger<ProductsController> logger)
     {
         _context = context;
         _localizer = localizer;
         _outputCacheStore = outputCacheStore;
+        _logger = logger;
     }
 
     // Deliberately unfiltered by IsPublished at the base query — this is the staff-facing view,
@@ -460,125 +462,154 @@ public class ProductsController : AdminBaseController
 
         var result = new BulkImportResult();
 
-        var products = await _context.Products.ToListAsync();
-        var productsBySku = products
-            .GroupBy(p => p.Sku.Trim(), StringComparer.OrdinalIgnoreCase)
-            .ToDictionary(g => g.Key, g => g.First(), StringComparer.OrdinalIgnoreCase);
-
-        var categoriesByName = (await _context.Categories.ToListAsync())
-            .ToDictionary(c => c.Name.Trim(), c => c, StringComparer.OrdinalIgnoreCase);
-
-        var defaultMerchant = await _context.Merchants.OrderBy(m => m.Id).FirstOrDefaultAsync();
-        var usedSlugs = new HashSet<string>(products.Select(p => p.Slug), StringComparer.OrdinalIgnoreCase);
-        var newProducts = new List<Product>();
-
-        foreach (var row in sheet.RowsUsed().Skip(1))
+        // The whole import — both sheets — runs as one all-or-nothing transaction: either
+        // everything below commits together, or (on any unexpected error) none of it does. A
+        // single SaveChangesAsync at the very end, not one per sheet, is what makes that true.
+        await using var transaction = await _context.Database.BeginTransactionAsync();
+        try
         {
-            var rowNum = row.RowNumber();
-            var sku = row.Cell(skuCol.Value).GetString().Trim();
-            if (string.IsNullOrWhiteSpace(sku))
-            {
-                continue;
-            }
+            var products = await _context.Products.ToListAsync();
+            var productsBySku = products
+                .GroupBy(p => p.Sku.Trim(), StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(g => g.Key, g => g.First(), StringComparer.OrdinalIgnoreCase);
 
-            if (!TryReadDecimal(row.Cell(priceCol.Value), out var price) || price < 0)
-            {
-                result.Errors.Add($"Row {rowNum} (SKU {sku}): invalid Price value.");
-                continue;
-            }
+            // Grouped-then-first, not a plain ToDictionary: pre-existing duplicate Category
+            // names (differing only by case, or a stray one left over from data cleanup) would
+            // otherwise throw "An item with the same key has already been added" and take the
+            // whole import down with a 500 before a single row is even read.
+            var categoriesByName = (await _context.Categories.ToListAsync())
+                .GroupBy(c => c.Name.Trim(), StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(g => g.Key, g => g.OrderBy(c => c.Id).First(), StringComparer.OrdinalIgnoreCase);
 
-            decimal? wholesale = null;
-            if (wholesaleCol != null && !row.Cell(wholesaleCol.Value).IsEmpty())
+            var defaultMerchant = await _context.Merchants.OrderBy(m => m.Id).FirstOrDefaultAsync();
+            var usedSlugs = new HashSet<string>(products.Select(p => p.Slug), StringComparer.OrdinalIgnoreCase);
+            var newProducts = new List<Product>();
+
+            foreach (var row in sheet.RowsUsed().Skip(1))
             {
-                if (!TryReadDecimal(row.Cell(wholesaleCol.Value), out var w) || w < 0)
+                var rowNum = row.RowNumber();
+                var sku = row.Cell(skuCol.Value).GetString().Trim();
+                if (string.IsNullOrWhiteSpace(sku))
                 {
-                    result.Errors.Add($"Row {rowNum} (SKU {sku}): invalid Wholesale Price value.");
                     continue;
                 }
-                wholesale = w;
+
+                if (!TryReadDecimal(row.Cell(priceCol.Value), out var price) || price < 0)
+                {
+                    result.Errors.Add($"Products row {rowNum} (SKU {sku}): invalid Price value.");
+                    continue;
+                }
+
+                decimal? wholesale = null;
+                if (wholesaleCol != null && !row.Cell(wholesaleCol.Value).IsEmpty())
+                {
+                    if (!TryReadDecimal(row.Cell(wholesaleCol.Value), out var w) || w < 0)
+                    {
+                        result.Errors.Add($"Products row {rowNum} (SKU {sku}): invalid Wholesale Price value.");
+                        continue;
+                    }
+                    wholesale = w;
+                }
+
+                if (!TryReadInt(row.Cell(stockCol.Value), out var stock) || stock < 0)
+                {
+                    result.Errors.Add($"Products row {rowNum} (SKU {sku}): invalid Stock Quantity value.");
+                    continue;
+                }
+
+                if (productsBySku.TryGetValue(sku, out var product))
+                {
+                    product.Price = Math.Round(price, 2);
+                    product.WholesalePrice = wholesale.HasValue ? Math.Round(wholesale.Value, 2) : null;
+                    product.StockQuantity = stock;
+                    result.UpdatedCount++;
+                    continue;
+                }
+
+                // Unrecognized SKU — create a new product from this row instead of skipping it.
+                var name = row.Cell(nameCol.Value).GetString().Trim();
+                if (string.IsNullOrWhiteSpace(name))
+                {
+                    result.Errors.Add($"Products row {rowNum} (SKU {sku}): new SKU with no Name — can't create a product without one.");
+                    continue;
+                }
+
+                var categoryName = row.Cell(categoryCol.Value).GetString().Trim();
+                if (string.IsNullOrWhiteSpace(categoryName) || !categoriesByName.TryGetValue(categoryName, out var category))
+                {
+                    result.Errors.Add($"Products row {rowNum} (SKU {sku}): new SKU with an unrecognized Category '{categoryName}' — check spelling against Admin → Categories.");
+                    continue;
+                }
+
+                if (defaultMerchant == null)
+                {
+                    result.Errors.Add($"Products row {rowNum} (SKU {sku}): no merchant account exists to assign this new product to.");
+                    continue;
+                }
+
+                var slug = Slugify(name);
+                var dedupeSuffix = 2;
+                while (!usedSlugs.Add(slug))
+                {
+                    slug = $"{Slugify(name)}-{dedupeSuffix}";
+                    dedupeSuffix++;
+                }
+
+                var imageUrl = imageCol == null || row.Cell(imageCol.Value).IsEmpty() ? null : row.Cell(imageCol.Value).GetString().Trim();
+
+                var newProduct = new Product
+                {
+                    Name = name,
+                    Slug = slug,
+                    Sku = sku,
+                    CategoryId = category.Id,
+                    MerchantId = defaultMerchant.Id,
+                    Price = Math.Round(price, 2),
+                    WholesalePrice = wholesale.HasValue ? Math.Round(wholesale.Value, 2) : null,
+                    StockQuantity = stock,
+                    ImageUrl = string.IsNullOrWhiteSpace(imageUrl) ? null : imageUrl,
+                    CreatedAt = DateTime.UtcNow
+                };
+
+                newProducts.Add(newProduct);
+                productsBySku[sku] = newProduct; // guards against a duplicate SKU appearing twice in the same sheet
+                result.CreatedCount++;
             }
 
-            if (!TryReadInt(row.Cell(stockCol.Value), out var stock) || stock < 0)
+            if (newProducts.Count > 0)
             {
-                result.Errors.Add($"Row {rowNum} (SKU {sku}): invalid Stock Quantity value.");
-                continue;
+                _context.Products.AddRange(newProducts);
             }
 
-            if (productsBySku.TryGetValue(sku, out var product))
+            // Optional second sheet: per color/size combo pricing and stock. Absent entirely on
+            // older exports (or a Products-only re-upload) — that's fine, nothing to do then.
+            if (workbook.Worksheets.Contains("Variants"))
             {
-                product.Price = Math.Round(price, 2);
-                product.WholesalePrice = wholesale.HasValue ? Math.Round(wholesale.Value, 2) : null;
-                product.StockQuantity = stock;
-                result.UpdatedCount++;
-                continue;
+                await ImportVariantsSheet(workbook.Worksheet("Variants"), productsBySku, result);
             }
 
-            // Unrecognized SKU — create a new product from this row instead of skipping it.
-            var name = row.Cell(nameCol.Value).GetString().Trim();
-            if (string.IsNullOrWhiteSpace(name))
+            if (result.UpdatedCount > 0 || result.CreatedCount > 0 || result.VariantsUpdatedCount > 0 || result.VariantsCreatedCount > 0)
             {
-                result.Errors.Add($"Row {rowNum} (SKU {sku}): new SKU with no Name — can't create a product without one.");
-                continue;
+                await _context.SaveChangesAsync();
             }
 
-            var categoryName = row.Cell(categoryCol.Value).GetString().Trim();
-            if (string.IsNullOrWhiteSpace(categoryName) || !categoriesByName.TryGetValue(categoryName, out var category))
+            await transaction.CommitAsync();
+
+            if (result.UpdatedCount > 0 || result.CreatedCount > 0 || result.VariantsUpdatedCount > 0 || result.VariantsCreatedCount > 0)
             {
-                result.Errors.Add($"Row {rowNum} (SKU {sku}): new SKU with an unrecognized Category '{categoryName}' — check spelling against Admin → Categories.");
-                continue;
+                await _outputCacheStore.EvictByTagAsync("products", HttpContext.RequestAborted);
             }
-
-            if (defaultMerchant == null)
-            {
-                result.Errors.Add($"Row {rowNum} (SKU {sku}): no merchant account exists to assign this new product to.");
-                continue;
-            }
-
-            var slug = Slugify(name);
-            var dedupeSuffix = 2;
-            while (!usedSlugs.Add(slug))
-            {
-                slug = $"{Slugify(name)}-{dedupeSuffix}";
-                dedupeSuffix++;
-            }
-
-            var imageUrl = imageCol == null || row.Cell(imageCol.Value).IsEmpty() ? null : row.Cell(imageCol.Value).GetString().Trim();
-
-            var newProduct = new Product
-            {
-                Name = name,
-                Slug = slug,
-                Sku = sku,
-                CategoryId = category.Id,
-                MerchantId = defaultMerchant.Id,
-                Price = Math.Round(price, 2),
-                WholesalePrice = wholesale.HasValue ? Math.Round(wholesale.Value, 2) : null,
-                StockQuantity = stock,
-                ImageUrl = string.IsNullOrWhiteSpace(imageUrl) ? null : imageUrl,
-                CreatedAt = DateTime.UtcNow
-            };
-
-            newProducts.Add(newProduct);
-            productsBySku[sku] = newProduct; // guards against a duplicate SKU appearing twice in the same sheet
-            result.CreatedCount++;
         }
-
-        if (newProducts.Count > 0)
+        catch (Exception ex)
         {
-            _context.Products.AddRange(newProducts);
-        }
+            await transaction.RollbackAsync();
+            _logger.LogError(ex, "Bulk Update import failed and was rolled back; no changes were saved.");
 
-        if (result.UpdatedCount > 0 || result.CreatedCount > 0)
-        {
-            await _context.SaveChangesAsync();
-            await _outputCacheStore.EvictByTagAsync("products", HttpContext.RequestAborted);
-        }
-
-        // Optional second sheet: per color/size combo pricing and stock. Absent entirely on
-        // older exports (or a Products-only re-upload) — that's fine, nothing to do then.
-        if (workbook.Worksheets.Contains("Variants"))
-        {
-            await ImportVariantsSheet(workbook.Worksheet("Variants"), productsBySku, result);
+            return View(new BulkImportResult
+            {
+                Errors = result.Errors,
+                FatalError = _localizer["The import failed and NO changes were saved (the whole file is rolled back together). Reason: {0}", ex.Message].Value
+            });
         }
 
         return View(result);
@@ -630,10 +661,22 @@ public class ProductsController : AdminBaseController
         var existingVariants = (await _context.ProductVariants.ToListAsync())
             .GroupBy(v => v.Sku.Trim(), StringComparer.OrdinalIgnoreCase)
             .ToDictionary(g => g.Key, g => g.First(), StringComparer.OrdinalIgnoreCase);
+
+        // Grouped-then-first (lowest Id wins, deterministically), not a plain ToDictionary:
+        // Color.Name and Size.Label have no uniqueness constraint in the database (only their
+        // Code does — see ApplicationDbContext), so pre-existing duplicates — e.g. two colors
+        // whose names collide only by case, or two sizes that differ only by "x" vs "×" — are
+        // entirely possible and, before this fix, threw "An item with the same key has already
+        // been added" here and took the whole import down with a generic 500 before a single
+        // variant row was read. Keying Sizes by NormalizeSizeKey (not the raw label) means an
+        // incoming "30X32" or "30 × 32" also lands on that same existing row below, instead of
+        // minting a near-duplicate size that differs only by separator or case.
         var colorsByName = (await _context.Colors.ToListAsync())
-            .ToDictionary(c => c.Name.Trim(), c => c, StringComparer.OrdinalIgnoreCase);
-        var sizesByLabel = (await _context.Sizes.ToListAsync())
-            .ToDictionary(s => s.Label.Trim(), s => s, StringComparer.OrdinalIgnoreCase);
+            .GroupBy(c => c.Name.Trim(), StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(g => g.Key, g => g.OrderBy(c => c.Id).First(), StringComparer.OrdinalIgnoreCase);
+        var sizesByKey = (await _context.Sizes.ToListAsync())
+            .GroupBy(s => NormalizeSizeKey(s.Label))
+            .ToDictionary(g => g.Key, g => g.OrderBy(s => s.Id).First());
         var newVariants = new List<ProductVariant>();
 
         foreach (var row in sheet.RowsUsed().Skip(1))
@@ -711,10 +754,11 @@ public class ProductsController : AdminBaseController
             var sizeLabel = sizeCol == null ? string.Empty : row.Cell(sizeCol.Value).GetString().Trim();
             if (!string.IsNullOrWhiteSpace(sizeLabel))
             {
-                if (!sizesByLabel.TryGetValue(sizeLabel, out size))
+                var sizeKey = NormalizeSizeKey(sizeLabel);
+                if (!sizesByKey.TryGetValue(sizeKey, out size))
                 {
-                    size = new Size { Label = sizeLabel, SortOrder = sizesByLabel.Count };
-                    sizesByLabel[sizeLabel] = size;
+                    size = new Size { Label = sizeLabel, SortOrder = sizesByKey.Count };
+                    sizesByKey[sizeKey] = size;
                     _context.Sizes.Add(size);
                 }
             }
@@ -740,12 +784,23 @@ public class ProductsController : AdminBaseController
             _context.ProductVariants.AddRange(newVariants);
         }
 
-        if (result.VariantsUpdatedCount > 0 || result.VariantsCreatedCount > 0)
-        {
-            await _context.SaveChangesAsync();
-            await _outputCacheStore.EvictByTagAsync("products", HttpContext.RequestAborted);
-        }
+        // No SaveChangesAsync here — the caller (BulkUpdate) saves both sheets together in one
+        // transaction, so this sheet's changes are committed (or rolled back) atomically with
+        // the Products sheet's.
     }
+
+    // Normalizes a size label for matching against existing Sizes: a separator ("x", "X", or
+    // "×", with or without surrounding spaces) between two numbers collapses to one canonical
+    // form, and the whole label is case-folded — so "30x32", "30X32", and "30 × 32" all resolve
+    // to the SAME key and match the SAME existing Size row, instead of each becoming its own
+    // near-duplicate size that differs only by punctuation or letter case. Only text between
+    // digits is touched, so letter-only labels like "S" or "XL" are unaffected beyond casing.
+    private static readonly System.Text.RegularExpressions.Regex SizeSeparatorPattern = new(
+        @"(?<=\d)\s*[x×]\s*(?=\d)",
+        System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.Compiled);
+
+    private static string NormalizeSizeKey(string label) =>
+        SizeSeparatorPattern.Replace(label.Trim(), "x").ToLowerInvariant();
 
     private static string Slugify(string name)
     {

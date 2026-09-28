@@ -8,6 +8,26 @@
 <h1>@Localizer["Bulk Update & Add Products (Excel)"]</h1>
 <p class="text-muted">@Localizer["Update prices, wholesale prices, stock quantities, and color/size variants — or add brand-new products — for many items at once."]</p>
 
+@if (!string.IsNullOrEmpty(Model.FatalError))
+{
+    <div class="alert alert-danger">
+        <div><strong>@Model.FatalError</strong></div>
+
+        @if (Model.Errors.Count > 0)
+        {
+            <div class="mt-2">
+                @Localizer["Row-level problems found before the error"]:
+                <ul class="mb-0">
+                    @foreach (var error in Model.Errors)
+                    {
+                        <li>@error</li>
+                    }
+                </ul>
+            </div>
+        }
+    </div>
+}
+
 @if (hasResult)
 {
     <div class="alert @(Model.Errors.Count > 0 ? "alert-warning" : "alert-success")">
