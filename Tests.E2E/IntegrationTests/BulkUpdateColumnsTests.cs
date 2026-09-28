@@ -383,7 +383,11 @@ public class BulkUpdateColumnsTests : IAsyncLifetime
         var otherCategory = new Category { Code = "FTW", Name = "Footwear", Slug = "footwear" };
         _context.Categories.Add(otherCategory);
         var rightSubcategory = new Subcategory { Name = "Trousers", Slug = "trousers", CategoryId = category.Id };
-        var wrongSubcategory = new Subcategory { Name = "Boots", Slug = "boots", CategoryId = otherCategory.Id };
+        // otherCategory hasn't been saved yet at this point, so its .Id is still the unassigned
+        // default (0) — capturing that into CategoryId directly would violate the FK constraint.
+        // The Category navigation property, not the CategoryId scalar, lets EF's own fixup assign
+        // the real FK once both entities save together below.
+        var wrongSubcategory = new Subcategory { Name = "Boots", Slug = "boots", Category = otherCategory };
         _context.Subcategories.AddRange(rightSubcategory, wrongSubcategory);
         await _context.SaveChangesAsync();
 
