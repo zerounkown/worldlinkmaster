@@ -465,6 +465,8 @@
                                 <source src="@firstItem["url"]" />
                             }
                         </video>
+                        <button type="button" class="product-zoom-arrow product-zoom-arrow-prev" id="mainImageArrowPrev" aria-label="@Localizer["Previous image"]"><i class="bi bi-chevron-left"></i></button>
+                        <button type="button" class="product-zoom-arrow product-zoom-arrow-next" id="mainImageArrowNext" aria-label="@Localizer["Next image"]"><i class="bi bi-chevron-right"></i></button>
                         <span class="zoom-hint"><i class="bi bi-zoom-in"></i> @Localizer["Hover to zoom · Click to enlarge"]</span>
                     </div>
                 </div>
@@ -492,6 +494,8 @@
                     }
                     <div class="product-zoom-container" id="zoomContainer">
                         <img src="@gallery[0]" alt="@Model.LocalizedName()" class="product-zoom-image" id="mainProductImage" />
+                        <button type="button" class="product-zoom-arrow product-zoom-arrow-prev" id="mainImageArrowPrev" aria-label="@Localizer["Previous image"]"><i class="bi bi-chevron-left"></i></button>
+                        <button type="button" class="product-zoom-arrow product-zoom-arrow-next" id="mainImageArrowNext" aria-label="@Localizer["Next image"]"><i class="bi bi-chevron-right"></i></button>
                         <span class="zoom-hint"><i class="bi bi-zoom-in"></i> @Localizer["Hover to zoom · Click to enlarge"]</span>
                     </div>
                 </div>
@@ -564,7 +568,7 @@
                     @if (hasProductColors)
                     {
                         <div class="mb-3">
-                            <label class="option-label">@Localizer["Color"]</label>
+                            <label class="option-label">@Localizer["Color"]: <span id="selectedColorLabel">@defaultProductColor!.Color?.Name</span></label>
                             <div class="color-options">
                                 @for (int i = 0; i < Model.ProductColors.Count; i++)
                                 {
@@ -581,7 +585,6 @@
                                     </label>
                                 }
                             </div>
-                            <span class="option-value" id="selectedColorLabel">@defaultProductColor!.Color?.Name</span>
                         </div>
                     }
                     else if (!hasProductColors && colorOptions.Count > 0)
@@ -590,7 +593,7 @@
                             ? Math.Max(0, colorOptions.FindIndex(o => string.Equals(o.Color.Name, requestedColorName, StringComparison.OrdinalIgnoreCase)))
                             : 0;
                         <div class="mb-3">
-                            <label class="option-label">@Localizer["Color"]</label>
+                            <label class="option-label">@Localizer["Color"]: <span id="selectedColorLabel">@colorOptions[defaultLegacyColorIndex].Color.Name</span></label>
                             <div class="color-options">
                                 @for (int i = 0; i < colorOptions.Count; i++)
                                 {
@@ -601,7 +604,6 @@
                                     </label>
                                 }
                             </div>
-                            <span class="option-value" id="selectedColorLabel">@colorOptions[defaultLegacyColorIndex].Color.Name</span>
                         </div>
                     }
 
