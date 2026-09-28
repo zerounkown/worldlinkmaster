@@ -13,6 +13,17 @@
     <PackageReference Include="xunit" Version="2.9.3" />
     <PackageReference Include="xunit.runner.visualstudio" Version="3.1.4" />
     <PackageReference Include="Microsoft.Playwright" Version="1.49.0" />
+    <PackageReference Include="Moq" Version="4.20.72" />
+    <!-- Pinned to the same "8.*" constraint WorldLinkMaster.Web.csproj uses for the same
+         packages — needed since IntegrationTests/BulkUpdateExecutionStrategyTests.cs builds an
+         ApplicationDbContext in-process (unlike the subprocess-based Playwright journeys below).
+         Without an explicit, matching reference here, this project's own restore can float to a
+         different EF Core patch version than the one WorldLinkMaster.Web.dll was actually built
+         against, which fails the build with CS1705 ("uses a higher version than referenced
+         assembly"). -->
+    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="8.*" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" Version="8.*" />
+    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="8.*" />
   </ItemGroup>
 
   <ItemGroup>
@@ -20,10 +31,13 @@
   </ItemGroup>
 
   <ItemGroup>
-    <!-- The app runs as a real child process (see E2EWebAppFactory), not in-process, so this
-         isn't needed for compiling against Program/DbContext — it's kept only so building
-         Tests.E2E always also builds WorldLinkMaster.Web into its own bin/Debug/net8.0/, which
-         E2EWebAppFactory launches as a subprocess. -->
+    <!-- Still launched as a real child process for the Playwright journeys (see
+         E2EWebAppFactory), but also referenced directly now: IntegrationTests/
+         BulkUpdateExecutionStrategyTests.cs runs ProductsController in-process against a real
+         Npgsql-backed ApplicationDbContext, to exercise the real NpgsqlRetryingExecutionStrategy
+         that a subprocess-only setup can't assert against from the test body. Building Tests.E2E
+         always also builds WorldLinkMaster.Web into its own bin/Debug/net8.0/ as a side effect,
+         which E2EWebAppFactory launches as a subprocess for the Playwright journeys. -->
     <ProjectReference Include="..\WorldLinkMaster.Web.csproj" />
   </ItemGroup>
 
