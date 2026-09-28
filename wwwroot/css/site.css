@@ -708,6 +708,7 @@ a:hover {
    (mobile, where a permanently-visible bar wouldn't fit in the header row) — same GET search to
    Products/Index either way, just two responsive presentations of the same functionality. */
 .header-search-inline {
+  position: relative;
   display: flex;
   align-items: center;
   width: 100%;
@@ -815,10 +816,108 @@ a:hover {
 }
 
 .header-search-form {
+  position: relative;
   display: flex;
   align-items: center;
   background: white;
   border-bottom: 2px solid var(--wlm-forest-dark);
+}
+
+/* Instant-search dropdown — shared markup/JS (wwwroot/js/header-instant-search.js) under both
+   the desktop .header-search-inline bar and the mobile/tablet .header-search-form panel, each
+   with their own copy of this element as a sibling of the <input>. left/right: 0 (not a
+   logical-property pair) so it always spans the FULL width of its own relative-positioned
+   parent regardless of dir="rtl" — no mirroring needed since the dropdown itself isn't
+   asymmetric, only the Arabic text rendered inside it (which inherits dir="rtl" from <html>
+   automatically). Hidden by default (JS toggles .open); reserving no layout space when empty. */
+.instant-search-dropdown {
+  display: none;
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  margin-top: 6px;
+  background: white;
+  border-radius: 6px;
+  box-shadow: 0 12px 30px rgba(10, 10, 10, 0.25);
+  overflow: hidden;
+  z-index: 1100;
+  max-height: 70vh;
+  overflow-y: auto;
+}
+
+.instant-search-dropdown.open {
+  display: block;
+}
+
+.instant-search-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 14px;
+  text-decoration: none;
+  color: var(--wlm-ink);
+  border-bottom: 1px solid var(--wlm-sand-light);
+}
+
+.instant-search-item:last-of-type {
+  border-bottom: none;
+}
+
+.instant-search-item:hover,
+.instant-search-item.active {
+  background: var(--wlm-sand-light);
+}
+
+.instant-search-item-image {
+  width: 44px;
+  height: 44px;
+  object-fit: cover;
+  border-radius: 4px;
+  flex: 0 0 auto;
+  background: var(--wlm-sand-light);
+}
+
+.instant-search-item-info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.instant-search-item-name {
+  font-size: 0.85rem;
+  color: var(--wlm-ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.instant-search-item-price {
+  font-size: 0.78rem;
+  color: var(--wlm-forest-mid);
+}
+
+.instant-search-view-all {
+  display: block;
+  padding: 10px 14px;
+  text-align: center;
+  font-size: 0.82rem;
+  font-weight: 600;
+  text-decoration: none;
+  color: var(--wlm-forest-dark);
+  background: var(--wlm-sand-light);
+}
+
+.instant-search-view-all:hover,
+.instant-search-view-all.active {
+  background: var(--wlm-sand);
+}
+
+.instant-search-empty {
+  padding: 14px;
+  text-align: center;
+  font-size: 0.85rem;
+  color: var(--wlm-forest-mid);
 }
 
 .header-search-input {

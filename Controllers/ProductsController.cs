@@ -427,6 +427,109 @@ public class ProductsController : Controller
         return View(vm);
     }
 
+    // Header instant-search dropdown. One lightweight query (no N+1: the matching variant, if
+    // any, is a correlated subquery projected alongside each product, not a separate round
+    // trip), capped to InstantSearchMaxResults and gated to a 2+ character term server-side too
+    // (not just the debounced client) so a stray 1-character request can't scan the table.
+    // ILIKE + the trigram indexes in ApplicationDbContext power this on Postgres (production);
+    // SQLite (fast unit tests) can't translate ILIKE at all, so it gets an equivalent
+    // ToLower().Contains() query instead — same results, no index, which is fine at unit-test
+    // data volumes. Some imported NameAr values carry a stray U+200E (LEFT-TO-RIGHT MARK)
+    // character right before a run of digits (e.g. "...200E24-7"), which would otherwise split
+    // "24-7" across the invisible character and silently fail to match — stripped out of NameAr
+    // before comparing, on both provider paths.
+    private const int InstantSearchMaxResults = 8;
+    private const string LeftToRightMark = "‎";
+
+    [HttpGet]
+    public async Task<IActionResult> InstantSearch(string? q)
+    {
+        var term = (q ?? string.Empty).Trim();
+        if (term.Length < 2)
+        {
+            return Json(new { results = Array.Empty<object>() });
+        }
+
+        var candidates = _context.Database.IsNpgsql()
+            ? await InstantSearchNpgsqlAsync(term)
+            : await InstantSearchSqliteAsync(term);
+
+        var isArabicUi = System.Globalization.CultureInfo.CurrentUICulture.TwoLetterISOLanguageName == "ar";
+        var payload = candidates.Select(c => new
+        {
+            slug = c.Slug,
+            name = isArabicUi && !string.IsNullOrEmpty(c.NameAr) ? c.NameAr : c.Name,
+            image = ImagePlaceholder.IsRealImageUrl(c.ImageUrl) ? c.ImageUrl : ImagePlaceholder.DataUri,
+            price = c.Price.ToDisplayCurrency(),
+            url = Url.Action("Details", "Products", new { slug = c.Slug, color = c.MatchedColorName })
+        });
+
+        return Json(new
+        {
+            results = payload,
+            searchUrl = Url.Action("Index", "Products", new { search = term })
+        });
+    }
+
+    private record InstantSearchCandidate(string Slug, string Name, string? NameAr, decimal Price, string? ImageUrl, string? MatchedColorName);
+
+    private async Task<List<InstantSearchCandidate>> InstantSearchNpgsqlAsync(string term)
+    {
+        var pattern = $"%{term}%";
+        var lowerTerm = term.ToLowerInvariant();
+
+        return await _context.Products
+            .AsNoTracking()
+            .Where(p => p.IsPublished && (
+                EF.Functions.ILike(p.Sku, pattern) ||
+                EF.Functions.ILike(p.Name, pattern) ||
+                (p.NameAr != null && EF.Functions.ILike(p.NameAr.Replace(LeftToRightMark, ""), pattern)) ||
+                p.Variants.Any(v => EF.Functions.ILike(v.Sku, pattern)) ||
+                p.Variants.Any(v => v.Barcode != null && EF.Functions.ILike(v.Barcode, pattern))))
+            .OrderByDescending(p => p.Sku.ToLower() == lowerTerm ? 3 : (p.Name.ToLower().StartsWith(lowerTerm) ? 2 : 1))
+            .ThenBy(p => p.Name)
+            .Take(InstantSearchMaxResults)
+            .Select(p => new InstantSearchCandidate(
+                p.Slug,
+                p.Name,
+                p.NameAr,
+                p.Price,
+                p.ImageUrl,
+                p.Variants
+                    .Where(v => EF.Functions.ILike(v.Sku, pattern) || (v.Barcode != null && EF.Functions.ILike(v.Barcode, pattern)))
+                    .Select(v => v.Color != null ? v.Color.Name : null)
+                    .FirstOrDefault()))
+            .ToListAsync();
+    }
+
+    private async Task<List<InstantSearchCandidate>> InstantSearchSqliteAsync(string term)
+    {
+        var lowerTerm = term.ToLowerInvariant();
+
+        return await _context.Products
+            .AsNoTracking()
+            .Where(p => p.IsPublished && (
+                p.Sku.ToLower().Contains(lowerTerm) ||
+                p.Name.ToLower().Contains(lowerTerm) ||
+                (p.NameAr != null && p.NameAr.Replace(LeftToRightMark, "").ToLower().Contains(lowerTerm)) ||
+                p.Variants.Any(v => v.Sku.ToLower().Contains(lowerTerm)) ||
+                p.Variants.Any(v => v.Barcode != null && v.Barcode.ToLower().Contains(lowerTerm))))
+            .OrderByDescending(p => p.Sku.ToLower() == lowerTerm ? 3 : (p.Name.ToLower().StartsWith(lowerTerm) ? 2 : 1))
+            .ThenBy(p => p.Name)
+            .Take(InstantSearchMaxResults)
+            .Select(p => new InstantSearchCandidate(
+                p.Slug,
+                p.Name,
+                p.NameAr,
+                p.Price,
+                p.ImageUrl,
+                p.Variants
+                    .Where(v => v.Sku.ToLower().Contains(lowerTerm) || (v.Barcode != null && v.Barcode.ToLower().Contains(lowerTerm)))
+                    .Select(v => v.Color != null ? v.Color.Name : null)
+                    .FirstOrDefault()))
+            .ToListAsync();
+    }
+
     public async Task<IActionResult> NewArrivals()
     {
         ViewBag.ActiveEvent = await _promoService.GetTopActiveEventAsync();
