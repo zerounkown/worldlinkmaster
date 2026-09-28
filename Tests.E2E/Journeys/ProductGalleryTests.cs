@@ -97,8 +97,11 @@ public class ProductGalleryTests : E2ETestBase
 
         // The label sits inside "COLOR: <name>" — assert the surrounding text carries the
         // localized "Color" heading alongside the live value, not just the bare name.
+        // Case-insensitive: .option-label is rendered all-uppercase via CSS text-transform
+        // (InnerTextAsync reflects that, unlike the DOM's own textContent), so the heading
+        // itself reads "COLOR" on the page even though the Razor source says "Color".
         var optionLabelText = await Page.Locator("label.option-label", new PageLocatorOptions { Has = detail.SelectedColorLabel }).InnerTextAsync();
-        Assert.Contains("Color", optionLabelText);
+        Assert.Contains("Color", optionLabelText, StringComparison.OrdinalIgnoreCase);
         Assert.Contains(initialLabel, optionLabelText);
 
         // Pick a swatch that isn't already selected and confirm the label updates to match.
