@@ -276,14 +276,29 @@ public class ProductsController : AdminBaseController
         return RedirectToAction(nameof(Index));
     }
 
-    private static readonly string[] ExcelHeaders = { "Sku", "Name", "Category", "Price (AED)", "Wholesale Price (AED)", "Stock Quantity", "Image URL" };
-    private static readonly string[] VariantExcelHeaders = { "Product Sku (Parent)", "Variant Sku", "Color", "Size", "Price (AED)", "Wholesale Price (AED)", "Stock Quantity", "Image URL" };
+    private static readonly string[] ExcelHeaders =
+    {
+        "Sku", "Name", "Category", "Price (AED)", "Wholesale Price (AED)", "Stock Quantity", "Image URL",
+        "Name (Arabic)", "Brand", "Subcategory", "Size Group", "Published"
+    };
+    // Matches the supplier reference format exactly, column-for-column — this is the layout a
+    // new supplier's own spreadsheet already comes in, not just our own export/re-import shape.
+    // See ImportVariantsSheet for what each column means (Internal Barcode, Size+Length, and the
+    // Price (AED)/Price+VAT pair all have rules of their own).
+    private static readonly string[] VariantExcelHeaders =
+    {
+        "Product Sku (Parent)", "Internal Barcode", "Variant Sku", "Color", "Size", "Length",
+        "Price (AED)", "Price+VAT", "Wholesale Price (AED)", "Stock Quantity", "Image URL"
+    };
 
     /// <summary>Downloads the full catalog as an .xlsx (Products + Variants sheets) — the same file layout <see cref="BulkUpdate(IFormFile?)"/> expects back.</summary>
     public async Task<IActionResult> ExportExcel()
     {
         var products = await _context.Products
             .Include(p => p.Category)
+            .Include(p => p.Brand)
+            .Include(p => p.Subcategory)
+            .Include(p => p.SizeGroup)
             .OrderBy(p => p.Category!.Name).ThenBy(p => p.Name)
             .ToListAsync();
 
@@ -310,6 +325,11 @@ public class ProductsController : AdminBaseController
             }
             sheet.Cell(row, 6).Value = product.StockQuantity;
             sheet.Cell(row, 7).Value = product.ImageUrl;
+            sheet.Cell(row, 8).Value = product.NameAr;
+            sheet.Cell(row, 9).Value = product.Brand?.Name;
+            sheet.Cell(row, 10).Value = product.Subcategory?.Name;
+            sheet.Cell(row, 11).Value = product.SizeGroup?.NameEn;
+            sheet.Cell(row, 12).Value = product.IsPublished ? "Yes" : "No";
             row++;
         }
 
@@ -335,19 +355,31 @@ public class ProductsController : AdminBaseController
         foreach (var variant in variants)
         {
             variantSheet.Cell(vRow, 1).Value = variant.Product?.Sku;
-            variantSheet.Cell(vRow, 2).Value = variant.Sku;
-            variantSheet.Cell(vRow, 3).Value = variant.Color?.Name;
-            variantSheet.Cell(vRow, 4).Value = variant.Size?.Label;
+            variantSheet.Cell(vRow, 2).Value = variant.Barcode;
+            variantSheet.Cell(vRow, 3).Value = variant.Sku;
+            variantSheet.Cell(vRow, 4).Value = variant.Color?.Name;
+            if (variant.Size != null)
+            {
+                var (sizePart, lengthPart) = SplitSizeLabel(variant.Size.Label);
+                variantSheet.Cell(vRow, 5).Value = sizePart;
+                if (lengthPart != null)
+                {
+                    variantSheet.Cell(vRow, 6).Value = lengthPart;
+                }
+            }
             if (variant.Price.HasValue)
             {
-                variantSheet.Cell(vRow, 5).Value = variant.Price.Value;
+                // Stored value is VAT-inclusive (see ImportVariantsSheet) — both columns are
+                // filled on export so either one alone still round-trips through a re-import.
+                variantSheet.Cell(vRow, 7).Value = Math.Round(variant.Price.Value / 1.05m, 2);
+                variantSheet.Cell(vRow, 8).Value = variant.Price.Value;
             }
             if (variant.WholesalePrice.HasValue)
             {
-                variantSheet.Cell(vRow, 6).Value = variant.WholesalePrice.Value;
+                variantSheet.Cell(vRow, 9).Value = variant.WholesalePrice.Value;
             }
-            variantSheet.Cell(vRow, 7).Value = variant.StockQuantity;
-            variantSheet.Cell(vRow, 8).Value = variant.ImageUrl;
+            variantSheet.Cell(vRow, 10).Value = variant.StockQuantity;
+            variantSheet.Cell(vRow, 11).Value = variant.ImageUrl;
             vRow++;
         }
 
@@ -401,9 +433,15 @@ public class ProductsController : AdminBaseController
 
     /// <summary>
     /// Matches rows to products by SKU (column A). A SKU that already exists gets its Price,
-    /// Wholesale Price, and Stock Quantity updated (Name/Category are reference-only for those
-    /// rows). A SKU that doesn't exist yet is created as a brand-new product using that row's
-    /// Name, Category, Price, Wholesale Price, Stock Quantity, and Image URL.
+    /// Stock Quantity, and any non-blank cell among Wholesale Price / Name (Arabic) / Brand /
+    /// Subcategory / Size Group / Published updated — a blank cell always leaves that field
+    /// unchanged, never wipes it (Name/Category themselves stay reference-only for those rows,
+    /// as before). A SKU that doesn't exist yet is created as a brand-new product from the whole
+    /// row — Published defaults to No unless the cell says Yes, and it's assigned to the default
+    /// merchant. Brand/Subcategory/Size Group are matched by name to existing records only —
+    /// never auto-created — and an unrecognized name fails just that row. Stock Quantity is
+    /// overridden after the Variants sheet runs for any product that ends up with variants: it's
+    /// always the sum of that product's variants' stock, system-wide, not the cell value here.
     /// </summary>
     [HttpPost]
     [ValidateAntiForgeryToken]
@@ -452,6 +490,14 @@ public class ProductsController : AdminBaseController
         var wholesaleCol = FindColumn(headers, "Wholesale Price (AED)", "Wholesale Price", "سعر الجملة");
         var stockCol = FindColumn(headers, "Stock Quantity", "Stock", "Qty", "الكمية", "كمية المخزون");
         var imageCol = FindColumn(headers, "Image URL", "Image", "رابط الصورة");
+
+        // All optional — an older export, or a supplier file that never had these columns,
+        // still imports fine without them.
+        var nameArCol = FindColumn(headers, "Name (Arabic)", "Name Ar", "الاسم بالعربية", "الاسم العربي");
+        var brandCol = FindColumn(headers, "Brand", "العلامة التجارية", "الماركة");
+        var subcategoryCol = FindColumn(headers, "Subcategory", "الفئة الفرعية", "القسم الفرعي");
+        var sizeGroupCol = FindColumn(headers, "Size Group", "مجموعة المقاسات");
+        var publishedCol = FindColumn(headers, "Published", "منشور");
 
         if (skuCol == null || nameCol == null || categoryCol == null || priceCol == null || stockCol == null)
         {
@@ -504,6 +550,23 @@ public class ProductsController : AdminBaseController
                     .GroupBy(c => c.Name.Trim(), StringComparer.OrdinalIgnoreCase)
                     .ToDictionary(g => g.Key, g => g.OrderBy(c => c.Id).First(), StringComparer.OrdinalIgnoreCase);
 
+                // Brand, Subcategory, and Size Group are matched by name only — never created by
+                // this import (unlike Color/Size on the Variants sheet). Same grouped-then-first
+                // defense against pre-existing duplicate names as Categories above.
+                var brandsByName = (await _context.Brands.ToListAsync())
+                    .GroupBy(b => b.Name.Trim(), StringComparer.OrdinalIgnoreCase)
+                    .ToDictionary(g => g.Key, g => g.OrderBy(b => b.Id).First(), StringComparer.OrdinalIgnoreCase);
+                var sizeGroupsByName = (await _context.SizeGroups.ToListAsync())
+                    .GroupBy(sg => sg.NameEn.Trim(), StringComparer.OrdinalIgnoreCase)
+                    .ToDictionary(g => g.Key, g => g.OrderBy(sg => sg.Id).First(), StringComparer.OrdinalIgnoreCase);
+                // A Subcategory name only has to be unique within its own Category (two different
+                // categories can each have a "Accessories" subcategory), so this is keyed by
+                // (CategoryId, lowercased name) rather than name alone. The name is pre-lowercased
+                // into the key itself since ValueTuple's default equality is ordinal.
+                var subcategoriesByCategoryAndName = (await _context.Subcategories.ToListAsync())
+                    .GroupBy(s => (s.CategoryId, Name: s.Name.Trim().ToLowerInvariant()))
+                    .ToDictionary(g => g.Key, g => g.OrderBy(s => s.Id).First());
+
                 var defaultMerchant = await _context.Merchants.OrderBy(m => m.Id).FirstOrDefaultAsync();
                 var usedSlugs = new HashSet<string>(products.Select(p => p.Slug), StringComparer.OrdinalIgnoreCase);
                 var newProducts = new List<Product>();
@@ -523,10 +586,15 @@ public class ProductsController : AdminBaseController
                         continue;
                     }
 
+                    // hasWholesaleCell distinguishes "blank — leave unchanged" from "provided —
+                    // apply it", which a nullable `wholesale` alone can't: null already means
+                    // both "not on this row" and "clear it", and only the latter should ever wipe
+                    // an existing value.
+                    var hasWholesaleCell = wholesaleCol != null && !row.Cell(wholesaleCol.Value).IsEmpty();
                     decimal? wholesale = null;
-                    if (wholesaleCol != null && !row.Cell(wholesaleCol.Value).IsEmpty())
+                    if (hasWholesaleCell)
                     {
-                        if (!TryReadDecimal(row.Cell(wholesaleCol.Value), out var w) || w < 0)
+                        if (!TryReadDecimal(row.Cell(wholesaleCol!.Value), out var w) || w < 0)
                         {
                             result.Errors.Add($"Products row {rowNum} (SKU {sku}): invalid Wholesale Price value.");
                             continue;
@@ -540,11 +608,60 @@ public class ProductsController : AdminBaseController
                         continue;
                     }
 
+                    // Optional classification columns. Blank means "leave unchanged" on an update
+                    // row (never wipe a value just because the cell is empty) and "use the
+                    // default" on a new-product row.
+                    var nameAr = nameArCol == null || row.Cell(nameArCol.Value).IsEmpty() ? null : row.Cell(nameArCol.Value).GetString().Trim();
+                    var brandName = brandCol == null || row.Cell(brandCol.Value).IsEmpty() ? null : row.Cell(brandCol.Value).GetString().Trim();
+                    var subcategoryName = subcategoryCol == null || row.Cell(subcategoryCol.Value).IsEmpty() ? null : row.Cell(subcategoryCol.Value).GetString().Trim();
+                    var sizeGroupName = sizeGroupCol == null || row.Cell(sizeGroupCol.Value).IsEmpty() ? null : row.Cell(sizeGroupCol.Value).GetString().Trim();
+                    var publishedText = publishedCol == null || row.Cell(publishedCol.Value).IsEmpty() ? null : row.Cell(publishedCol.Value).GetString().Trim();
+
+                    // Brand and Size Group aren't scoped to a Category, so they resolve the same
+                    // way regardless of whether this row turns out to be an update or a create.
+                    // Never auto-created — an unrecognized name is a row error, not a new record.
+                    Brand? brand = null;
+                    if (brandName != null && !brandsByName.TryGetValue(brandName, out brand))
+                    {
+                        result.Errors.Add($"Products row {rowNum} (SKU {sku}): unrecognized Brand '{brandName}' — check spelling against Admin → Brands.");
+                        continue;
+                    }
+
+                    SizeGroup? sizeGroup = null;
+                    if (sizeGroupName != null && !sizeGroupsByName.TryGetValue(sizeGroupName, out sizeGroup))
+                    {
+                        result.Errors.Add($"Products row {rowNum} (SKU {sku}): unrecognized Size Group '{sizeGroupName}' — check spelling against Admin → Size Groups.");
+                        continue;
+                    }
+
                     if (productsBySku.TryGetValue(sku, out var product))
                     {
+                        // Subcategory is validated against the product's CURRENT category — this
+                        // row's Category cell is reference-only for an update (as Name already
+                        // is), so changing it here isn't supported and shouldn't silently change
+                        // which category the Subcategory has to belong to either.
+                        Subcategory? subcategory = null;
+                        if (subcategoryName != null &&
+                            !subcategoriesByCategoryAndName.TryGetValue((product.CategoryId, subcategoryName.ToLowerInvariant()), out subcategory))
+                        {
+                            result.Errors.Add($"Products row {rowNum} (SKU {sku}): unrecognized Subcategory '{subcategoryName}' for this product's current category — check spelling, and that it belongs to the right category.");
+                            continue;
+                        }
+
                         product.Price = Math.Round(price, 2);
-                        product.WholesalePrice = wholesale.HasValue ? Math.Round(wholesale.Value, 2) : null;
-                        product.StockQuantity = stock;
+                        if (hasWholesaleCell)
+                        {
+                            product.WholesalePrice = Math.Round(wholesale!.Value, 2);
+                        }
+                        product.StockQuantity = stock; // overridden below for any product that ends up with variants
+                        if (nameAr != null) product.NameAr = nameAr;
+                        if (brandName != null) product.BrandId = brand!.Id;
+                        if (subcategoryName != null) product.SubcategoryId = subcategory!.Id;
+                        if (sizeGroupName != null) product.SizeGroupId = sizeGroup!.Id;
+                        if (publishedText != null && TryReadYesNo(publishedText, out var isPublishedUpdate))
+                        {
+                            product.IsPublished = isPublishedUpdate;
+                        }
                         result.UpdatedCount++;
                         continue;
                     }
@@ -564,6 +681,14 @@ public class ProductsController : AdminBaseController
                         continue;
                     }
 
+                    Subcategory? subcategoryForCreate = null;
+                    if (subcategoryName != null &&
+                        !subcategoriesByCategoryAndName.TryGetValue((category.Id, subcategoryName.ToLowerInvariant()), out subcategoryForCreate))
+                    {
+                        result.Errors.Add($"Products row {rowNum} (SKU {sku}): unrecognized Subcategory '{subcategoryName}' for Category '{categoryName}' — check spelling, and that it belongs to the right category.");
+                        continue;
+                    }
+
                     if (defaultMerchant == null)
                     {
                         result.Errors.Add($"Products row {rowNum} (SKU {sku}): no merchant account exists to assign this new product to.");
@@ -580,17 +705,26 @@ public class ProductsController : AdminBaseController
 
                     var imageUrl = imageCol == null || row.Cell(imageCol.Value).IsEmpty() ? null : row.Cell(imageCol.Value).GetString().Trim();
 
+                    // Unpublished by default — Published = Yes is opt-in, not opt-out, so a
+                    // blank/unrecognized cell (or an explicit "No") both land here as false.
+                    var isPublishedNew = publishedText != null && TryReadYesNo(publishedText, out var publishedValueNew) && publishedValueNew;
+
                     var newProduct = new Product
                     {
                         Name = name,
+                        NameAr = nameAr,
                         Slug = slug,
                         Sku = sku,
                         CategoryId = category.Id,
+                        SubcategoryId = subcategoryForCreate?.Id,
+                        BrandId = brand?.Id,
+                        SizeGroupId = sizeGroup?.Id,
                         MerchantId = defaultMerchant.Id,
                         Price = Math.Round(price, 2),
-                        WholesalePrice = wholesale.HasValue ? Math.Round(wholesale.Value, 2) : null,
+                        WholesalePrice = hasWholesaleCell ? Math.Round(wholesale!.Value, 2) : null,
                         StockQuantity = stock,
                         ImageUrl = string.IsNullOrWhiteSpace(imageUrl) ? null : imageUrl,
+                        IsPublished = isPublishedNew,
                         CreatedAt = DateTime.UtcNow
                     };
 
@@ -609,6 +743,40 @@ public class ProductsController : AdminBaseController
                 if (workbook.Worksheets.Contains("Variants"))
                 {
                     await ImportVariantsSheet(workbook.Worksheet("Variants"), productsBySku, result);
+                }
+
+                // Any product that has variants always has its Stock Quantity set to the sum of
+                // its variants' stock — the Products sheet's Stock Quantity cell is ignored for
+                // that product (set above, then overridden here). This runs from the
+                // ChangeTracker rather than a fresh DB query, deliberately: a brand-new product
+                // or variant created earlier in this same attempt has no database row yet to
+                // query, but is already tracked. ChangeTracker.Entries<ProductVariant>() also
+                // still includes every pre-existing variant this file never even mentioned
+                // (loaded, untouched, and still tracked as Unchanged) — not just the ones this
+                // upload touched — which is what makes the sum correct for a partial re-upload.
+                var productsById = products.ToDictionary(p => p.Id);
+                var variantStockByProduct = new Dictionary<Product, int>();
+                foreach (var entry in _context.ChangeTracker.Entries<ProductVariant>())
+                {
+                    var trackedVariant = entry.Entity;
+                    // A variant just created in this attempt has its Product navigation set
+                    // directly (see ImportVariantsSheet) but no real ProductId yet — that FK is
+                    // only resolved from the navigation property when SaveChanges runs. A
+                    // pre-existing variant is the opposite: loaded straight from the database
+                    // with a real ProductId, but without .Product (never Include()d).
+                    var owningProduct = trackedVariant.Product
+                        ?? (productsById.TryGetValue(trackedVariant.ProductId, out var existingOwner) ? existingOwner : null);
+                    if (owningProduct == null)
+                    {
+                        continue;
+                    }
+
+                    variantStockByProduct[owningProduct] = variantStockByProduct.GetValueOrDefault(owningProduct) + trackedVariant.StockQuantity;
+                }
+
+                foreach (var (productWithVariants, totalVariantStock) in variantStockByProduct)
+                {
+                    productWithVariants.StockQuantity = totalVariantStock;
                 }
 
                 if (result.UpdatedCount > 0 || result.CreatedCount > 0 || result.VariantsUpdatedCount > 0 || result.VariantsCreatedCount > 0)
@@ -674,10 +842,15 @@ public class ProductsController : AdminBaseController
 
     /// <summary>
     /// Matches rows to variants by Variant Sku (column B). An existing Variant Sku gets its
-    /// Price, Wholesale Price, and Stock Quantity updated. A new Variant Sku is created and
-    /// attached to the product named in Product Sku (Parent) (column A) — which must already
-    /// exist, including any product just created earlier in the same upload. Color/Size names
-    /// that don't exist yet are created on the fly.
+    /// Stock Quantity, and any non-blank cell among Price / Wholesale Price / Internal Barcode,
+    /// updated — a blank cell leaves that field unchanged, never wipes it. A new Variant Sku is
+    /// created and attached to the product named in Product Sku (Parent) (column A) — which must
+    /// already exist, including any product just created earlier in the same upload. Color/Size
+    /// names that don't exist yet are created on the fly (Size is combined from the Size + Length
+    /// columns — see CombineSizeAndLength). Internal Barcode, when provided, must be unique
+    /// across every variant — a duplicate within this same file, or one that already belongs to
+    /// a different variant in the database, fails just that row. Price (AED) / Price+VAT are
+    /// resolved to the single VAT-inclusive value actually stored — see TryResolveVariantPrice.
     /// </summary>
     private async Task ImportVariantsSheet(IXLWorksheet sheet, Dictionary<string, Product> productsBySku, BulkImportResult result)
     {
@@ -686,10 +859,20 @@ public class ProductsController : AdminBaseController
         var variantSkuCol = FindColumn(headers, "Variant Sku", "SKU المتغير");
         var colorCol = FindColumn(headers, "Color", "اللون");
         var sizeCol = FindColumn(headers, "Size", "المقاس");
-        var priceCol = FindColumn(headers, "Price (AED)", "Price", "السعر");
+        var lengthCol = FindColumn(headers, "Length", "الطول");
+        var priceExclVatCol = FindColumn(headers, "Price (AED)", "Price", "السعر");
+        var priceInclVatCol = FindColumn(headers, "Price+VAT", "Price + VAT", "Price Incl. VAT", "السعر شامل الضريبة");
         var wholesaleCol = FindColumn(headers, "Wholesale Price (AED)", "Wholesale Price", "سعر الجملة");
         var stockCol = FindColumn(headers, "Stock Quantity", "Stock", "الكمية");
         var imageCol = FindColumn(headers, "Image URL", "Image");
+        var barcodeCol = FindColumn(headers, "Internal Barcode", "Barcode", "الباركود الداخلي", "الباركود");
+
+        // No "Price+VAT" column anywhere in the sheet at all — not just blank on this row — means
+        // this is the older export shape, where "Price (AED)" held the VAT-INCLUSIVE price
+        // directly (there was no VAT split at all). That old meaning has to be preserved exactly,
+        // never reinterpreted as the new excl.-VAT column of the same name — see
+        // TryResolveVariantPrice, which branches on this flag before reading either price cell.
+        var isOldPriceFormat = priceInclVatCol == null;
 
         if (parentSkuCol == null || variantSkuCol == null || stockCol == null)
         {
@@ -716,6 +899,18 @@ public class ProductsController : AdminBaseController
         var sizesByKey = (await _context.Sizes.ToListAsync())
             .GroupBy(s => NormalizeSizeKey(s.Label))
             .ToDictionary(g => g.Key, g => g.OrderBy(s => s.Id).First());
+
+        // Barcode is unique across ALL variants (enforced by a DB index too — see
+        // ApplicationDbContext — this dictionary just turns a violation into a friendly per-row
+        // error instead of a whole-transaction rollback). Grouped-then-first for the same
+        // pre-existing-duplicate defense as Colors/Sizes above. Re-registering the owner after
+        // every accepted row (below) is what also catches the SAME barcode appearing twice
+        // within this file, not just a collision against the database.
+        var variantsByBarcode = existingVariants.Values
+            .Where(v => !string.IsNullOrWhiteSpace(v.Barcode))
+            .GroupBy(v => v.Barcode!.Trim(), StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(g => g.Key, g => g.OrderBy(v => v.Id).First(), StringComparer.OrdinalIgnoreCase);
+
         var newVariants = new List<ProductVariant>();
 
         foreach (var row in sheet.RowsUsed().Skip(1))
@@ -733,21 +928,21 @@ public class ProductsController : AdminBaseController
                 continue;
             }
 
-            decimal? price = null;
-            if (priceCol != null && !row.Cell(priceCol.Value).IsEmpty())
+            // hasWholesaleCell: a blank cell must leave the existing value alone on an update,
+            // not wipe it — same reasoning as the Products sheet above. Price itself goes through
+            // TryResolveVariantPrice instead (it has two source columns to reconcile).
+            if (!TryResolveVariantPrice(row, priceExclVatCol, priceInclVatCol, isOldPriceFormat, out var hasPriceCell, out var priceValue, out var priceError))
             {
-                if (!TryReadDecimal(row.Cell(priceCol.Value), out var p) || p < 0)
-                {
-                    result.Errors.Add($"Variants row {rowNum} (SKU {variantSku}): invalid Price value.");
-                    continue;
-                }
-                price = Math.Round(p, 2);
+                result.Errors.Add($"Variants row {rowNum} (SKU {variantSku}): {priceError}");
+                continue;
             }
+            decimal? price = hasPriceCell ? priceValue : null;
 
+            var hasWholesaleCell = wholesaleCol != null && !row.Cell(wholesaleCol.Value).IsEmpty();
             decimal? wholesale = null;
-            if (wholesaleCol != null && !row.Cell(wholesaleCol.Value).IsEmpty())
+            if (hasWholesaleCell)
             {
-                if (!TryReadDecimal(row.Cell(wholesaleCol.Value), out var w) || w < 0)
+                if (!TryReadDecimal(row.Cell(wholesaleCol!.Value), out var w) || w < 0)
                 {
                     result.Errors.Add($"Variants row {rowNum} (SKU {variantSku}): invalid Wholesale Price value.");
                     continue;
@@ -756,17 +951,46 @@ public class ProductsController : AdminBaseController
             }
 
             var imageUrl = imageCol == null || row.Cell(imageCol.Value).IsEmpty() ? null : row.Cell(imageCol.Value).GetString().Trim();
+            var barcode = barcodeCol == null || row.Cell(barcodeCol.Value).IsEmpty() ? null : row.Cell(barcodeCol.Value).GetString().Trim();
+            if (string.IsNullOrWhiteSpace(barcode))
+            {
+                barcode = null;
+            }
 
             if (existingVariants.TryGetValue(variantSku, out var existingVariant))
             {
-                existingVariant.Price = price;
-                existingVariant.WholesalePrice = wholesale;
+                if (barcode != null)
+                {
+                    if (variantsByBarcode.TryGetValue(barcode, out var barcodeOwner) && barcodeOwner != existingVariant)
+                    {
+                        result.Errors.Add($"Variants row {rowNum} (SKU {variantSku}): Barcode '{barcode}' already belongs to variant '{barcodeOwner.Sku}'.");
+                        continue;
+                    }
+                    existingVariant.Barcode = barcode;
+                    variantsByBarcode[barcode] = existingVariant;
+                }
+                // else: blank Barcode cell — leave the existing value unchanged.
+
+                if (hasPriceCell)
+                {
+                    existingVariant.Price = price;
+                }
+                if (hasWholesaleCell)
+                {
+                    existingVariant.WholesalePrice = wholesale;
+                }
                 existingVariant.StockQuantity = stock;
                 if (!string.IsNullOrWhiteSpace(imageUrl))
                 {
                     existingVariant.ImageUrl = imageUrl;
                 }
                 result.VariantsUpdatedCount++;
+                continue;
+            }
+
+            if (barcode != null && variantsByBarcode.TryGetValue(barcode, out var conflictingVariant))
+            {
+                result.Errors.Add($"Variants row {rowNum} (SKU {variantSku}): Barcode '{barcode}' already belongs to variant '{conflictingVariant.Sku}'.");
                 continue;
             }
 
@@ -790,8 +1014,10 @@ public class ProductsController : AdminBaseController
             }
 
             Size? size = null;
-            var sizeLabel = sizeCol == null ? string.Empty : row.Cell(sizeCol.Value).GetString().Trim();
-            if (!string.IsNullOrWhiteSpace(sizeLabel))
+            var sizeText = sizeCol == null || row.Cell(sizeCol.Value).IsEmpty() ? null : row.Cell(sizeCol.Value).GetString().Trim();
+            var lengthText = lengthCol == null || row.Cell(lengthCol.Value).IsEmpty() ? null : row.Cell(lengthCol.Value).GetString().Trim();
+            var sizeLabel = string.IsNullOrWhiteSpace(sizeText) ? null : CombineSizeAndLength(sizeText, string.IsNullOrWhiteSpace(lengthText) ? null : lengthText);
+            if (sizeLabel != null)
             {
                 var sizeKey = NormalizeSizeKey(sizeLabel);
                 if (!sizesByKey.TryGetValue(sizeKey, out size))
@@ -811,10 +1037,15 @@ public class ProductsController : AdminBaseController
                 Price = price,
                 WholesalePrice = wholesale,
                 StockQuantity = stock,
-                ImageUrl = string.IsNullOrWhiteSpace(imageUrl) ? null : imageUrl
+                ImageUrl = string.IsNullOrWhiteSpace(imageUrl) ? null : imageUrl,
+                Barcode = barcode
             };
             newVariants.Add(newVariant);
             existingVariants[variantSku] = newVariant; // guards against a duplicate SKU appearing twice in the same sheet
+            if (barcode != null)
+            {
+                variantsByBarcode[barcode] = newVariant; // guards against the same barcode appearing twice in the same sheet
+            }
             result.VariantsCreatedCount++;
         }
 
@@ -840,6 +1071,126 @@ public class ProductsController : AdminBaseController
 
     private static string NormalizeSizeKey(string label) =>
         SizeSeparatorPattern.Replace(label.Trim(), "x").ToLowerInvariant();
+
+    // The Variants sheet's Size/Length columns are the split-apart form of a stored Size label:
+    // waist/inseam-style sizes ("30x32") are two numbers, everything else (letter sizes, a bare
+    // shoe size, "One Size") is just one. Combine (import) joins Size+Length back into the same
+    // "NxN" shape NormalizeSizeKey already understands, so a combined "28"+"30" matches (and
+    // never duplicates) an existing "28x30" Size exactly like a single-column "28x30" always did.
+    private static string CombineSizeAndLength(string size, string? length) =>
+        length == null ? size : $"{size}x{length}";
+
+    // Split (export) is the inverse: only a label that IS exactly "<number>x<number>" (whole
+    // string, either separator, any case) splits into two columns — a letter size or anything
+    // else that doesn't fit that shape exports as Size alone, Length blank, so it reads back
+    // through Combine unchanged.
+    private static readonly System.Text.RegularExpressions.Regex SizeLengthSplitPattern = new(
+        @"^(\d+(?:\.\d+)?)\s*[x×]\s*(\d+(?:\.\d+)?)$",
+        System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.Compiled);
+
+    private static (string Size, string? Length) SplitSizeLabel(string label)
+    {
+        var match = SizeLengthSplitPattern.Match(label.Trim());
+        return match.Success ? (match.Groups[1].Value, match.Groups[2].Value) : (label, null);
+    }
+
+    // Resolves the Variants sheet's Price (AED) / Price+VAT cells into the single VAT-inclusive
+    // value ProductVariant.Price actually stores (the site stores prices INCLUDING 5% VAT).
+    // `hasValue` distinguishes "both cells blank — nothing to apply, leave any existing price
+    // unchanged" from a resolved `value`; a `false` return means the row itself is invalid — the
+    // caller adds `error` to the results and skips the whole row, same as any other bad cell.
+    //
+    // isOldPriceFormat (no "Price+VAT" column anywhere in the sheet, not just blank on this row)
+    // preserves the older export's meaning exactly: "Price (AED)" WAS the VAT-inclusive price
+    // there (there was no VAT split at all), so it's read as-is — never multiplied by 1.05, which
+    // would silently double-apply VAT to a value that already had it.
+    private static bool TryResolveVariantPrice(
+        IXLRow row, int? priceExclVatCol, int? priceInclVatCol, bool isOldPriceFormat,
+        out bool hasValue, out decimal value, out string? error)
+    {
+        hasValue = false;
+        value = 0;
+        error = null;
+
+        if (isOldPriceFormat)
+        {
+            if (priceExclVatCol == null || row.Cell(priceExclVatCol.Value).IsEmpty())
+            {
+                return true;
+            }
+            if (!TryReadDecimal(row.Cell(priceExclVatCol.Value), out var oldPrice) || oldPrice < 0)
+            {
+                error = "invalid Price (AED) value.";
+                return false;
+            }
+            hasValue = true;
+            value = Math.Round(oldPrice, 2);
+            return true;
+        }
+
+        var hasExcl = priceExclVatCol != null && !row.Cell(priceExclVatCol.Value).IsEmpty();
+        var hasIncl = priceInclVatCol != null && !row.Cell(priceInclVatCol.Value).IsEmpty();
+        if (!hasExcl && !hasIncl)
+        {
+            return true;
+        }
+
+        decimal excl = 0, incl = 0;
+        if (hasExcl && (!TryReadDecimal(row.Cell(priceExclVatCol!.Value), out excl) || excl < 0))
+        {
+            error = "invalid Price (AED) value.";
+            return false;
+        }
+        if (hasIncl && (!TryReadDecimal(row.Cell(priceInclVatCol!.Value), out incl) || incl < 0))
+        {
+            error = "invalid Price+VAT value.";
+            return false;
+        }
+
+        if (hasExcl && hasIncl)
+        {
+            var computed = Math.Round(excl * 1.05m, 2);
+            if (Math.Abs(computed - incl) > 0.01m)
+            {
+                error = $"Price (AED) {excl} × 1.05 = {computed}, which doesn't match Price+VAT {incl} (must agree within 0.01).";
+                return false;
+            }
+            hasValue = true;
+            value = Math.Round(incl, 2);
+            return true;
+        }
+
+        if (hasExcl)
+        {
+            hasValue = true;
+            value = Math.Round(excl * 1.05m, 2);
+            return true;
+        }
+
+        hasValue = true;
+        value = Math.Round(incl, 2);
+        return true;
+    }
+
+    // Tolerates "Yes"/"No", "True"/"False", and "1"/"0" — anything else (including a typo) is
+    // unrecognized, not an error: the caller treats an unrecognized Published cell the same as a
+    // blank one (leave unchanged on an update, default to unpublished on a new product) rather
+    // than failing the whole row over a formatting slip in an optional column.
+    private static bool TryReadYesNo(string text, out bool value)
+    {
+        if (text.Equals("Yes", StringComparison.OrdinalIgnoreCase) || text.Equals("True", StringComparison.OrdinalIgnoreCase) || text == "1")
+        {
+            value = true;
+            return true;
+        }
+        if (text.Equals("No", StringComparison.OrdinalIgnoreCase) || text.Equals("False", StringComparison.OrdinalIgnoreCase) || text == "0")
+        {
+            value = false;
+            return true;
+        }
+        value = false;
+        return false;
+    }
 
     private static string Slugify(string name)
     {
