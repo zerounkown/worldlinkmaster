@@ -462,147 +462,170 @@ public class ProductsController : AdminBaseController
 
         var result = new BulkImportResult();
 
-        // The whole import — both sheets — runs as one all-or-nothing transaction: either
-        // everything below commits together, or (on any unexpected error) none of it does. A
-        // single SaveChangesAsync at the very end, not one per sheet, is what makes that true.
-        await using var transaction = await _context.Database.BeginTransactionAsync();
+        // Postgres is configured with EnableRetryOnFailure (see Program.cs's ConfigureNpgsql),
+        // so _context.Database is backed by a NpgsqlRetryingExecutionStrategy. That strategy
+        // refuses a transaction opened with a bare BeginTransactionAsync() outside of its own
+        // ExecuteAsync — "does not support user-initiated transactions" — because if a transient
+        // failure hits mid-transaction, it has no way to redo a transaction it didn't start.
+        // Everything that touches the database for this import (BeginTransaction, both sheets'
+        // row loops, SaveChanges, Commit) has to live inside the delegate below instead, so the
+        // whole thing is one retriable unit.
+        var strategy = _context.Database.CreateExecutionStrategy();
         try
         {
-            var products = await _context.Products.ToListAsync();
-            var productsBySku = products
-                .GroupBy(p => p.Sku.Trim(), StringComparer.OrdinalIgnoreCase)
-                .ToDictionary(g => g.Key, g => g.First(), StringComparer.OrdinalIgnoreCase);
-
-            // Grouped-then-first, not a plain ToDictionary: pre-existing duplicate Category
-            // names (differing only by case, or a stray one left over from data cleanup) would
-            // otherwise throw "An item with the same key has already been added" and take the
-            // whole import down with a 500 before a single row is even read.
-            var categoriesByName = (await _context.Categories.ToListAsync())
-                .GroupBy(c => c.Name.Trim(), StringComparer.OrdinalIgnoreCase)
-                .ToDictionary(g => g.Key, g => g.OrderBy(c => c.Id).First(), StringComparer.OrdinalIgnoreCase);
-
-            var defaultMerchant = await _context.Merchants.OrderBy(m => m.Id).FirstOrDefaultAsync();
-            var usedSlugs = new HashSet<string>(products.Select(p => p.Slug), StringComparer.OrdinalIgnoreCase);
-            var newProducts = new List<Product>();
-
-            foreach (var row in sheet.RowsUsed().Skip(1))
+            await strategy.ExecuteAsync(async () =>
             {
-                var rowNum = row.RowNumber();
-                var sku = row.Cell(skuCol.Value).GetString().Trim();
-                if (string.IsNullOrWhiteSpace(sku))
-                {
-                    continue;
-                }
+                // A retry re-runs this delegate from the top. Anything left over from a failed
+                // attempt — entities the ChangeTracker picked up before the failure, or counts/
+                // errors already appended to `result` — has to be cleared here, or a retry
+                // double-adds tracked entities and double-counts rows against the same `result`.
+                _context.ChangeTracker.Clear();
+                result.UpdatedCount = 0;
+                result.CreatedCount = 0;
+                result.VariantsUpdatedCount = 0;
+                result.VariantsCreatedCount = 0;
+                result.Errors.Clear();
 
-                if (!TryReadDecimal(row.Cell(priceCol.Value), out var price) || price < 0)
-                {
-                    result.Errors.Add($"Products row {rowNum} (SKU {sku}): invalid Price value.");
-                    continue;
-                }
+                // The whole import — both sheets — is one all-or-nothing transaction: either
+                // everything below commits together, or (on any error) none of it does. A single
+                // SaveChangesAsync at the very end, not one per sheet, is what makes that true.
+                await using var transaction = await _context.Database.BeginTransactionAsync();
 
-                decimal? wholesale = null;
-                if (wholesaleCol != null && !row.Cell(wholesaleCol.Value).IsEmpty())
+                var products = await _context.Products.ToListAsync();
+                var productsBySku = products
+                    .GroupBy(p => p.Sku.Trim(), StringComparer.OrdinalIgnoreCase)
+                    .ToDictionary(g => g.Key, g => g.First(), StringComparer.OrdinalIgnoreCase);
+
+                // Grouped-then-first, not a plain ToDictionary: pre-existing duplicate Category
+                // names (differing only by case, or a stray one left over from data cleanup) would
+                // otherwise throw "An item with the same key has already been added" and take the
+                // whole import down with a 500 before a single row is even read.
+                var categoriesByName = (await _context.Categories.ToListAsync())
+                    .GroupBy(c => c.Name.Trim(), StringComparer.OrdinalIgnoreCase)
+                    .ToDictionary(g => g.Key, g => g.OrderBy(c => c.Id).First(), StringComparer.OrdinalIgnoreCase);
+
+                var defaultMerchant = await _context.Merchants.OrderBy(m => m.Id).FirstOrDefaultAsync();
+                var usedSlugs = new HashSet<string>(products.Select(p => p.Slug), StringComparer.OrdinalIgnoreCase);
+                var newProducts = new List<Product>();
+
+                foreach (var row in sheet.RowsUsed().Skip(1))
                 {
-                    if (!TryReadDecimal(row.Cell(wholesaleCol.Value), out var w) || w < 0)
+                    var rowNum = row.RowNumber();
+                    var sku = row.Cell(skuCol.Value).GetString().Trim();
+                    if (string.IsNullOrWhiteSpace(sku))
                     {
-                        result.Errors.Add($"Products row {rowNum} (SKU {sku}): invalid Wholesale Price value.");
                         continue;
                     }
-                    wholesale = w;
+
+                    if (!TryReadDecimal(row.Cell(priceCol.Value), out var price) || price < 0)
+                    {
+                        result.Errors.Add($"Products row {rowNum} (SKU {sku}): invalid Price value.");
+                        continue;
+                    }
+
+                    decimal? wholesale = null;
+                    if (wholesaleCol != null && !row.Cell(wholesaleCol.Value).IsEmpty())
+                    {
+                        if (!TryReadDecimal(row.Cell(wholesaleCol.Value), out var w) || w < 0)
+                        {
+                            result.Errors.Add($"Products row {rowNum} (SKU {sku}): invalid Wholesale Price value.");
+                            continue;
+                        }
+                        wholesale = w;
+                    }
+
+                    if (!TryReadInt(row.Cell(stockCol.Value), out var stock) || stock < 0)
+                    {
+                        result.Errors.Add($"Products row {rowNum} (SKU {sku}): invalid Stock Quantity value.");
+                        continue;
+                    }
+
+                    if (productsBySku.TryGetValue(sku, out var product))
+                    {
+                        product.Price = Math.Round(price, 2);
+                        product.WholesalePrice = wholesale.HasValue ? Math.Round(wholesale.Value, 2) : null;
+                        product.StockQuantity = stock;
+                        result.UpdatedCount++;
+                        continue;
+                    }
+
+                    // Unrecognized SKU — create a new product from this row instead of skipping it.
+                    var name = row.Cell(nameCol.Value).GetString().Trim();
+                    if (string.IsNullOrWhiteSpace(name))
+                    {
+                        result.Errors.Add($"Products row {rowNum} (SKU {sku}): new SKU with no Name — can't create a product without one.");
+                        continue;
+                    }
+
+                    var categoryName = row.Cell(categoryCol.Value).GetString().Trim();
+                    if (string.IsNullOrWhiteSpace(categoryName) || !categoriesByName.TryGetValue(categoryName, out var category))
+                    {
+                        result.Errors.Add($"Products row {rowNum} (SKU {sku}): new SKU with an unrecognized Category '{categoryName}' — check spelling against Admin → Categories.");
+                        continue;
+                    }
+
+                    if (defaultMerchant == null)
+                    {
+                        result.Errors.Add($"Products row {rowNum} (SKU {sku}): no merchant account exists to assign this new product to.");
+                        continue;
+                    }
+
+                    var slug = Slugify(name);
+                    var dedupeSuffix = 2;
+                    while (!usedSlugs.Add(slug))
+                    {
+                        slug = $"{Slugify(name)}-{dedupeSuffix}";
+                        dedupeSuffix++;
+                    }
+
+                    var imageUrl = imageCol == null || row.Cell(imageCol.Value).IsEmpty() ? null : row.Cell(imageCol.Value).GetString().Trim();
+
+                    var newProduct = new Product
+                    {
+                        Name = name,
+                        Slug = slug,
+                        Sku = sku,
+                        CategoryId = category.Id,
+                        MerchantId = defaultMerchant.Id,
+                        Price = Math.Round(price, 2),
+                        WholesalePrice = wholesale.HasValue ? Math.Round(wholesale.Value, 2) : null,
+                        StockQuantity = stock,
+                        ImageUrl = string.IsNullOrWhiteSpace(imageUrl) ? null : imageUrl,
+                        CreatedAt = DateTime.UtcNow
+                    };
+
+                    newProducts.Add(newProduct);
+                    productsBySku[sku] = newProduct; // guards against a duplicate SKU appearing twice in the same sheet
+                    result.CreatedCount++;
                 }
 
-                if (!TryReadInt(row.Cell(stockCol.Value), out var stock) || stock < 0)
+                if (newProducts.Count > 0)
                 {
-                    result.Errors.Add($"Products row {rowNum} (SKU {sku}): invalid Stock Quantity value.");
-                    continue;
+                    _context.Products.AddRange(newProducts);
                 }
 
-                if (productsBySku.TryGetValue(sku, out var product))
+                // Optional second sheet: per color/size combo pricing and stock. Absent entirely
+                // on older exports (or a Products-only re-upload) — that's fine, nothing to do.
+                if (workbook.Worksheets.Contains("Variants"))
                 {
-                    product.Price = Math.Round(price, 2);
-                    product.WholesalePrice = wholesale.HasValue ? Math.Round(wholesale.Value, 2) : null;
-                    product.StockQuantity = stock;
-                    result.UpdatedCount++;
-                    continue;
+                    await ImportVariantsSheet(workbook.Worksheet("Variants"), productsBySku, result);
                 }
 
-                // Unrecognized SKU — create a new product from this row instead of skipping it.
-                var name = row.Cell(nameCol.Value).GetString().Trim();
-                if (string.IsNullOrWhiteSpace(name))
+                if (result.UpdatedCount > 0 || result.CreatedCount > 0 || result.VariantsUpdatedCount > 0 || result.VariantsCreatedCount > 0)
                 {
-                    result.Errors.Add($"Products row {rowNum} (SKU {sku}): new SKU with no Name — can't create a product without one.");
-                    continue;
+                    await _context.SaveChangesAsync();
                 }
 
-                var categoryName = row.Cell(categoryCol.Value).GetString().Trim();
-                if (string.IsNullOrWhiteSpace(categoryName) || !categoriesByName.TryGetValue(categoryName, out var category))
-                {
-                    result.Errors.Add($"Products row {rowNum} (SKU {sku}): new SKU with an unrecognized Category '{categoryName}' — check spelling against Admin → Categories.");
-                    continue;
-                }
-
-                if (defaultMerchant == null)
-                {
-                    result.Errors.Add($"Products row {rowNum} (SKU {sku}): no merchant account exists to assign this new product to.");
-                    continue;
-                }
-
-                var slug = Slugify(name);
-                var dedupeSuffix = 2;
-                while (!usedSlugs.Add(slug))
-                {
-                    slug = $"{Slugify(name)}-{dedupeSuffix}";
-                    dedupeSuffix++;
-                }
-
-                var imageUrl = imageCol == null || row.Cell(imageCol.Value).IsEmpty() ? null : row.Cell(imageCol.Value).GetString().Trim();
-
-                var newProduct = new Product
-                {
-                    Name = name,
-                    Slug = slug,
-                    Sku = sku,
-                    CategoryId = category.Id,
-                    MerchantId = defaultMerchant.Id,
-                    Price = Math.Round(price, 2),
-                    WholesalePrice = wholesale.HasValue ? Math.Round(wholesale.Value, 2) : null,
-                    StockQuantity = stock,
-                    ImageUrl = string.IsNullOrWhiteSpace(imageUrl) ? null : imageUrl,
-                    CreatedAt = DateTime.UtcNow
-                };
-
-                newProducts.Add(newProduct);
-                productsBySku[sku] = newProduct; // guards against a duplicate SKU appearing twice in the same sheet
-                result.CreatedCount++;
-            }
-
-            if (newProducts.Count > 0)
-            {
-                _context.Products.AddRange(newProducts);
-            }
-
-            // Optional second sheet: per color/size combo pricing and stock. Absent entirely on
-            // older exports (or a Products-only re-upload) — that's fine, nothing to do then.
-            if (workbook.Worksheets.Contains("Variants"))
-            {
-                await ImportVariantsSheet(workbook.Worksheet("Variants"), productsBySku, result);
-            }
-
-            if (result.UpdatedCount > 0 || result.CreatedCount > 0 || result.VariantsUpdatedCount > 0 || result.VariantsCreatedCount > 0)
-            {
-                await _context.SaveChangesAsync();
-            }
-
-            await transaction.CommitAsync();
-
-            if (result.UpdatedCount > 0 || result.CreatedCount > 0 || result.VariantsUpdatedCount > 0 || result.VariantsCreatedCount > 0)
-            {
-                await _outputCacheStore.EvictByTagAsync("products", HttpContext.RequestAborted);
-            }
+                await transaction.CommitAsync();
+            });
         }
         catch (Exception ex)
         {
-            await transaction.RollbackAsync();
+            // No RollbackAsync here: the transaction lives inside the lambda above and is opened
+            // with `await using`, so an exception unwinding out of that scope already disposes
+            // (and thereby rolls back) whatever this attempt had done, before the execution
+            // strategy either retries the whole delegate or — once retries are exhausted, or the
+            // failure isn't one it considers transient — rethrows out here.
             _logger.LogError(ex, "Bulk Update import failed and was rolled back; no changes were saved.");
 
             return View(new BulkImportResult
@@ -610,6 +633,22 @@ public class ProductsController : AdminBaseController
                 Errors = result.Errors,
                 FatalError = _localizer["The import failed and NO changes were saved (the whole file is rolled back together). Reason: {0}", ex.Message].Value
             });
+        }
+
+        // Cache eviction happens once the transaction has definitively committed — it's not part
+        // of the retriable DB unit above (retrying it wouldn't help, and it isn't the reason an
+        // import would fail), and a failure here shouldn't turn an import that DID save into a
+        // "nothing was saved" error page for the admin.
+        if (result.UpdatedCount > 0 || result.CreatedCount > 0 || result.VariantsUpdatedCount > 0 || result.VariantsCreatedCount > 0)
+        {
+            try
+            {
+                await _outputCacheStore.EvictByTagAsync("products", HttpContext.RequestAborted);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Bulk Update import saved successfully, but evicting the 'products' output cache tag failed; cached pages may be stale until the next natural eviction.");
+            }
         }
 
         return View(result);
