@@ -60,6 +60,7 @@ public class ProductsInstantSearchTests : IClassFixture<CustomWebApplicationFact
 
         context.ProductVariants.Add(new ProductVariant
         {
+            Id = 9101,
             ProductId = publishedProduct.Id,
             Sku = "WLM-TBL-001-BLK",
             Barcode = "6291234567890",
@@ -111,9 +112,9 @@ public class ProductsInstantSearchTests : IClassFixture<CustomWebApplicationFact
         Assert.Single(results);
         Assert.Equal("Trailblazer Base Layer", results[0].GetProperty("name").GetString());
         // Matched via the product's own Name — "Trailblazer" isn't a substring of the variant's
-        // Sku/Barcode, so no variant matched and there's no color to deep-link to. The URL
-        // carries no "color" query parameter at all (not an empty one).
-        Assert.DoesNotContain("color=", results[0].GetProperty("url").GetString());
+        // Sku/Barcode, so no variant matched and there's no specific variant to deep-link to.
+        // The URL carries no "variant" query parameter at all (not an empty one).
+        Assert.DoesNotContain("variant=", results[0].GetProperty("url").GetString());
     }
 
     [Fact]
@@ -152,22 +153,22 @@ public class ProductsInstantSearchTests : IClassFixture<CustomWebApplicationFact
     }
 
     [Fact]
-    public async Task Search_ByVariantSku_ReturnsParentProduct_WithItsColorPreselected()
+    public async Task Search_ByVariantSku_ReturnsParentProduct_WithItsVariantLinked()
     {
         var results = ResultsOf(await SearchAsync("TBL-001-BLK"));
 
         Assert.Single(results);
         Assert.Equal("Trailblazer Base Layer", results[0].GetProperty("name").GetString());
-        Assert.Contains("color=Black", results[0].GetProperty("url").GetString());
+        Assert.Contains("variant=9101", results[0].GetProperty("url").GetString());
     }
 
     [Fact]
-    public async Task Search_ByVariantBarcode_ReturnsParentProduct_WithItsColorPreselected()
+    public async Task Search_ByVariantBarcode_ReturnsParentProduct_WithItsVariantLinked()
     {
         var results = ResultsOf(await SearchAsync("6291234567890"));
 
         Assert.Single(results);
-        Assert.Contains("color=Black", results[0].GetProperty("url").GetString());
+        Assert.Contains("variant=9101", results[0].GetProperty("url").GetString());
     }
 
     [Fact]

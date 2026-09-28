@@ -48,13 +48,25 @@
         .OrderBy(s => s.SortOrder)
         .ToList();
 
+    // ?variant=<ProductVariant.Id> — the one clean place an exact-match search-to-product-page
+    // redirect (ProductsController.Index/InstantSearch, on a variant Sku/Barcode match) carries
+    // which specific color+size combo to land on, so price/stock/Add to Cart line up with the
+    // barcode/SKU the shopper actually searched for instead of whatever this product's default
+    // color+size happens to be. Looked up against the already-loaded Model.Variants (no extra
+    // query) — an unknown/foreign id (wrong product, stale link) just leaves requestedVariant
+    // null and everything below falls back to the normal default-color/default-size behavior.
+    var requestedVariantId = int.TryParse(Context.Request.Query["variant"].ToString(), out var parsedVariantId) ? parsedVariantId : (int?)null;
+    var requestedVariant = requestedVariantId.HasValue ? Model.Variants.FirstOrDefault(v => v.Id == requestedVariantId.Value) : null;
+    var requestedSizeLabel = requestedVariant?.Size?.Label;
+
     // Lets product-card swatches, the cart drawer/page, and the "Back to product" link all
     // deep-link straight to a specific color via ?color=Name — e.g. hovered/tapped a swatch, then
-    // clicked through, or came back from the cart for the color they just added. Falls back to
-    // the normal DefaultColor/first-color logic when absent or the name doesn't match any of this
-    // product's colors. Shared by both the imported (hasProductColors) and legacy color pickers
-    // below, so it works the same way regardless of which one a given product uses.
-    var requestedColorName = Context.Request.Query["color"].ToString();
+    // clicked through, or came back from the cart for the color they just added. requestedVariant
+    // (above) takes priority when both are present, since it's the more specific request. Falls
+    // back to the normal DefaultColor/first-color logic when absent or the name doesn't match any
+    // of this product's colors. Shared by both the imported (hasProductColors) and legacy color
+    // pickers below, so it works the same way regardless of which one a given product uses.
+    var requestedColorName = requestedVariant?.Color?.Name ?? Context.Request.Query["color"].ToString();
 
     // --- New per-color gallery (only meaningful when hasProductColors) ---
     ProductColor? defaultProductColor = null;
@@ -292,15 +304,27 @@
         // Default to the first waist that has at least one in-stock length, then the first
         // in-stock length for that waist — falls back to the very first combo at all if nothing
         // is in stock (the page's own "Out of Stock" messaging is driven separately by the
-        // aggregate Model.StockQuantity, not this picker).
+        // aggregate Model.StockQuantity, not this picker). requestedSizeLabel (?variant=, see
+        // above) wins over that default whenever it decomposes into a waist/length combo this
+        // color actually offers — a barcode/variant-Sku search landing here should open on the
+        // exact size searched for, not whatever the color's first in-stock combo happens to be.
         var defaultColorId = defaultProductColor!.Id;
         var defaultCombos = waistLengthComboByColorId.GetValueOrDefault(defaultColorId, new());
         var defaultWaists = waistsByColorId.GetValueOrDefault(defaultColorId, new());
         var defaultLengths = lengthsByColorId.GetValueOrDefault(defaultColorId, new());
-        initialWaist = defaultWaists.FirstOrDefault(w => defaultLengths.Any(l => StockFor(defaultCombos, $"{w}|{l}") > 0))
-            ?? defaultWaists.FirstOrDefault() ?? "";
-        initialLength = defaultLengths.FirstOrDefault(l => StockFor(defaultCombos, $"{initialWaist}|{l}") > 0)
-            ?? defaultLengths.FirstOrDefault() ?? "";
+        var (requestedWaist, requestedLength) = requestedSizeLabel != null ? DecomposeWaistLength(requestedSizeLabel) : ("", "");
+        if (requestedSizeLabel != null && defaultCombos.ContainsKey($"{requestedWaist}|{requestedLength}"))
+        {
+            initialWaist = requestedWaist;
+            initialLength = requestedLength;
+        }
+        else
+        {
+            initialWaist = defaultWaists.FirstOrDefault(w => defaultLengths.Any(l => StockFor(defaultCombos, $"{w}|{l}") > 0))
+                ?? defaultWaists.FirstOrDefault() ?? "";
+            initialLength = defaultLengths.FirstOrDefault(l => StockFor(defaultCombos, $"{initialWaist}|{l}") > 0)
+                ?? defaultLengths.FirstOrDefault() ?? "";
+        }
     }
 
     // System.Text.Json serializes a ValueTuple by its Item1/Item2 field names, not the "Label"/
@@ -352,10 +376,23 @@
     var variantPriceDataJson = JsonSerializer.Serialize(variantPriceByKey);
     var variantSkuDataJson = JsonSerializer.Serialize(variantSkuByKey);
 
+    // Legacy (!hasProductColors) mirrors the swatch picker's own requestedColorName match below
+    // (Color.Name, case-insensitive) rather than always colorOptions[0], so initialVariantSku/the
+    // SKU line agree with whichever color a ?color= or ?variant= link actually landed on.
+    var legacyRequestedColor = !hasProductColors && !string.IsNullOrEmpty(requestedColorName)
+        ? colorOptions.FirstOrDefault(o => string.Equals(o.Color.Name, requestedColorName, StringComparison.OrdinalIgnoreCase)).Color
+        : null;
     var initialColorKey = hasProductColors
         ? defaultProductColor?.Id.ToString()
-        : (colorOptions.Count > 0 ? colorOptions[0].Color.Id.ToString() : null);
-    var initialSizeLabel = initialSizeOptions.Count > 0 ? initialSizeOptions[0].Label : null;
+        : ((legacyRequestedColor ?? (colorOptions.Count > 0 ? colorOptions[0].Color : null))?.Id.ToString());
+    // requestedSizeLabel (?variant=, see above) is always the target variant's ORIGINAL,
+    // unsplit Size.Label — the same shape initialSizeOptions holds regardless of which of the
+    // three size-picker modes below is active (plain pills / letter-suffix split / waist×length
+    // split all key off this same unsplit label) — so preferring it here, once, correctly drives
+    // the SKU line and initialVariantSku for all three, without needing a per-mode branch.
+    var initialSizeLabel = requestedSizeLabel != null && initialSizeOptions.Any(s => s.Label == requestedSizeLabel)
+        ? requestedSizeLabel
+        : (initialSizeOptions.Count > 0 ? initialSizeOptions[0].Label : null);
     var initialVariantSku = variantSkuByKey.GetValueOrDefault($"{initialColorKey}|{initialSizeLabel}", Model.Sku);
 
     // Description-tab feature bullets — rows in the Attributes sheet with Attribute Code
@@ -655,13 +692,20 @@
                         var initialDecomposed = initialSizeOptions.Select(s => DecomposeSize(s.Label)).ToList();
                         var initialUnits = initialDecomposed.Select(d => d.Unit).Distinct().ToList();
                         var initialLengths = initialDecomposed.Select(d => d.Length).Distinct().OrderBy(LengthSortRank).ToList();
+                        // requestedSizeLabel (?variant=) wins over the plain "first unit/first
+                        // length" default when it decomposes into a unit+length this color offers
+                        // — same reasoning as the waist×length block above.
+                        var requestedSplit = requestedSizeLabel != null ? DecomposeSize(requestedSizeLabel) : ((string Unit, string Length)?)null;
+                        var initialUnit = requestedSplit != null && initialUnits.Contains(requestedSplit.Value.Unit) ? requestedSplit.Value.Unit : initialUnits.FirstOrDefault();
+                        var initialSplitLength = requestedSplit != null && initialLengths.Contains(requestedSplit.Value.Length) ? requestedSplit.Value.Length : initialLengths.FirstOrDefault();
                         <div class="mb-3">
                             <label class="option-label">@Localizer["Size"]</label>
                             <div class="size-options" id="sizeUnitOptionsContainer">
                                 @for (int i = 0; i < initialUnits.Count; i++)
                                 {
+                                    var isInitialUnit = initialUnits[i] == initialUnit;
                                     <label class="size-pill">
-                                        <input type="radio" name="sizeUnit" value="@initialUnits[i]" required="@(i == 0 ? "required" : null)" checked="@(i == 0 ? "checked" : null)" />
+                                        <input type="radio" name="sizeUnit" value="@initialUnits[i]" required="@(i == 0 ? "required" : null)" checked="@(isInitialUnit ? "checked" : null)" />
                                         <span>@initialUnits[i]</span>
                                     </label>
                                 }
@@ -672,14 +716,15 @@
                             <div class="size-options" id="sizeLengthOptionsContainer">
                                 @for (int i = 0; i < initialLengths.Count; i++)
                                 {
+                                    var isInitialLength = initialLengths[i] == initialSplitLength;
                                     <label class="size-pill">
-                                        <input type="radio" name="sizeLength" value="@initialLengths[i]" required="@(i == 0 ? "required" : null)" checked="@(i == 0 ? "checked" : null)" />
+                                        <input type="radio" name="sizeLength" value="@initialLengths[i]" required="@(i == 0 ? "required" : null)" checked="@(isInitialLength ? "checked" : null)" />
                                         <span>@initialLengths[i]</span>
                                     </label>
                                 }
                             </div>
                         </div>
-                        <input type="hidden" name="size" id="pdpSizeHiddenInput" value="@initialSizeOptions[0].Label" />
+                        <input type="hidden" name="size" id="pdpSizeHiddenInput" value="@initialSizeLabel" />
                         <script type="application/json" id="splitSizeConfig">@Html.Raw(JsonSerializer.Serialize(new { enabled = true }))</script>
                         @if (hasProductColors)
                         {
@@ -694,8 +739,9 @@
                                 @for (int i = 0; i < initialSizeOptions.Count; i++)
                                 {
                                     var size = initialSizeOptions[i];
+                                    var isInitialSize = size.Label == initialSizeLabel;
                                     <label class="size-pill">
-                                        <input type="radio" name="size" value="@size.Label" required="@(i == 0 ? "required" : null)" checked="@(i == 0 ? "checked" : null)" />
+                                        <input type="radio" name="size" value="@size.Label" required="@(i == 0 ? "required" : null)" checked="@(isInitialSize ? "checked" : null)" />
                                         <span>@size.Label</span>
                                     </label>
                                 }

@@ -86,6 +86,23 @@ public class ProductsController : Controller
         var searchTrimmed = search?.Trim() ?? string.Empty;
         var searchIsNumericId = int.TryParse(searchTrimmed, out var searchNumericId);
 
+        // An exact (case-insensitive) match on a variant's own Sku or Internal Barcode is
+        // unambiguous — go straight to that variant's product page instead of a results page
+        // that would just show a list of one. Deliberately scoped to variant fields only (not
+        // the product's own Sku): a product-level Sku match is still "the product," but a
+        // variant-level exact match is "this exact color+size," which is worth landing on
+        // directly with that variant pre-selected (see Details.cshtml's ?variant= handling).
+        // Partial matches (the common case while typing) are unaffected — this only fires when
+        // the whole trimmed search text equals a variant's Sku/Barcode outright.
+        if (!string.IsNullOrWhiteSpace(searchTrimmed))
+        {
+            var exactVariantMatch = await FindExactVariantMatchAsync(searchTrimmed);
+            if (exactVariantMatch != null)
+            {
+                return RedirectToAction(nameof(Details), new { slug = exactVariantMatch.Product!.Slug, variant = exactVariantMatch.Id });
+            }
+        }
+
         // Factored out (rather than a plain local variable) so the facet-count queries below can
         // rebuild the same filtered base query against their own separate DbContext instances —
         // needed to actually run them concurrently, since a single context can't handle more than
@@ -461,7 +478,11 @@ public class ProductsController : Controller
             name = isArabicUi && !string.IsNullOrEmpty(c.NameAr) ? c.NameAr : c.Name,
             image = ImagePlaceholder.IsRealImageUrl(c.ImageUrl) ? c.ImageUrl : ImagePlaceholder.DataUri,
             price = c.Price.ToDisplayCurrency(),
-            url = Url.Action("Details", "Products", new { slug = c.Slug, color = c.MatchedColorName })
+            // MatchedVariantId (set only when this product matched via a variant's Sku/Barcode)
+            // carries color AND size through in one URL param, via Details.cshtml's ?variant=
+            // handling — a plain product/name match has no specific variant, so null here means
+            // no ?variant= at all and the page opens on its own normal default color+size.
+            url = Url.Action("Details", "Products", new { slug = c.Slug, variant = c.MatchedVariantId })
         });
 
         return Json(new
@@ -471,7 +492,23 @@ public class ProductsController : Controller
         });
     }
 
-    private record InstantSearchCandidate(string Slug, string Name, string? NameAr, decimal Price, string? ImageUrl, string? MatchedColorName);
+    // Exact (case-insensitive) match on a variant's own Sku or Barcode — used by Index to
+    // redirect straight to the product (see there) and shared here so InstantSearch's dropdown
+    // and the full-page redirect agree on exactly what counts as "exact." Deliberately not
+    // provider-branched like InstantSearchNpgsqlAsync/SqliteAsync below: plain equality (not a
+    // %wildcard% pattern) translates identically on Postgres and SQLite, so there's no need for
+    // an ILike vs ToLower().Contains() split here.
+    private async Task<ProductVariant?> FindExactVariantMatchAsync(string term)
+    {
+        var lowerTerm = term.ToLowerInvariant();
+        return await _context.ProductVariants
+            .AsNoTracking()
+            .Include(v => v.Product)
+            .Where(v => v.Product!.IsPublished && (v.Sku.ToLower() == lowerTerm || (v.Barcode != null && v.Barcode.ToLower() == lowerTerm)))
+            .FirstOrDefaultAsync();
+    }
+
+    private record InstantSearchCandidate(string Slug, string Name, string? NameAr, decimal Price, string? ImageUrl, int? MatchedVariantId);
 
     private async Task<List<InstantSearchCandidate>> InstantSearchNpgsqlAsync(string term)
     {
@@ -497,7 +534,7 @@ public class ProductsController : Controller
                 p.ImageUrl,
                 p.Variants
                     .Where(v => EF.Functions.ILike(v.Sku, pattern) || (v.Barcode != null && EF.Functions.ILike(v.Barcode, pattern)))
-                    .Select(v => v.Color != null ? v.Color.Name : null)
+                    .Select(v => (int?)v.Id)
                     .FirstOrDefault()))
             .ToListAsync();
     }
@@ -525,7 +562,7 @@ public class ProductsController : Controller
                 p.ImageUrl,
                 p.Variants
                     .Where(v => v.Sku.ToLower().Contains(lowerTerm) || (v.Barcode != null && v.Barcode.ToLower().Contains(lowerTerm)))
-                    .Select(v => v.Color != null ? v.Color.Name : null)
+                    .Select(v => (int?)v.Id)
                     .FirstOrDefault()))
             .ToListAsync();
     }
