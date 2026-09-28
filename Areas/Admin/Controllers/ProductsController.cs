@@ -276,19 +276,25 @@ public class ProductsController : AdminBaseController
         return RedirectToAction(nameof(Index));
     }
 
+    // Price (AED) is EXCLUDING VAT, Price+VAT (and Wholesale Price+VAT) is INCLUDING VAT — the
+    // value actually stored (Product.Price/WholesalePrice are always VAT-inclusive; see
+    // TryResolvePriceCells). Both sheets use the identical pair for both Price and Wholesale
+    // Price so the same header never means two different things depending on which sheet it's
+    // on — see the fix note in TryResolvePriceCells for why that mattered.
     private static readonly string[] ExcelHeaders =
     {
-        "Sku", "Name", "Category", "Price (AED)", "Wholesale Price (AED)", "Stock Quantity", "Image URL",
+        "Sku", "Name", "Category", "Price (AED)", "Price+VAT", "Wholesale Price (AED)", "Wholesale Price+VAT", "Stock Quantity", "Image URL",
         "Name (Arabic)", "Brand", "Subcategory", "Size Group", "Published"
     };
-    // Matches the supplier reference format exactly, column-for-column — this is the layout a
-    // new supplier's own spreadsheet already comes in, not just our own export/re-import shape.
+    // Column order otherwise matches the supplier reference format exactly — this is the layout
+    // a new supplier's own spreadsheet already comes in, not just our own export/re-import shape.
     // See ImportVariantsSheet for what each column means (Internal Barcode, Size+Length, and the
-    // Price (AED)/Price+VAT pair all have rules of their own).
+    // Price (AED)/Price+VAT and Wholesale Price (AED)/Wholesale Price+VAT pairs all have rules of
+    // their own).
     private static readonly string[] VariantExcelHeaders =
     {
         "Product Sku (Parent)", "Internal Barcode", "Variant Sku", "Color", "Size", "Length",
-        "Price (AED)", "Price+VAT", "Wholesale Price (AED)", "Stock Quantity", "Image URL"
+        "Price (AED)", "Price+VAT", "Wholesale Price (AED)", "Wholesale Price+VAT", "Stock Quantity", "Image URL"
     };
 
     /// <summary>Downloads the full catalog as an .xlsx (Products + Variants sheets) — the same file layout <see cref="BulkUpdate(IFormFile?)"/> expects back.</summary>
@@ -318,18 +324,22 @@ public class ProductsController : AdminBaseController
             sheet.Cell(row, 1).Value = product.Sku;
             sheet.Cell(row, 2).Value = product.Name;
             sheet.Cell(row, 3).Value = product.Category?.Name;
-            sheet.Cell(row, 4).Value = product.Price;
+            // Stored value is VAT-inclusive — both columns are filled on export so either one
+            // alone still round-trips through a re-import.
+            sheet.Cell(row, 4).Value = Math.Round(product.Price / 1.05m, 2);
+            sheet.Cell(row, 5).Value = product.Price;
             if (product.WholesalePrice.HasValue)
             {
-                sheet.Cell(row, 5).Value = product.WholesalePrice.Value;
+                sheet.Cell(row, 6).Value = Math.Round(product.WholesalePrice.Value / 1.05m, 2);
+                sheet.Cell(row, 7).Value = product.WholesalePrice.Value;
             }
-            sheet.Cell(row, 6).Value = product.StockQuantity;
-            sheet.Cell(row, 7).Value = product.ImageUrl;
-            sheet.Cell(row, 8).Value = product.NameAr;
-            sheet.Cell(row, 9).Value = product.Brand?.Name;
-            sheet.Cell(row, 10).Value = product.Subcategory?.Name;
-            sheet.Cell(row, 11).Value = product.SizeGroup?.NameEn;
-            sheet.Cell(row, 12).Value = product.IsPublished ? "Yes" : "No";
+            sheet.Cell(row, 8).Value = product.StockQuantity;
+            sheet.Cell(row, 9).Value = product.ImageUrl;
+            sheet.Cell(row, 10).Value = product.NameAr;
+            sheet.Cell(row, 11).Value = product.Brand?.Name;
+            sheet.Cell(row, 12).Value = product.Subcategory?.Name;
+            sheet.Cell(row, 13).Value = product.SizeGroup?.NameEn;
+            sheet.Cell(row, 14).Value = product.IsPublished ? "Yes" : "No";
             row++;
         }
 
@@ -376,10 +386,11 @@ public class ProductsController : AdminBaseController
             }
             if (variant.WholesalePrice.HasValue)
             {
-                variantSheet.Cell(vRow, 9).Value = variant.WholesalePrice.Value;
+                variantSheet.Cell(vRow, 9).Value = Math.Round(variant.WholesalePrice.Value / 1.05m, 2);
+                variantSheet.Cell(vRow, 10).Value = variant.WholesalePrice.Value;
             }
-            variantSheet.Cell(vRow, 10).Value = variant.StockQuantity;
-            variantSheet.Cell(vRow, 11).Value = variant.ImageUrl;
+            variantSheet.Cell(vRow, 11).Value = variant.StockQuantity;
+            variantSheet.Cell(vRow, 12).Value = variant.ImageUrl;
             vRow++;
         }
 
@@ -486,8 +497,10 @@ public class ProductsController : AdminBaseController
         var skuCol = FindColumn(headers, "Sku", "SKU", "Product Sku", "رمز المنتج");
         var nameCol = FindColumn(headers, "Name", "Product Name", "الاسم", "اسم المنتج");
         var categoryCol = FindColumn(headers, "Category", "الفئة", "القسم");
-        var priceCol = FindColumn(headers, "Price (AED)", "Price", "السعر");
-        var wholesaleCol = FindColumn(headers, "Wholesale Price (AED)", "Wholesale Price", "سعر الجملة");
+        var priceExclVatCol = FindColumn(headers, "Price (AED)", "Price", "السعر");
+        var priceInclVatCol = FindColumn(headers, "Price+VAT", "Price + VAT", "Price Incl. VAT", "السعر شامل الضريبة");
+        var wholesaleExclVatCol = FindColumn(headers, "Wholesale Price (AED)", "Wholesale Price", "سعر الجملة");
+        var wholesaleInclVatCol = FindColumn(headers, "Wholesale Price+VAT", "Wholesale Price + VAT", "سعر الجملة شامل الضريبة");
         var stockCol = FindColumn(headers, "Stock Quantity", "Stock", "Qty", "الكمية", "كمية المخزون");
         var imageCol = FindColumn(headers, "Image URL", "Image", "رابط الصورة");
 
@@ -499,7 +512,15 @@ public class ProductsController : AdminBaseController
         var sizeGroupCol = FindColumn(headers, "Size Group", "مجموعة المقاسات");
         var publishedCol = FindColumn(headers, "Published", "منشور");
 
-        if (skuCol == null || nameCol == null || categoryCol == null || priceCol == null || stockCol == null)
+        // No incl.-VAT column anywhere in the sheet at all — not just blank on this row — means
+        // this is an older export shape, where the excl.-VAT-named column held the VAT-INCLUSIVE
+        // price directly (there was no VAT split at all here either). See TryResolvePriceCells,
+        // and ImportVariantsSheet's identical flags — Price and Wholesale Price are checked
+        // independently in case a hand-edited file only added one pair.
+        var isOldPriceFormat = priceInclVatCol == null;
+        var isOldWholesaleFormat = wholesaleInclVatCol == null;
+
+        if (skuCol == null || nameCol == null || categoryCol == null || priceExclVatCol == null || stockCol == null)
         {
             ModelState.AddModelError(string.Empty,
                 _localizer["Couldn't find required columns (Sku, Name, Category, Price, Stock Quantity). Check the column headers in row 1."]);
@@ -580,9 +601,18 @@ public class ProductsController : AdminBaseController
                         continue;
                     }
 
-                    if (!TryReadDecimal(row.Cell(priceCol.Value), out var price) || price < 0)
+                    // hasValue distinguishes "both Price cells blank" from a resolved value — see
+                    // TryResolvePriceCells. Price is required on every Products row (unlike
+                    // Wholesale below), so unlike the Variants sheet a missing value is itself an
+                    // error here, not "leave unchanged" — matches this sheet's existing behavior.
+                    if (!TryResolvePriceCells(row, priceExclVatCol, priceInclVatCol, isOldPriceFormat, "Price (AED)", "Price+VAT", out var hasPriceValue, out var price, out var priceError))
                     {
-                        result.Errors.Add($"Products row {rowNum} (SKU {sku}): invalid Price value.");
+                        result.Errors.Add($"Products row {rowNum} (SKU {sku}): {priceError}");
+                        continue;
+                    }
+                    if (!hasPriceValue)
+                    {
+                        result.Errors.Add($"Products row {rowNum} (SKU {sku}): missing Price (AED) / Price+VAT value.");
                         continue;
                     }
 
@@ -590,17 +620,12 @@ public class ProductsController : AdminBaseController
                     // apply it", which a nullable `wholesale` alone can't: null already means
                     // both "not on this row" and "clear it", and only the latter should ever wipe
                     // an existing value.
-                    var hasWholesaleCell = wholesaleCol != null && !row.Cell(wholesaleCol.Value).IsEmpty();
-                    decimal? wholesale = null;
-                    if (hasWholesaleCell)
+                    if (!TryResolvePriceCells(row, wholesaleExclVatCol, wholesaleInclVatCol, isOldWholesaleFormat, "Wholesale Price (AED)", "Wholesale Price+VAT", out var hasWholesaleCell, out var wholesaleValue, out var wholesaleError))
                     {
-                        if (!TryReadDecimal(row.Cell(wholesaleCol!.Value), out var w) || w < 0)
-                        {
-                            result.Errors.Add($"Products row {rowNum} (SKU {sku}): invalid Wholesale Price value.");
-                            continue;
-                        }
-                        wholesale = w;
+                        result.Errors.Add($"Products row {rowNum} (SKU {sku}): {wholesaleError}");
+                        continue;
                     }
+                    decimal? wholesale = hasWholesaleCell ? wholesaleValue : null;
 
                     if (!TryReadInt(row.Cell(stockCol.Value), out var stock) || stock < 0)
                     {
@@ -849,8 +874,9 @@ public class ProductsController : AdminBaseController
     /// names that don't exist yet are created on the fly (Size is combined from the Size + Length
     /// columns — see CombineSizeAndLength). Internal Barcode, when provided, must be unique
     /// across every variant — a duplicate within this same file, or one that already belongs to
-    /// a different variant in the database, fails just that row. Price (AED) / Price+VAT are
-    /// resolved to the single VAT-inclusive value actually stored — see TryResolveVariantPrice.
+    /// a different variant in the database, fails just that row. Price (AED)/Price+VAT and
+    /// Wholesale Price (AED)/Wholesale Price+VAT are each resolved to the single VAT-inclusive
+    /// value actually stored — see TryResolvePriceCells.
     /// </summary>
     private async Task ImportVariantsSheet(IXLWorksheet sheet, Dictionary<string, Product> productsBySku, BulkImportResult result)
     {
@@ -862,17 +888,20 @@ public class ProductsController : AdminBaseController
         var lengthCol = FindColumn(headers, "Length", "الطول");
         var priceExclVatCol = FindColumn(headers, "Price (AED)", "Price", "السعر");
         var priceInclVatCol = FindColumn(headers, "Price+VAT", "Price + VAT", "Price Incl. VAT", "السعر شامل الضريبة");
-        var wholesaleCol = FindColumn(headers, "Wholesale Price (AED)", "Wholesale Price", "سعر الجملة");
+        var wholesaleExclVatCol = FindColumn(headers, "Wholesale Price (AED)", "Wholesale Price", "سعر الجملة");
+        var wholesaleInclVatCol = FindColumn(headers, "Wholesale Price+VAT", "Wholesale Price + VAT", "سعر الجملة شامل الضريبة");
         var stockCol = FindColumn(headers, "Stock Quantity", "Stock", "الكمية");
         var imageCol = FindColumn(headers, "Image URL", "Image");
         var barcodeCol = FindColumn(headers, "Internal Barcode", "Barcode", "الباركود الداخلي", "الباركود");
 
-        // No "Price+VAT" column anywhere in the sheet at all — not just blank on this row — means
-        // this is the older export shape, where "Price (AED)" held the VAT-INCLUSIVE price
-        // directly (there was no VAT split at all). That old meaning has to be preserved exactly,
-        // never reinterpreted as the new excl.-VAT column of the same name — see
-        // TryResolveVariantPrice, which branches on this flag before reading either price cell.
+        // No incl.-VAT column anywhere in the sheet at all — not just blank on this row — means
+        // this is an older export shape, where the excl.-VAT-named column held the VAT-INCLUSIVE
+        // price directly (there was no VAT split at all). That old meaning has to be preserved
+        // exactly, never reinterpreted as the new excl.-VAT column of the same name — see
+        // TryResolvePriceCells, which branches on this flag before reading either cell. Price and
+        // Wholesale Price are checked independently in case a hand-edited file only added one pair.
         var isOldPriceFormat = priceInclVatCol == null;
+        var isOldWholesaleFormat = wholesaleInclVatCol == null;
 
         if (parentSkuCol == null || variantSkuCol == null || stockCol == null)
         {
@@ -928,27 +957,21 @@ public class ProductsController : AdminBaseController
                 continue;
             }
 
-            // hasWholesaleCell: a blank cell must leave the existing value alone on an update,
-            // not wipe it — same reasoning as the Products sheet above. Price itself goes through
-            // TryResolveVariantPrice instead (it has two source columns to reconcile).
-            if (!TryResolveVariantPrice(row, priceExclVatCol, priceInclVatCol, isOldPriceFormat, out var hasPriceCell, out var priceValue, out var priceError))
+            // hasValue for either distinguishes "both cells blank — leave the existing value
+            // alone on an update, don't wipe it" from a resolved value — see TryResolvePriceCells.
+            if (!TryResolvePriceCells(row, priceExclVatCol, priceInclVatCol, isOldPriceFormat, "Price (AED)", "Price+VAT", out var hasPriceCell, out var priceValue, out var priceError))
             {
                 result.Errors.Add($"Variants row {rowNum} (SKU {variantSku}): {priceError}");
                 continue;
             }
             decimal? price = hasPriceCell ? priceValue : null;
 
-            var hasWholesaleCell = wholesaleCol != null && !row.Cell(wholesaleCol.Value).IsEmpty();
-            decimal? wholesale = null;
-            if (hasWholesaleCell)
+            if (!TryResolvePriceCells(row, wholesaleExclVatCol, wholesaleInclVatCol, isOldWholesaleFormat, "Wholesale Price (AED)", "Wholesale Price+VAT", out var hasWholesaleCell, out var wholesaleValue, out var wholesaleError))
             {
-                if (!TryReadDecimal(row.Cell(wholesaleCol!.Value), out var w) || w < 0)
-                {
-                    result.Errors.Add($"Variants row {rowNum} (SKU {variantSku}): invalid Wholesale Price value.");
-                    continue;
-                }
-                wholesale = Math.Round(w, 2);
+                result.Errors.Add($"Variants row {rowNum} (SKU {variantSku}): {wholesaleError}");
+                continue;
             }
+            decimal? wholesale = hasWholesaleCell ? wholesaleValue : null;
 
             var imageUrl = imageCol == null || row.Cell(imageCol.Value).IsEmpty() ? null : row.Cell(imageCol.Value).GetString().Trim();
             var barcode = barcodeCol == null || row.Cell(barcodeCol.Value).IsEmpty() ? null : row.Cell(barcodeCol.Value).GetString().Trim();
@@ -1094,33 +1117,42 @@ public class ProductsController : AdminBaseController
         return match.Success ? (match.Groups[1].Value, match.Groups[2].Value) : (label, null);
     }
 
-    // Resolves the Variants sheet's Price (AED) / Price+VAT cells into the single VAT-inclusive
-    // value ProductVariant.Price actually stores (the site stores prices INCLUDING 5% VAT).
-    // `hasValue` distinguishes "both cells blank — nothing to apply, leave any existing price
-    // unchanged" from a resolved `value`; a `false` return means the row itself is invalid — the
-    // caller adds `error` to the results and skips the whole row, same as any other bad cell.
+    // Resolves an excl.-VAT / incl.-VAT column pair (Price (AED)/Price+VAT, or Wholesale Price
+    // (AED)/Wholesale Price+VAT — on either the Products or Variants sheet, all four call sites
+    // share this one function) into the single VAT-inclusive value actually stored
+    // (Product/ProductVariant .Price and .WholesalePrice are always VAT-inclusive — the site
+    // stores prices INCLUDING 5% VAT). `hasValue` distinguishes "both cells blank — nothing to
+    // apply, leave any existing value unchanged" from a resolved `value`; a `false` return means
+    // the row itself is invalid — the caller adds `error` to the results and skips the whole row,
+    // same as any other bad cell. exclLabel/inclLabel are just for error messages, so a Wholesale
+    // Price problem doesn't get reported as a plain "Price" one.
     //
-    // isOldPriceFormat (no "Price+VAT" column anywhere in the sheet, not just blank on this row)
-    // preserves the older export's meaning exactly: "Price (AED)" WAS the VAT-inclusive price
-    // there (there was no VAT split at all), so it's read as-is — never multiplied by 1.05, which
-    // would silently double-apply VAT to a value that already had it.
-    private static bool TryResolveVariantPrice(
-        IXLRow row, int? priceExclVatCol, int? priceInclVatCol, bool isOldPriceFormat,
+    // Both sheets used to disagree about what a bare "Price (AED)" column (no pair) meant — excl.
+    // VAT on the Variants sheet, incl. VAT on the Products sheet — which was genuinely dangerous:
+    // a new product's Price (AED) cell, filled in with the excl.-VAT figure out of habit from the
+    // Variants sheet, would have silently become the site's stored (and displayed/charged) price.
+    // They now always mean the same thing on both sheets. isOldFormat (no incl.-VAT column
+    // anywhere in the sheet, not just blank on this row) exists so a file from before that pairing
+    // existed still imports correctly: back then the single column WAS the VAT-inclusive price
+    // (there was no split at all), so it's read as-is here — never multiplied by 1.05, which would
+    // silently double-apply VAT to a value that already had it.
+    private static bool TryResolvePriceCells(
+        IXLRow row, int? exclVatCol, int? inclVatCol, bool isOldFormat, string exclLabel, string inclLabel,
         out bool hasValue, out decimal value, out string? error)
     {
         hasValue = false;
         value = 0;
         error = null;
 
-        if (isOldPriceFormat)
+        if (isOldFormat)
         {
-            if (priceExclVatCol == null || row.Cell(priceExclVatCol.Value).IsEmpty())
+            if (exclVatCol == null || row.Cell(exclVatCol.Value).IsEmpty())
             {
                 return true;
             }
-            if (!TryReadDecimal(row.Cell(priceExclVatCol.Value), out var oldPrice) || oldPrice < 0)
+            if (!TryReadDecimal(row.Cell(exclVatCol.Value), out var oldPrice) || oldPrice < 0)
             {
-                error = "invalid Price (AED) value.";
+                error = $"invalid {exclLabel} value.";
                 return false;
             }
             hasValue = true;
@@ -1128,22 +1160,22 @@ public class ProductsController : AdminBaseController
             return true;
         }
 
-        var hasExcl = priceExclVatCol != null && !row.Cell(priceExclVatCol.Value).IsEmpty();
-        var hasIncl = priceInclVatCol != null && !row.Cell(priceInclVatCol.Value).IsEmpty();
+        var hasExcl = exclVatCol != null && !row.Cell(exclVatCol.Value).IsEmpty();
+        var hasIncl = inclVatCol != null && !row.Cell(inclVatCol.Value).IsEmpty();
         if (!hasExcl && !hasIncl)
         {
             return true;
         }
 
         decimal excl = 0, incl = 0;
-        if (hasExcl && (!TryReadDecimal(row.Cell(priceExclVatCol!.Value), out excl) || excl < 0))
+        if (hasExcl && (!TryReadDecimal(row.Cell(exclVatCol!.Value), out excl) || excl < 0))
         {
-            error = "invalid Price (AED) value.";
+            error = $"invalid {exclLabel} value.";
             return false;
         }
-        if (hasIncl && (!TryReadDecimal(row.Cell(priceInclVatCol!.Value), out incl) || incl < 0))
+        if (hasIncl && (!TryReadDecimal(row.Cell(inclVatCol!.Value), out incl) || incl < 0))
         {
-            error = "invalid Price+VAT value.";
+            error = $"invalid {inclLabel} value.";
             return false;
         }
 
@@ -1152,7 +1184,7 @@ public class ProductsController : AdminBaseController
             var computed = Math.Round(excl * 1.05m, 2);
             if (Math.Abs(computed - incl) > 0.01m)
             {
-                error = $"Price (AED) {excl} × 1.05 = {computed}, which doesn't match Price+VAT {incl} (must agree within 0.01).";
+                error = $"{exclLabel} {excl} × 1.05 = {computed}, which doesn't match {inclLabel} {incl} (must agree within 0.01).";
                 return false;
             }
             hasValue = true;

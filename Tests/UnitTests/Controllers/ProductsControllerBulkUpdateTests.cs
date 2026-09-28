@@ -759,4 +759,168 @@ public class ProductsControllerBulkUpdateTests
         Assert.Equal("M", letterRow.Cell(sizeCol).GetString().Trim());
         Assert.True(letterRow.Cell(lengthCol).IsEmpty());
     }
+
+    // --- Products sheet Price (AED) / Price+VAT -----------------------------------------------
+    // Both sheets used to disagree about what a bare "Price (AED)" column meant — excl. VAT on
+    // Variants, incl. VAT on Products — which was genuinely dangerous: a new product's Price
+    // (AED) cell, filled in with the excl.-VAT figure out of habit from the Variants sheet, would
+    // have silently become the site's stored (and charged) price. These use their OWN workbook
+    // helper (NewWorkbookWithVatPricingHeaders/WriteProductRowVat) with the current, full header
+    // shape (Price+VAT present) — deliberately separate from NewWorkbookWithHeaders()/
+    // WriteProductRow() above, which stay on the older single-price-column shape so the many
+    // existing tests using them keep exercising the backward-compatible "old format" path
+    // unchanged, exactly as they did before this column was added.
+
+    private static XLWorkbook NewWorkbookWithVatPricingHeaders()
+    {
+        var workbook = new XLWorkbook();
+        var productsSheet = workbook.Worksheets.Add("Products");
+        string[] productHeaders =
+        {
+            "Sku", "Name", "Category", "Price (AED)", "Price+VAT", "Wholesale Price (AED)", "Wholesale Price+VAT",
+            "Stock Quantity", "Image URL", "Name (Arabic)", "Brand", "Subcategory", "Size Group", "Published"
+        };
+        for (var i = 0; i < productHeaders.Length; i++) productsSheet.Cell(1, i + 1).Value = productHeaders[i];
+
+        var variantsSheet = workbook.Worksheets.Add("Variants");
+        string[] variantHeaders =
+        {
+            "Product Sku (Parent)", "Internal Barcode", "Variant Sku", "Color", "Size", "Length",
+            "Price (AED)", "Price+VAT", "Wholesale Price (AED)", "Wholesale Price+VAT", "Stock Quantity", "Image URL"
+        };
+        for (var i = 0; i < variantHeaders.Length; i++) variantsSheet.Cell(1, i + 1).Value = variantHeaders[i];
+
+        return workbook;
+    }
+
+    private static void WriteProductRowVat(
+        IXLWorksheet sheet, int row, string sku, string name, string category, int stock,
+        decimal? priceExclVat = null, decimal? priceInclVat = null,
+        decimal? wholesaleExclVat = null, decimal? wholesaleInclVat = null)
+    {
+        sheet.Cell(row, 1).Value = sku;
+        sheet.Cell(row, 2).Value = name;
+        sheet.Cell(row, 3).Value = category;
+        if (priceExclVat.HasValue) sheet.Cell(row, 4).Value = priceExclVat.Value;
+        if (priceInclVat.HasValue) sheet.Cell(row, 5).Value = priceInclVat.Value;
+        if (wholesaleExclVat.HasValue) sheet.Cell(row, 6).Value = wholesaleExclVat.Value;
+        if (wholesaleInclVat.HasValue) sheet.Cell(row, 7).Value = wholesaleInclVat.Value;
+        sheet.Cell(row, 8).Value = stock;
+    }
+
+    [Fact]
+    public async Task BulkUpdate_NewProductBothPriceColumnsAgreeing_SavesThePriceInclVatValue()
+    {
+        var (context, connection) = CreateContext();
+        using var _ = connection;
+        using var __ = context;
+        SeedCategoryAndMerchant(context);
+
+        using var workbook = NewWorkbookWithVatPricingHeaders();
+        // 100 excl. VAT x 1.05 = 105.00 — matches Price+VAT exactly.
+        WriteProductRowVat(workbook.Worksheet("Products"), 2, "NEW-VAT1", "New Product", "Tactical Apparel", 10, priceExclVat: 100m, priceInclVat: 105m);
+
+        var controller = CreateController(context);
+        var model = Assert.IsType<BulkImportResult>(Assert.IsType<ViewResult>(await controller.BulkUpdate(ToFormFile(workbook))).Model);
+
+        Assert.Null(model.FatalError);
+        Assert.Empty(model.Errors);
+        Assert.Equal(1, model.CreatedCount);
+        var product = await context.Products.AsNoTracking().FirstAsync(p => p.Sku == "NEW-VAT1");
+        Assert.Equal(105.00m, product.Price);
+    }
+
+    [Fact]
+    public async Task BulkUpdate_NewProductOnlyExclVatProvided_ComputesInclVatAt105Percent()
+    {
+        var (context, connection) = CreateContext();
+        using var _ = connection;
+        using var __ = context;
+        SeedCategoryAndMerchant(context);
+
+        using var workbook = NewWorkbookWithVatPricingHeaders();
+        WriteProductRowVat(workbook.Worksheet("Products"), 2, "NEW-VAT2", "New Product", "Tactical Apparel", 10, priceExclVat: 200m);
+
+        var controller = CreateController(context);
+        var model = Assert.IsType<BulkImportResult>(Assert.IsType<ViewResult>(await controller.BulkUpdate(ToFormFile(workbook))).Model);
+
+        Assert.Null(model.FatalError);
+        Assert.Empty(model.Errors);
+        var product = await context.Products.AsNoTracking().FirstAsync(p => p.Sku == "NEW-VAT2");
+        Assert.Equal(210.00m, product.Price); // 200 * 1.05
+    }
+
+    [Fact]
+    public async Task BulkUpdate_ProductPriceColumnsDisagree_FailsTheRowAndSavesNothing()
+    {
+        var (context, connection) = CreateContext();
+        using var _ = connection;
+        using var __ = context;
+        SeedCategoryAndMerchant(context);
+
+        using var workbook = NewWorkbookWithVatPricingHeaders();
+        // 100 x 1.05 = 105.00, but Price+VAT says 999 — well outside the 0.01 tolerance.
+        WriteProductRowVat(workbook.Worksheet("Products"), 2, "NEW-VAT3", "New Product", "Tactical Apparel", 10, priceExclVat: 100m, priceInclVat: 999m);
+
+        var controller = CreateController(context);
+        var model = Assert.IsType<BulkImportResult>(Assert.IsType<ViewResult>(await controller.BulkUpdate(ToFormFile(workbook))).Model);
+
+        Assert.Null(model.FatalError);
+        Assert.Single(model.Errors);
+        Assert.Contains("doesn't match", model.Errors[0]);
+        Assert.Equal(0, model.CreatedCount);
+        Assert.False(await context.Products.AnyAsync(p => p.Sku == "NEW-VAT3"));
+    }
+
+    [Fact]
+    public async Task BulkUpdate_ProductWholesalePriceColumns_ResolveIndependentlyOfPrice()
+    {
+        var (context, connection) = CreateContext();
+        using var _ = connection;
+        using var __ = context;
+        SeedCategoryAndMerchant(context);
+
+        using var workbook = NewWorkbookWithVatPricingHeaders();
+        // Price: only incl. VAT given. Wholesale: only excl. VAT given (50 x 1.05 = 52.50).
+        WriteProductRowVat(workbook.Worksheet("Products"), 2, "NEW-VAT4", "New Product", "Tactical Apparel", 10, priceInclVat: 150m, wholesaleExclVat: 50m);
+
+        var controller = CreateController(context);
+        var model = Assert.IsType<BulkImportResult>(Assert.IsType<ViewResult>(await controller.BulkUpdate(ToFormFile(workbook))).Model);
+
+        Assert.Null(model.FatalError);
+        Assert.Empty(model.Errors);
+        var product = await context.Products.AsNoTracking().FirstAsync(p => p.Sku == "NEW-VAT4");
+        Assert.Equal(150.00m, product.Price);
+        Assert.Equal(52.50m, product.WholesalePrice);
+    }
+
+    [Fact]
+    public async Task BulkUpdate_OldFormatProductsSheet_NoPriceVatColumnAtAll_TreatsPriceAedAsAlreadyVatInclusive()
+    {
+        var (context, connection) = CreateContext();
+        using var _ = connection;
+        using var __ = context;
+        SeedCategoryAndMerchant(context);
+
+        // The OLD shape — no "Price+VAT" column at all — where "Price (AED)" meant the
+        // VAT-INCLUSIVE price directly.
+        using var workbook = new XLWorkbook();
+        var productsSheet = workbook.Worksheets.Add("Products");
+        string[] productHeaders = { "Sku", "Name", "Category", "Price (AED)", "Wholesale Price (AED)", "Stock Quantity", "Image URL" };
+        for (var i = 0; i < productHeaders.Length; i++) productsSheet.Cell(1, i + 1).Value = productHeaders[i];
+        productsSheet.Cell(2, 1).Value = "NEW-VAT5";
+        productsSheet.Cell(2, 2).Value = "Old Format Product";
+        productsSheet.Cell(2, 3).Value = "Tactical Apparel";
+        productsSheet.Cell(2, 4).Value = 105m; // old semantics: already VAT-inclusive
+        productsSheet.Cell(2, 6).Value = 10;
+
+        var controller = CreateController(context);
+        var model = Assert.IsType<BulkImportResult>(Assert.IsType<ViewResult>(await controller.BulkUpdate(ToFormFile(workbook))).Model);
+
+        Assert.Null(model.FatalError);
+        Assert.Empty(model.Errors);
+        var product = await context.Products.AsNoTracking().FirstAsync(p => p.Sku == "NEW-VAT5");
+        // Must NOT be 105 x 1.05 = 110.25 — that would be double-applying VAT.
+        Assert.Equal(105.00m, product.Price);
+    }
 }
