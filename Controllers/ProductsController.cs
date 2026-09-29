@@ -224,20 +224,28 @@ public class ProductsController : Controller
 
         // Slider bounds for the price filter reflect every other active filter so they don't
         // shrink to whatever range the shopper already picked on the price slider itself. Also
-        // variant-price-aware, same scoping as the filter above: when colors are selected, every
-        // product left in priceBoundsQuery is already guaranteed (by the color filter) to have at
-        // least one variant in one of those colors, so the "no variants" fallback only matters
-        // when no color filter is active at all.
+        // variant-price-aware, same scoping as the filter above and the same one-value-per-
+        // product shape as price sorting below: each product contributes the min/max among its
+        // own in-scope variants (falling back to its own Price when it has none), not a
+        // SelectMany-joined row per variant — that would have meant re-running priceBoundsQuery's
+        // own filters (and every Include behind it) a second time as a UNIONed subquery, which is
+        // exactly the kind of extra round trip this needs to avoid.
+        // (decimal?) on the OUTER Select, not just the inner one, so MinAsync()/MaxAsync() return
+        // null gracefully (instead of throwing) when the current filters match zero products —
+        // same reason the original, simpler version of this query cast to decimal? too.
         var priceBoundsQuery = ApplyFacets(baseQuery, skipPrice: true);
-        var variantBoundsPrices = priceBoundsQuery.SelectMany(p =>
-            p.Variants
+        var lowestPrice = await priceBoundsQuery
+            .Select(p => (decimal?)(p.Variants
                 .Where(v => selectedFamilyIds.Count == 0 || (v.Color != null && selectedFamilyIds.Contains(v.Color.FamilyId ?? otherFamilyId)))
-                .Select(v => (decimal?)(v.Price ?? p.Price)));
-        var boundsPrices = selectedFamilyIds.Count == 0
-            ? variantBoundsPrices.Concat(priceBoundsQuery.Where(p => !p.Variants.Any()).Select(p => (decimal?)p.Price))
-            : variantBoundsPrices;
-        var lowestPrice = await boundsPrices.MinAsync();
-        var highestPrice = await boundsPrices.MaxAsync();
+                .Select(v => (decimal?)(v.Price ?? p.Price))
+                .Min() ?? p.Price))
+            .MinAsync();
+        var highestPrice = await priceBoundsQuery
+            .Select(p => (decimal?)(p.Variants
+                .Where(v => selectedFamilyIds.Count == 0 || (v.Color != null && selectedFamilyIds.Contains(v.Color.FamilyId ?? otherFamilyId)))
+                .Select(v => (decimal?)(v.Price ?? p.Price))
+                .Max() ?? p.Price))
+            .MaxAsync();
         var priceRangeMin = lowestPrice.HasValue ? (int)Math.Floor(lowestPrice.Value.ToDisplayCurrencyValue() / 10) * 10 : 0;
         var priceRangeMax = highestPrice.HasValue ? (int)Math.Ceiling(highestPrice.Value.ToDisplayCurrencyValue() / 10) * 10 : 0;
 
