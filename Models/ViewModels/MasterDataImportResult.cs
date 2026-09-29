@@ -19,6 +19,14 @@ public class MasterDataImportResult
 
     public List<string> Errors { get; set; } = new();
 
+    // Set only when an unexpected exception aborted the import outright (a DB constraint
+    // violation not caught by per-row validation, a connectivity failure, etc.) — a per-row
+    // problem always goes in Errors instead and just skips that row. Whichever sheets had already
+    // called SaveChangesAsync before the failure are NOT rolled back (each sheet commits
+    // independently — see MasterDataController), so the counts above can be non-zero even when
+    // this is set.
+    public string? FatalError { get; set; }
+
     public bool HasActivity =>
         BrandsCreated + BrandsUpdated + CategoriesCreated + CategoriesUpdated +
         SubcategoriesCreated + SubcategoriesUpdated + ColorsCreated + ColorsUpdated +
