@@ -355,9 +355,14 @@ else
             else
             {
                 <div class="product-grid">
+                    @{
+                        var cardViewData = new ViewDataDictionary(ViewData);
+                        cardViewData["SelectedColorFamilyIds"] = Model.SelectedColorFamilyIds;
+                        cardViewData["OtherColorFamilyId"] = Model.OtherColorFamilyId;
+                    }
                     @foreach (var product in Model.Products)
                     {
-                        <partial name="_ProductCard" model="product" />
+                        <partial name="_ProductCard" model="product" view-data="cardViewData" />
                     }
                 </div>
 

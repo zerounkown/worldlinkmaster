@@ -849,6 +849,13 @@ public static class SeedData
             Product("Vanguard Softshell Jacket", "vanguard-softshell-jacket", categories["tactical-apparel"], "Wind-resistant softshell jacket with adjustable hood.", Aed(89.99m), "WLM-APP-003", 25, false, 6368576, 4.8m, 176),
             Product("Trailblazer Base Layer", "trailblazer-base-layer", categories["tactical-apparel"], "Moisture-wicking thermal base layer for cold weather ops.", Aed(34.99m), "WLM-APP-004", 50, false, 9522942, 4.5m, 98),
             Product("Overwatch Cargo Shorts", "overwatch-cargo-shorts", categories["tactical-apparel"], "Lightweight ripstop cargo shorts built for hot climates.", Aed(44.99m), "WLM-APP-005", 30, false, 11716436, 4.4m, 67),
+            // 530.25/472.50 are literal AED figures (not run through Aed()'s USD conversion) —
+            // this product mirrors real production data used to validate the listing page's
+            // per-variant price filter/sort/display: priced at 530.25 for most colors, but
+            // Ranger Green undercuts it at 472.50 (set below, after ApplyVariants runs) so the
+            // "at least one variant in range" logic has a real same-product price spread to
+            // exercise, not just products priced identically across every color.
+            Product("24-7 Agility Pant", "24-7-agility-pant", categories["tactical-apparel"], "Four-way stretch tactical pant built for all-day mobility.", 530.25m, "WLM-APP-006", 45, false, 16983321, 4.7m, 143),
 
             // Bags & Packs
             Product("Expedition 45L Rucksack", "expedition-45l-rucksack", categories["bags-and-packs"], "Modular 45L rucksack with MOLLE webbing and hydration port.", Aed(149.99m), "WLM-BAG-001", 20, true, 11900635, 4.9m, 415),
@@ -887,6 +894,14 @@ public static class SeedData
         }
 
         ApplyVariants(products, colorCache, sizeCache);
+
+        // See the "24-7 Agility Pant" comment above — every other color keeps the product's
+        // base 530.25 price (ProductVariant.Price left null, falling back to Product.Price as
+        // normal); only Ranger Green gets an explicit, lower per-variant override.
+        foreach (var variant in products.First(p => p.Slug == "24-7-agility-pant").Variants.Where(v => v.Color?.Name == RangerGreen.Name))
+        {
+            variant.Price = 472.50m;
+        }
 
         context.Products.AddRange(products);
         await context.SaveChangesAsync();
@@ -963,6 +978,7 @@ public static class SeedData
         ["vanguard-softshell-jacket"] = (new[] { 19928303, 32039137 }, new[] { Black, Charcoal, CoyoteTan }, ClothingSizes),
         ["trailblazer-base-layer"] = (new[] { 6506484, 32256806 }, new[] { Black, Charcoal }, ClothingSizes),
         ["overwatch-cargo-shorts"] = (new[] { 35043249, 20196037 }, new[] { Black, CoyoteTan, RangerGreen }, ClothingSizes),
+        ["24-7-agility-pant"] = (new[] { 16983204, 6368576 }, new[] { Black, CoyoteTan, RangerGreen }, ClothingSizes),
 
         ["expedition-45l-rucksack"] = (new[] { 11900631, 31438937 }, new[] { Black, CoyoteTan, RangerGreen }, null),
         ["recon-sling-pack"] = (new[] { 18318689, 9448166 }, new[] { Black, CoyoteTan }, null),

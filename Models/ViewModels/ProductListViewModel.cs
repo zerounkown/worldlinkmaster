@@ -41,6 +41,11 @@ public class ProductListViewModel
     public List<int> SelectedBrandIds { get; set; } = new();
     // Family codes (e.g. "black", "tan-coyote"), not individual color names.
     public List<string> SelectedColorFamilies { get; set; } = new();
+    // Same selection, resolved to ColorFamily.Id and in the exact order the filter checkboxes
+    // themselves render in (DisplayOrder) — handed to each _ProductCard so it can pick "the
+    // first checked family this product actually has a color in" for its own image/price/link.
+    public List<int> SelectedColorFamilyIds { get; set; } = new();
+    public int OtherColorFamilyId { get; set; }
     public List<string> SelectedSizes { get; set; } = new();
     public List<int> SelectedFeatureIds { get; set; } = new();
     public List<string> SelectedAvailability { get; set; } = new();

@@ -9,8 +9,8 @@
     var salePrice = activeEvent != null ? Model.Price * (1 - activeEvent.DiscountPercent / 100m) : (decimal?)null;
     var hasVariants = Model.Variants.Count > 0;
     var isFavorite = User.Identity?.IsAuthenticated == true && await FavoriteService.IsFavoriteAsync(Model.Id);
-    var cardImageUrl = string.IsNullOrEmpty(Model.ImageUrl) ? ImagePlaceholder.DataUri : Model.ImageUrl;
-    var hoverImageUrl = Model.GetHoverImageUrl(cardImageUrl);
+    var hoverImageUrlFallback = string.IsNullOrEmpty(Model.ImageUrl) ? ImagePlaceholder.DataUri : Model.ImageUrl;
+    var hoverImageUrl = Model.GetHoverImageUrl(hoverImageUrlFallback);
 
     // Hoisted out of the quick-add-only block below (still reused there) so swatches can gate on
     // "2+ colors" independently of hasVariants — a product can have variants (sizes) without
@@ -21,12 +21,34 @@
     var cardColors = Model.Variants
         .Where(v => v.Color != null)
         .GroupBy(v => v.ColorId)
-        .Select(g => new
+        .Select(g =>
         {
-            name = g.First().Color!.Name,
-            hex = g.First().Color!.HexCode,
-            image = ImagePlaceholder.IsRealImageUrl(g.First().ProductColor?.SwatchImageUrl) ? g.First().ProductColor!.SwatchImageUrl : null,
-            isDefault = g.Key == defaultCardColorId
+            // Cheapest variant for this color (usually the only price that color has at all;
+            // Min() covers products where price varies by size too) — same "variant Price falls
+            // back to Product.Price" convention used everywhere else (Details.cshtml, the
+            // quick-add JSON below).
+            var priceBase = g.Min(v => v.Price ?? Model.Price);
+            var priceSale = activeEvent != null ? priceBase * (1 - activeEvent.DiscountPercent / 100m) : (decimal?)null;
+            // ProductColor.SwatchImageUrl only exists for products brought in through the
+            // Product Importer — every other (legacy-style) product, including every one of
+            // Data/SeedData.cs's curated launch items, has no ProductColor rows at all, only a
+            // per-color ProductVariant.ImageUrl (see BuildVariants there). Falls back to that —
+            // same pattern Details.cshtml's own legacy colorOptions already uses — so the swatch
+            // row's image swap (and therefore the color filter's card override below) actually
+            // has a real photo to show for the whole catalog, not just imported products.
+            var swatchImage = ImagePlaceholder.IsRealImageUrl(g.First().ProductColor?.SwatchImageUrl)
+                ? g.First().ProductColor!.SwatchImageUrl
+                : g.Select(v => v.ImageUrl).FirstOrDefault(ImagePlaceholder.IsRealImageUrl);
+            return new
+            {
+                colorId = g.Key,
+                name = g.First().Color!.Name,
+                hex = g.First().Color!.HexCode,
+                image = swatchImage,
+                isDefault = g.Key == defaultCardColorId,
+                priceBase,
+                priceSale
+            };
         })
         // Default color first so it's never cut off by Take(6) on a product with 7+ colors —
         // its ring needs to actually be visible on load, not just theoretically present in data.
@@ -34,6 +56,41 @@
         .ToList();
     var visibleSwatchColors = cardColors.Take(6).ToList();
     var extraSwatchCount = cardColors.Count - visibleSwatchColors.Count;
+
+    // Set only by Views/Products/Index.cshtml (via ProductsController.Index), in the same
+    // DisplayOrder the Color filter checkboxes themselves render in — every other call site
+    // (Sales, NewArrivals, Favorites, related products on the PDP) leaves this null, and the
+    // card falls back to its normal default-color rendering exactly as before. When present,
+    // "the first checked family this product actually has a color in" decides which color the
+    // whole card (image, price, link) opens on — not just the swatch row.
+    var selectedColorFamilyIds = ViewData["SelectedColorFamilyIds"] as List<int>;
+    var otherColorFamilyId = ViewData["OtherColorFamilyId"] as int? ?? -1;
+    int? filterMatchedColorId = null;
+    if (selectedColorFamilyIds is { Count: > 0 })
+    {
+        foreach (var familyId in selectedColorFamilyIds)
+        {
+            var match = Model.Variants.FirstOrDefault(v => v.Color != null && (v.Color.FamilyId ?? otherColorFamilyId) == familyId);
+            if (match != null)
+            {
+                filterMatchedColorId = match.ColorId;
+                break;
+            }
+        }
+    }
+
+    // Swatch "active"/"resting" state: the filter match wins when present (so hovering away from
+    // a previewed swatch reverts to the FILTERED color, not the product's unrelated true
+    // default); otherwise this is exactly the pre-existing default-color logic.
+    var effectiveActiveColorId = filterMatchedColorId ?? defaultCardColorId;
+
+    // Card-level image/price/link overrides — only when a filter actually matched a color on
+    // THIS product; otherwise every one of these stays byte-for-byte what it always rendered.
+    var filterMatchedEntry = filterMatchedColorId.HasValue ? cardColors.FirstOrDefault(c => c.colorId == filterMatchedColorId.Value) : null;
+    var cardImageUrl = filterMatchedEntry?.image ?? hoverImageUrlFallback;
+    var linkColorName = filterMatchedEntry?.name;
+    var displayBasePrice = filterMatchedEntry?.priceBase ?? Model.Price;
+    var displaySalePrice = filterMatchedEntry?.priceSale ?? salePrice;
 
     string quickAddJson = "null";
     if (hasVariants)
@@ -109,7 +166,7 @@
                 <i class="bi bi-heart"></i>
             </a>
         }
-        <a class="product-card-tilt product-card-link @(hoverImageUrl != null ? "has-hover-image" : "")" asp-area="" asp-controller="Products" asp-action="Details" asp-route-slug="@Model.Slug">
+        <a class="product-card-tilt product-card-link @(hoverImageUrl != null ? "has-hover-image" : "")" asp-area="" asp-controller="Products" asp-action="Details" asp-route-slug="@Model.Slug" asp-route-color="@linkColorName">
             <img src="@cardImageUrl" alt="@Model.LocalizedName()" class="card-product-image" data-default-image="@cardImageUrl" />
             @if (hoverImageUrl != null)
             {
@@ -118,17 +175,17 @@
         </a>
     </div>
     <div class="product-card-body">
-        <h3><a class="product-card-link" asp-area="" asp-controller="Products" asp-action="Details" asp-route-slug="@Model.Slug">@Model.LocalizedName()</a></h3>
+        <h3><a class="product-card-link" asp-area="" asp-controller="Products" asp-action="Details" asp-route-slug="@Model.Slug" asp-route-color="@linkColorName">@Model.LocalizedName()</a></h3>
 
-        <div class="product-card-price-row">
-            @if (salePrice.HasValue)
+        <div class="product-card-price-row" data-default-price="@displayBasePrice.ToDisplayCurrency()" data-default-price-sale="@(displaySalePrice?.ToDisplayCurrency())">
+            @if (displaySalePrice.HasValue)
             {
-                <span class="price-was">@Model.Price.ToDisplayCurrency()</span>
-                <span class="price price-sale">@salePrice.Value.ToDisplayCurrency()</span>
+                <span class="price-was">@displayBasePrice.ToDisplayCurrency()</span>
+                <span class="price price-sale">@displaySalePrice.Value.ToDisplayCurrency()</span>
             }
             else
             {
-                <span class="price">@Model.Price.ToDisplayCurrency()</span>
+                <span class="price">@displayBasePrice.ToDisplayCurrency()</span>
             }
         </div>
 
@@ -139,8 +196,12 @@
             {
                 @foreach (var color in visibleSwatchColors)
                 {
-                    <button type="button" class="product-card-swatch @(color.isDefault ? "active" : "")" style="--swatch-color: @color.hex"
-                            data-color="@color.name" data-image="@color.image" data-default="@(color.isDefault ? "1" : null)"
+                    var isActive = color.colorId == effectiveActiveColorId;
+                    <button type="button" class="product-card-swatch @(isActive ? "active" : "")" style="--swatch-color: @color.hex"
+                            data-color="@color.name" data-image="@color.image"
+                            data-price="@(color.priceSale ?? color.priceBase).ToDisplayCurrency()"
+                            data-price-was="@(color.priceSale.HasValue ? color.priceBase.ToDisplayCurrency() : null)"
+                            data-default="@(isActive ? "1" : null)"
                             aria-label="@color.name" title="@color.name"></button>
                 }
                 @if (extraSwatchCount > 0)

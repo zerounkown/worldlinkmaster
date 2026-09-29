@@ -1,11 +1,14 @@
 // Color swatches on product cards (category/search grids, homepage carousels, related
 // products, favorites — everywhere .product-card or .featured-product-card renders).
-// Desktop: hovering a swatch swaps the card image to that color's photo; moving off the whole
-// card (not just the swatch) reverts to the default image. Mobile: tapping a swatch swaps the
-// image and "arms" that color; tapping the image or name afterward opens the product with that
-// color preselected via ?color=Name. Delegated at the document level (mirrors
-// product-quick-add.js's own pattern) so it keeps working for cards rendered after an
-// AJAX-refreshed grid, not just ones present at page load.
+// Desktop: hovering a swatch swaps the card image and price to that color's; moving off the
+// whole card (not just the swatch) reverts to whatever the card was already showing on load —
+// its own default color normally, or the Color filter's matched color when
+// Views/Shared/_ProductCard.cshtml pre-selected one (see its data-default="1" swatch, which is
+// what a card starts "resting" on). Mobile: tapping a swatch swaps the image/price and "arms"
+// that color; tapping the image or name afterward opens the product with that color preselected
+// via ?color=Name. Delegated at the document level (mirrors product-quick-add.js's own pattern)
+// so it keeps working for cards rendered after an AJAX-refreshed grid, not just ones present at
+// page load.
 (function () {
     function cardOf(el) {
         return el.closest(".product-card, .featured-product-card");
@@ -35,6 +38,25 @@
         });
     }
 
+    // Sets whichever price element(s) the card actually has — a plain .price, or a .price-was +
+    // .price-sale pair when a promo event is active. Which shape a given card uses never changes
+    // between colors (the active promo event is store-wide, not per-color), so this never needs
+    // to rebuild the row's structure, only swap the text already there.
+    function applyPrice(card, price, priceWas) {
+        if (!price) return;
+        var priceRow = card.querySelector(".product-card-price-row");
+        if (!priceRow) return;
+        var saleEl = priceRow.querySelector(".price-sale");
+        var wasEl = priceRow.querySelector(".price-was");
+        if (saleEl && wasEl) {
+            saleEl.textContent = price;
+            if (priceWas) wasEl.textContent = priceWas;
+        } else {
+            var plainEl = priceRow.querySelector(".price");
+            if (plainEl) plainEl.textContent = price;
+        }
+    }
+
     function applyColor(card, swatch) {
         var img = card.querySelector(".card-product-image:not(.card-product-image-hover)");
         var imageUrl = swatch.getAttribute("data-image");
@@ -44,6 +66,7 @@
         card.querySelectorAll(".product-card-link").forEach(function (link) {
             link.setAttribute("href", withColor(baseHref(link), swatch.getAttribute("data-color")));
         });
+        applyPrice(card, swatch.getAttribute("data-price"), swatch.getAttribute("data-price-was"));
         setActiveSwatch(card, swatch);
     }
 
@@ -56,6 +79,10 @@
         card.querySelectorAll(".product-card-link").forEach(function (link) {
             link.setAttribute("href", baseHref(link));
         });
+        var priceRow = card.querySelector(".product-card-price-row");
+        if (priceRow) {
+            applyPrice(card, priceRow.getAttribute("data-default-price"), priceRow.getAttribute("data-default-price-sale"));
+        }
         setActiveSwatch(card, card.querySelector(".product-card-swatch[data-default='1']"));
     }
 
