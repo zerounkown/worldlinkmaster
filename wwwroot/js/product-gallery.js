@@ -921,6 +921,32 @@
 
             var colorId = input.getAttribute("data-color-id");
 
+            // Gallery (main image + thumbnails) first, before any size-picker rebuild below —
+            // deliberately not dependent on it succeeding. The size pickers have their own
+            // per-color data (sizesByColorId / waistsByColorId / lengthsByColorId) that a data
+            // gap for one particular color could leave empty or inconsistent; that's a real
+            // problem worth its own fix, but it's no reason the photo the customer is looking at
+            // should also fail to update for a color that has perfectly good gallery data.
+            if (colorThumbItems && colorThumbItems.length > 0) {
+                renderGallery(colorThumbItems, colorId);
+            } else {
+                var items = galleryByColorId && colorId ? galleryByColorId[colorId] : null;
+                if (items && items.length > 0) {
+                    renderGallery(items);
+                } else {
+                    // Legacy fallback: swap just the main image to this color's representative photo.
+                    var image = input.getAttribute("data-image");
+                    if (image) {
+                        showMainItem(image, "Image");
+                        if (lightbox && lightbox.classList.contains("open")) {
+                            lightboxImage.src = image;
+                        }
+                        var matchingThumb = thumbsContainer ? thumbsContainer.querySelector('.product-thumb[data-full="' + CSS.escape(image) + '"]') : null;
+                        setActiveThumb(matchingThumb);
+                    }
+                }
+            }
+
             if (isWaistLengthMode && colorId) {
                 renderWaistLength(colorId, currentWaist(), currentLength());
             } else if (sizesByColorId && colorId) {
@@ -944,28 +970,6 @@
                 } else {
                     lifestylePhoto.style.display = "none";
                 }
-            }
-
-            if (colorThumbItems && colorThumbItems.length > 0) {
-                renderGallery(colorThumbItems, colorId);
-                return;
-            }
-
-            var items = galleryByColorId && colorId ? galleryByColorId[colorId] : null;
-            if (items && items.length > 0) {
-                renderGallery(items);
-                return;
-            }
-
-            // Legacy fallback: swap just the main image to this color's representative photo.
-            var image = input.getAttribute("data-image");
-            if (image) {
-                showMainItem(image, "Image");
-                if (lightbox && lightbox.classList.contains("open")) {
-                    lightboxImage.src = image;
-                }
-                var matchingThumb = thumbsContainer ? thumbsContainer.querySelector('.product-thumb[data-full="' + CSS.escape(image) + '"]') : null;
-                setActiveThumb(matchingThumb);
             }
         });
     });
