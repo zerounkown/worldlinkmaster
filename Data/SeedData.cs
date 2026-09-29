@@ -944,7 +944,21 @@ public static class SeedData
         // See the "24-7 Agility Pant" comment above — every other color keeps the product's
         // base 530.25 price (ProductVariant.Price left null, falling back to Product.Price as
         // normal); only Ranger Green gets an explicit, lower per-variant override.
-        foreach (var variant in products.First(p => p.Slug == "24-7-agility-pant").Variants.Where(v => v.Color?.Name == RangerGreen.Name))
+        var agilityPant = products.First(p => p.Slug == "24-7-agility-pant");
+
+        // ApplyVariants adds BonusColors (below) to every product, including "Olive Drab" — which
+        // also maps to the "green-olive" family via AssignColorFamiliesAsync. Left in place, its
+        // unmodified 530.25 base price would make the product match a 530-540 price filter through
+        // Olive Drab even with Ranger Green (472.50) excluded, defeating the whole point of this
+        // product: exactly one Green/Olive-family color, priced differently from the rest. Remove
+        // it here so "green-olive" resolves to Ranger Green alone for this product, matching the
+        // real production item this seed data mirrors.
+        foreach (var variant in agilityPant.Variants.Where(v => v.Color?.Name == OliveDrab.Name).ToList())
+        {
+            agilityPant.Variants.Remove(variant);
+        }
+
+        foreach (var variant in agilityPant.Variants.Where(v => v.Color?.Name == RangerGreen.Name))
         {
             variant.Price = 472.50m;
         }
