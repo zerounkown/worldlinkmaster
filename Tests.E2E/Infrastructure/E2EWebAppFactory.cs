@@ -42,6 +42,13 @@ public class E2EWebAppFactory : IAsyncLifetime
 
     private const string SchemaName = "e2e_test";
 
+    // Exposed so a journey test that needs data beyond what SeedData.InitializeAsync() already
+    // seeds (e.g. a size group/product combination the baseline catalog doesn't have) can open
+    // its own ApplicationDbContext against the exact same schema this factory's app process is
+    // running against, rather than a separate isolated one — the seeded rows then show up on the
+    // same pages Playwright is already navigating, no extra wiring needed on the app side.
+    public string ConnectionString => $"{AdminConnectionString};Search Path={SchemaName}";
+
     // Tests.E2E/bin/Debug/net8.0/ -> up 4 levels -> repo root. Building Tests.E2E (via its
     // ProjectReference) always also builds WorldLinkMaster.Web into its own bin/Debug/net8.0/
     // as a side effect, so this path is guaranteed to exist once the test project has built.

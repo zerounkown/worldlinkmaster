@@ -455,6 +455,7 @@
                 galleryPanelViewData["GalleryByColorId"] = galleryByColorId;
                 galleryPanelViewData["ColorThumbItems"] = colorThumbItems;
                 galleryPanelViewData["SharedGalleryItems"] = sharedGalleryItems;
+                galleryPanelViewData["DefaultProductColor"] = defaultProductColor;
                 <partial name="_PdpColorGallery" model="Model" view-data="galleryPanelViewData" />
                 <script type="application/json" id="colorGalleryData">@Html.Raw(galleryDataJson)</script>
                 <script type="application/json" id="colorThumbData">@Html.Raw(colorThumbItemsJson)</script>
