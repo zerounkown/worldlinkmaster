@@ -199,7 +199,7 @@
                     var isActive = color.colorId == effectiveActiveColorId;
                     <button type="button" class="product-card-swatch @(isActive ? "active" : "")" style="--swatch-color: @color.hex"
                             data-color="@color.name" data-image="@color.image"
-                            data-price="@(color.priceSale ?? color.priceBase).ToDisplayCurrency()"
+                            data-price="@((color.priceSale ?? color.priceBase).ToDisplayCurrency())"
                             data-price-was="@(color.priceSale.HasValue ? color.priceBase.ToDisplayCurrency() : null)"
                             data-default="@(isActive ? "1" : null)"
                             aria-label="@color.name" title="@color.name"></button>
