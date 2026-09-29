@@ -901,7 +901,19 @@ public static class SeedData
             // Ranger Green undercuts it at 472.50 (set below, after ApplyVariants runs) so the
             // "at least one variant in range" logic has a real same-product price spread to
             // exercise, not just products priced identically across every color.
-            Product("24-7 Agility Pant", "24-7-agility-pant", categories["tactical-apparel"], "Four-way stretch tactical pant built for all-day mobility.", 530.25m, "WLM-APP-006", 45, false, 16983321, 4.7m, 143),
+            //
+            // Stock is 90, not a smaller "typical" figure, because ApplyVariants splits it evenly
+            // across every color x size combo (colors here + BonusColors x ClothingSizes = 40
+            // combos before the Olive Drab removal below) via Math.Max(1, StockQuantity / combos):
+            // 90/40 = 2 per variant. "24-7 Agility Pant" sorts alphabetically first, so it's the
+            // product Tests.E2E/Infrastructure/E2ETestBase.cs's OpenFirstProductDetailAsync() opens
+            // for every journey test that needs "some real product" — including
+            // CartAndCheckoutStartTests, which adds one to cart and then increments its quantity.
+            // A lower stock figure here rounds down to 1 unit per variant, which is correct
+            // inventory behavior (the "+1" button is rightly blocked at the stock ceiling) but
+            // silently breaks that unrelated, pre-existing test the moment this product becomes
+            // catalog-alphabetically-first, since it never expects to land on a qty-capped-at-1 item.
+            Product("24-7 Agility Pant", "24-7-agility-pant", categories["tactical-apparel"], "Four-way stretch tactical pant built for all-day mobility.", 530.25m, "WLM-APP-006", 90, false, 16983321, 4.7m, 143),
 
             // Bags & Packs
             Product("Expedition 45L Rucksack", "expedition-45l-rucksack", categories["bags-and-packs"], "Modular 45L rucksack with MOLLE webbing and hydration port.", Aed(149.99m), "WLM-BAG-001", 20, true, 11900635, 4.9m, 415),
