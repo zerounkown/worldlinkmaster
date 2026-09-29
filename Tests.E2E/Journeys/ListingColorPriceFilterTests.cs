@@ -1,0 +1,143 @@
+using Microsoft.Playwright;
+using WorldLinkMaster.E2E.Infrastructure;
+
+namespace WorldLinkMaster.E2E.Journeys;
+
+/// <summary>
+/// Views/Products/Index.cshtml's Color and Price filters, and how they drive each product
+/// card (Views/Shared/_ProductCard.cshtml + wwwroot/js/product-card-swatches.js).
+///
+/// "24-7 Agility Pant" (Data/SeedData.cs) is real production data used specifically to cover
+/// this: priced 530.25 for most colors, but Ranger Green undercuts it at 472.50 — the only
+/// seeded product whose price actually varies by color, so it's the one that can prove the
+/// listing page filters/sorts/displays by VARIANT price, not just Product.Price.
+///
+/// Displayed card prices below are 20% lower than those two figures — Data/SeedData.cs's
+/// "UAE Summer Surprises" promo (StartDate/EndDate built from "today" at seed time) is always
+/// active on whatever day this runs, storewide, so every card always shows a sale price. The
+/// price FILTER itself (?minPrice=/?maxPrice=) compares against the raw, pre-discount
+/// Price/ProductVariant.Price values directly (ProductsController.ApplyVariantPriceFilter never
+/// applies the promo discount), so filter range assertions still use 530.25/472.50 unchanged —
+/// only assertions on the card's own displayed text need the discounted figures.
+///
+/// "?search=24-7" scopes every test to just this one product (it's the only seeded item with
+/// "24-7" anywhere in its name/Sku) rather than relying on pagination/sort order to put it on
+/// page 1 — a plain product-name search doesn't trigger the exact-match-redirect added for
+/// variant Sku/Barcode searches (PR #153), so this always lands on the ordinary listing page.
+/// </summary>
+[Collection(E2ETestCollection.Name)]
+public class ListingColorPriceFilterTests : E2ETestBase
+{
+    // 20% off "UAE Summer Surprises" — see the class remarks above.
+    private const string BasePriceDisplayed = "424\\.20"; // 530.25 * 0.8
+    private const string RangerGreenPriceDisplayed = "378\\.0"; // 472.50 * 0.8 (378.00 or 378)
+
+    public ListingColorPriceFilterTests(E2EWebAppFactory app, PlaywrightFixture playwright) : base(app, playwright)
+    {
+    }
+
+    private ILocator AgilityPantCard =>
+        Page.Locator(".product-card").Filter(new LocatorFilterOptions { HasText = "24-7 Agility Pant" });
+
+    // Views/Products/Index.cshtml only shows the first 5 color-family checkboxes; the rest carry
+    // class="filter-extra" (site.css: display: none) until this button is clicked (site.js
+    // toggles filter-extra-visible). Families here are ordered by match COUNT desc, then Name
+    // (Controllers/ProductsController.cs's RunVariantFacetsAsync), not display order — scoping to
+    // "24-7 Agility Pant" alone (via ?search=) means every family it matches ties at Count=1, so
+    // alphabetical tie-breaking can easily push "Green/Olive" past position 5. Real shoppers hit
+    // this exact "Show more" click too; it's not something worth avoiding, so the test does it.
+    private async Task RevealExtraColorCheckboxesIfNeededAsync()
+    {
+        var showMoreButton = Page.Locator("#colorFacetList .filter-show-more");
+        if (await showMoreButton.CountAsync() > 0)
+        {
+            await showMoreButton.ClickAsync();
+        }
+    }
+
+    [Fact]
+    public async Task CheckingGreenOliveFilter_SwitchesCardToRangerGreen_PriceAndSwatch()
+    {
+        await Page.GotoAsync(Url("Products?search=24-7"));
+        await Assertions.Expect(AgilityPantCard).ToBeVisibleAsync();
+        await Assertions.Expect(AgilityPantCard.Locator(".price")).ToHaveTextAsync(new System.Text.RegularExpressions.Regex(BasePriceDisplayed));
+
+        await RevealExtraColorCheckboxesIfNeededAsync();
+        await Page.Locator("#colorFacetList input[type='checkbox'][value='green-olive']").CheckAsync();
+        await Page.WaitForURLAsync(url => url.Contains("colors=green-olive"));
+
+        await Assertions.Expect(AgilityPantCard).ToBeVisibleAsync();
+        await Assertions.Expect(AgilityPantCard.Locator(".price")).ToHaveTextAsync(new System.Text.RegularExpressions.Regex(RangerGreenPriceDisplayed));
+        await Assertions.Expect(AgilityPantCard.Locator(".product-card-swatch[data-color='Ranger Green']")).ToHaveClassAsync(new System.Text.RegularExpressions.Regex("active"));
+
+        // Unchecking returns the card to its default (base-priced) color. The page reloaded
+        // after the check above, so "Show more" (a client-side toggle) needs revealing again.
+        await RevealExtraColorCheckboxesIfNeededAsync();
+        await Page.Locator("#colorFacetList input[type='checkbox'][value='green-olive']").UncheckAsync();
+        await Page.WaitForURLAsync(url => !url.Contains("colors=green-olive"));
+        await Assertions.Expect(AgilityPantCard.Locator(".price")).ToHaveTextAsync(new System.Text.RegularExpressions.Regex(BasePriceDisplayed));
+    }
+
+    [Fact]
+    public async Task ClickingCardWithColorFilterActive_OpensProductPageWithThatColorPreselected()
+    {
+        await Page.GotoAsync(Url("Products?search=24-7&colors=green-olive"));
+        await AgilityPantCard.Locator("h3 a.product-card-link").ClickAsync();
+
+        await Page.WaitForURLAsync(url => url.Contains("/Products/Details") && url.Contains("24-7-agility-pant"));
+        await Assertions.Expect(Page.Locator("#selectedColorLabel")).ToHaveTextAsync("Ranger Green");
+    }
+
+    [Fact]
+    public async Task ClickingSwatchOnCard_ChangesImagePriceAndFollowsLinkToThatColor()
+    {
+        await Page.GotoAsync(Url("Products?search=24-7"));
+
+        var swatch = AgilityPantCard.Locator(".product-card-swatch[data-color='Ranger Green']");
+        var image = AgilityPantCard.Locator(".card-product-image:not(.card-product-image-hover)");
+        var defaultImageSrc = await image.GetAttributeAsync("src");
+
+        await swatch.HoverAsync();
+        await Assertions.Expect(AgilityPantCard.Locator(".price")).ToHaveTextAsync(new System.Text.RegularExpressions.Regex(RangerGreenPriceDisplayed));
+        var hoveredImageSrc = await image.GetAttributeAsync("src");
+        Assert.NotEqual(defaultImageSrc, hoveredImageSrc);
+
+        await swatch.ClickAsync();
+        await AgilityPantCard.Locator("h3 a.product-card-link").ClickAsync();
+
+        await Page.WaitForURLAsync(url => url.Contains("/Products/Details") && url.Contains("24-7-agility-pant"));
+        await Assertions.Expect(Page.Locator("#selectedColorLabel")).ToHaveTextAsync("Ranger Green");
+    }
+
+    [Fact]
+    public async Task PriceFilter_ScopedToSelectedColor_ExcludesProduct_WhenRangerGreenPriceOutOfRange()
+    {
+        // 530-540 covers the base (pre-discount) price every OTHER color has, but not Ranger
+        // Green's 472.50 — with Green/Olive as the only selected color, the product must be
+        // excluded entirely. The filter compares against the raw Price/ProductVariant.Price, not
+        // the promo-discounted display price, so these bounds are unaffected by the active promo.
+        await Page.GotoAsync(Url("Products?search=24-7&colors=green-olive&minPrice=530&maxPrice=540"));
+
+        await Assertions.Expect(AgilityPantCard).ToHaveCountAsync(0);
+    }
+
+    [Fact]
+    public async Task PriceFilter_ScopedToSelectedColor_IncludesProduct_WhenRangerGreenPriceInRange()
+    {
+        await Page.GotoAsync(Url("Products?search=24-7&colors=green-olive&minPrice=470&maxPrice=480"));
+
+        await Assertions.Expect(AgilityPantCard).ToBeVisibleAsync();
+        await Assertions.Expect(AgilityPantCard.Locator(".price")).ToHaveTextAsync(new System.Text.RegularExpressions.Regex(RangerGreenPriceDisplayed));
+    }
+
+    [Fact]
+    public async Task PriceFilter_NoColorSelected_StillMatchesViaTheOneCheapVariant()
+    {
+        // No color filter: the product must still be findable via its Ranger Green variant
+        // alone at 470-480 (raw price), even though every other color is priced well outside
+        // that range.
+        await Page.GotoAsync(Url("Products?search=24-7&minPrice=470&maxPrice=480"));
+
+        await Assertions.Expect(AgilityPantCard).ToBeVisibleAsync();
+    }
+}

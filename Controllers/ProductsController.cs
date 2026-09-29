@@ -194,17 +194,16 @@ public class ProductsController : Controller
             }
 
             // Min/max are typed in whichever currency the shopper is currently viewing the
-            // store in, so they need converting back to AED before comparing against stored prices.
-            if (!skipPrice && minPrice.HasValue)
+            // store in, so they need converting back to AED before comparing against stored
+            // prices — see ApplyVariantPriceFilter below for the actual (variant-aware) filter.
+            if (!skipPrice && (minPrice.HasValue || maxPrice.HasValue))
             {
-                var minPriceAed = minPrice.Value.FromDisplayCurrencyToAed();
-                q = q.Where(p => p.Price >= minPriceAed);
-            }
-
-            if (!skipPrice && maxPrice.HasValue)
-            {
-                var maxPriceAed = maxPrice.Value.FromDisplayCurrencyToAed();
-                q = q.Where(p => p.Price <= maxPriceAed);
+                q = ApplyVariantPriceFilter(
+                    q,
+                    minPrice.HasValue ? minPrice.Value.FromDisplayCurrencyToAed() : null,
+                    maxPrice.HasValue ? maxPrice.Value.FromDisplayCurrencyToAed() : null,
+                    selectedFamilyIds,
+                    otherFamilyId);
             }
 
             // Both boxes checked (or neither) means no real filtering — either reads as "show everything".
@@ -224,10 +223,29 @@ public class ProductsController : Controller
         }
 
         // Slider bounds for the price filter reflect every other active filter so they don't
-        // shrink to whatever range the shopper already picked on the price slider itself.
+        // shrink to whatever range the shopper already picked on the price slider itself. Also
+        // variant-price-aware, same scoping as the filter above and the same one-value-per-
+        // product shape as price sorting below: each product contributes the min/max among its
+        // own in-scope variants (falling back to its own Price when it has none), not a
+        // SelectMany-joined row per variant — that would have meant re-running priceBoundsQuery's
+        // own filters (and every Include behind it) a second time as a UNIONed subquery, which is
+        // exactly the kind of extra round trip this needs to avoid.
+        // (decimal?) on the OUTER Select, not just the inner one, so MinAsync()/MaxAsync() return
+        // null gracefully (instead of throwing) when the current filters match zero products —
+        // same reason the original, simpler version of this query cast to decimal? too.
         var priceBoundsQuery = ApplyFacets(baseQuery, skipPrice: true);
-        var lowestPrice = await priceBoundsQuery.Select(p => (decimal?)p.Price).MinAsync();
-        var highestPrice = await priceBoundsQuery.Select(p => (decimal?)p.Price).MaxAsync();
+        var lowestPrice = await priceBoundsQuery
+            .Select(p => (decimal?)(p.Variants
+                .Where(v => selectedFamilyIds.Count == 0 || (v.Color != null && selectedFamilyIds.Contains(v.Color.FamilyId ?? otherFamilyId)))
+                .Select(v => (decimal?)(v.Price ?? p.Price))
+                .Min() ?? p.Price))
+            .MinAsync();
+        var highestPrice = await priceBoundsQuery
+            .Select(p => (decimal?)(p.Variants
+                .Where(v => selectedFamilyIds.Count == 0 || (v.Color != null && selectedFamilyIds.Contains(v.Color.FamilyId ?? otherFamilyId)))
+                .Select(v => (decimal?)(v.Price ?? p.Price))
+                .Max() ?? p.Price))
+            .MaxAsync();
         var priceRangeMin = lowestPrice.HasValue ? (int)Math.Floor(lowestPrice.Value.ToDisplayCurrencyValue() / 10) * 10 : 0;
         var priceRangeMax = highestPrice.HasValue ? (int)Math.Ceiling(highestPrice.Value.ToDisplayCurrencyValue() / 10) * 10 : 0;
 
@@ -237,10 +255,19 @@ public class ProductsController : Controller
         // explicit sort choice (price/newest/rating) still wins, same as Amazon/Propper letting
         // you re-sort search results. Tiers: exact identifier match (SKU/ID/barcode) > exact or
         // prefix name match > partial name match > matched only in description/brand/color.
+        // Price sorting uses the same effective price _ProductCard.cshtml shows on the card: the
+        // cheapest in-scope variant (scoped to the selected colors, same as the filter/bounds
+        // above), falling back to the product's own Price when it has no variants at all.
         query = sort switch
         {
-            "price_asc" => query.OrderBy(p => p.Price),
-            "price_desc" => query.OrderByDescending(p => p.Price),
+            "price_asc" => query.OrderBy(p => p.Variants
+                .Where(v => selectedFamilyIds.Count == 0 || (v.Color != null && selectedFamilyIds.Contains(v.Color.FamilyId ?? otherFamilyId)))
+                .Select(v => (decimal?)(v.Price ?? p.Price))
+                .Min() ?? p.Price),
+            "price_desc" => query.OrderByDescending(p => p.Variants
+                .Where(v => selectedFamilyIds.Count == 0 || (v.Color != null && selectedFamilyIds.Contains(v.Color.FamilyId ?? otherFamilyId)))
+                .Select(v => (decimal?)(v.Price ?? p.Price))
+                .Min() ?? p.Price),
             "newest" => query.OrderByDescending(p => p.CreatedAt),
             "rating" => query.OrderByDescending(p => p.Rating).ThenByDescending(p => p.ReviewCount),
             _ when !string.IsNullOrWhiteSpace(searchTrimmed) => query
@@ -410,6 +437,8 @@ public class ProductsController : Controller
             SelectedSubcategoryIsEmpty = selectedSubcategoryIsEmpty,
             SelectedBrandIds = selectedBrandIds,
             SelectedColorFamilies = selectedColorFamilyCodes,
+            SelectedColorFamilyIds = selectedFamilyIds,
+            OtherColorFamilyId = otherFamilyId,
             SelectedSizes = selectedSizes,
             SelectedFeatureIds = selectedFeatureIds,
             SelectedAvailability = selectedAvailability,
@@ -442,6 +471,40 @@ public class ProductsController : Controller
         };
 
         return View(vm);
+    }
+
+    // A product matches if AT LEAST ONE of its variants — scoped to the selected colors, exactly
+    // like the color filter above, when any are selected — has an effective price (its own
+    // Price, falling back to the product's base Price exactly like everywhere else in the app)
+    // inside the range. Products with no variants at all fall back to their own Price directly.
+    // This is what makes e.g. a product priced 530.25 everywhere except one color at 472.50
+    // filterable/findable by that one color's real price, not just the product's base price.
+    //
+    // internal (not a local function inside Index()) purely so Tests/UnitTests can call it
+    // directly against a SQLite-backed context: Index() itself can't run there at all — it
+    // unconditionally computes price-range slider bounds via MinAsync()/MaxAsync() over a
+    // decimal column, which SQLite's EF Core provider can't translate (see
+    // ProductsControllerTests.IndexSkipReason) — but this filter is plain WHERE-clause decimal
+    // comparisons, no aggregates, which both providers handle identically.
+    internal static IQueryable<Product> ApplyVariantPriceFilter(IQueryable<Product> query, decimal? minPriceAed, decimal? maxPriceAed, List<int> selectedFamilyIds, int otherFamilyId)
+    {
+        if (minPriceAed.HasValue)
+        {
+            var min = minPriceAed.Value;
+            query = query.Where(p =>
+                p.Variants.Any(v => (selectedFamilyIds.Count == 0 || (v.Color != null && selectedFamilyIds.Contains(v.Color.FamilyId ?? otherFamilyId))) && (v.Price ?? p.Price) >= min)
+                || (!p.Variants.Any() && p.Price >= min));
+        }
+
+        if (maxPriceAed.HasValue)
+        {
+            var max = maxPriceAed.Value;
+            query = query.Where(p =>
+                p.Variants.Any(v => (selectedFamilyIds.Count == 0 || (v.Color != null && selectedFamilyIds.Contains(v.Color.FamilyId ?? otherFamilyId))) && (v.Price ?? p.Price) <= max)
+                || (!p.Variants.Any() && p.Price <= max));
+        }
+
+        return query;
     }
 
     // Header instant-search dropdown. One lightweight query (no N+1: the matching variant, if

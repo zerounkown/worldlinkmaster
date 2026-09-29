@@ -18,6 +18,13 @@
     <None Remove="Tests.E2E\**" />
   </ItemGroup>
 
+  <!-- Lets Tests/ call internal helpers (e.g. ProductsController.ApplyVariantPriceFilter) that
+       are deliberately not public API but are worth unit-testing in isolation from actions that
+       can't run against SQLite at all — see that method's own comment for why. -->
+  <ItemGroup>
+    <InternalsVisibleTo Include="WorldLinkMaster.Tests" />
+  </ItemGroup>
+
   <ItemGroup>
     <PackageReference Include="Azure.Storage.Blobs" Version="12.29.2" />
     <PackageReference Include="ClosedXML" Version="0.104.1" />
