@@ -73,6 +73,7 @@ public static class SeedData
         await SeedApparelUseCaseAttributeDefinitionAsync(context);
         await SeedApparelSubTypeAttributeDefinitionsAsync(context);
         await SeedColorFamiliesAsync(context);
+        await AssignColorFamiliesAsync(context);
     }
 
     // Public and pure (no I/O) so it's directly unit-testable without a real database connection.
@@ -133,6 +134,51 @@ public static class SeedData
             SwatchImageUrl = f.SwatchUrl,
             DisplayOrder = f.Order
         }));
+        await context.SaveChangesAsync();
+    }
+
+    // GetOrCreateColor (below) never sets FamilyId — it only fills in Name/HexCode — and
+    // ApplicationDbContext's AutoAssignNewColorFamiliesAsync (its SaveChanges override) only
+    // copies a family onto a NEW color from an EXISTING, already-mapped color of the same name.
+    // On a completely fresh database (a new E2E schema for every CI run, a fresh local dev
+    // database, or — before this method existed — even a fresh production one) no color is ever
+    // mapped to a family at all, so the listing page's Color filter silently matches zero
+    // products for every family except "Other". Maps the common color names this catalog
+    // actually seeds to their obvious family, once, here — same "only fill in what's missing"
+    // guard as SeedColorFamiliesAsync above, so this never overwrites a real admin's own
+    // re-mapping of a color to a different family.
+    private static async Task AssignColorFamiliesAsync(ApplicationDbContext context)
+    {
+        var unmappedColors = await context.Colors.Where(c => c.FamilyId == null).ToListAsync();
+        if (unmappedColors.Count == 0)
+        {
+            return;
+        }
+
+        var familyIdByCode = await context.ColorFamilies.ToDictionaryAsync(f => f.Code, f => f.Id, StringComparer.OrdinalIgnoreCase);
+
+        string? FamilyCodeFor(string colorName) => colorName.Trim().ToLowerInvariant() switch
+        {
+            "black" => "black",
+            "coyote tan" or "khaki" or "tan" => "tan-coyote",
+            "ranger green" or "olive drab" => "green-olive",
+            "navy" => "navy-blue",
+            "charcoal" or "grey" or "gray" or "silver" or "slate gray" => "grey",
+            "brown" => "brown",
+            "arctic white" or "white" => "white",
+            "red" => "red",
+            _ => null
+        };
+
+        foreach (var color in unmappedColors)
+        {
+            var code = FamilyCodeFor(color.Name);
+            if (code != null && familyIdByCode.TryGetValue(code, out var familyId))
+            {
+                color.FamilyId = familyId;
+            }
+        }
+
         await context.SaveChangesAsync();
     }
 
