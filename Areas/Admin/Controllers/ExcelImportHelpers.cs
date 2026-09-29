@@ -68,6 +68,18 @@ internal static class ExcelImportHelpers
         return int.TryParse(cell.GetString(), NumberStyles.Any, CultureInfo.InvariantCulture, out value);
     }
 
+    // A [StringLength(N)] data annotation is display/model-binding validation only — it does
+    // nothing to stop SaveChangesAsync from sending an over-limit value straight to the database.
+    // Postgres genuinely enforces the "character varying(N)" column length it was migrated to and
+    // throws (SqlState 22001) on a violation; SQLite (the fast unit-test suite) never enforces
+    // declared VARCHAR(n) length at all, so this exact failure mode is invisible there. Returns
+    // null when the value is within limits (or null/empty), else a friendly message — callers
+    // prefix it with the sheet/row/field context and skip the row, same as any other bad cell.
+    public static string? ValidateLength(string? value, int maxLength, string fieldName) =>
+        value != null && value.Length > maxLength
+            ? $"{fieldName} exceeds the maximum length of {maxLength} characters (got {value.Length})."
+            : null;
+
     // "Yes"/"No" (also tolerates True/False/1/0) — defaultValue when the cell is blank.
     public static bool ReadYesNo(IXLWorksheet sheet, int row, int? col, bool defaultValue)
     {

@@ -1,9 +1,12 @@
 using ClosedXML.Excel;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging.Abstractions;
 using WorldLinkMaster.E2E.Infrastructure;
 using WorldLinkMaster.Web.Areas.Admin.Controllers;
 using WorldLinkMaster.Web.Data;
+using WorldLinkMaster.Web.Models.ViewModels;
 
 namespace WorldLinkMaster.E2E.IntegrationTests;
 
@@ -15,18 +18,21 @@ namespace WorldLinkMaster.E2E.IntegrationTests;
 /// Root cause: SizeGroup.UnitType is [StringLength(20)] (Models/SizeGroup.cs), which EF's
 /// Postgres migration turned into a real "character varying(20)" column
 /// (20260728071547_AddMasterDataAndProductImportSchema.cs). A hand-typed "Unit / Type" cell like
-/// "Fitted hat size (inches)" (25 characters) is accepted by ClosedXML and by every C# check in
-/// MasterDataController.ImportSizeGroupsAsync — nothing there ever looks at string length — so it
-/// sails straight through to SaveChangesAsync, where Postgres genuinely enforces the column's
+/// "Fitted hat size (inches)" (25 characters) was accepted by ClosedXML and by every C# check in
+/// MasterDataController.ImportSizeGroupsAsync — nothing there ever looked at string length — so it
+/// sailed straight through to SaveChangesAsync, where Postgres genuinely enforces the column's
 /// declared length and throws (Npgsql.PostgresException, SqlState 22001, "value too long for type
 /// character varying(20)"), wrapped by EF as a DbUpdateException. SQLite (the fast Tests/ unit
 /// suite) never enforces declared VARCHAR(n) length at all — a SQLite-backed test can insert a
 /// 500-character value into a "VARCHAR(20)" column without complaint — so this exact failure mode
-/// is invisible to anything but a real Postgres connection, exactly like the transaction bug
+/// was invisible to anything but a real Postgres connection, exactly like the transaction bug
 /// BulkUpdateExecutionStrategyTests exists to catch (see that class's remarks) and for the same
 /// underlying reason: MasterDataController.Import had no try/catch of any kind around the six
 /// sheet-import calls, so this (or any other) exception propagated all the way out of the action
-/// uncaught.
+/// uncaught. The fix (this commit) adds per-row length validation ahead of every save, plus a
+/// try/catch backstop for anything that validation doesn't cover — see MasterDataController's own
+/// remarks. The previous commit on this branch proved the crash was genuine, in CI, against this
+/// same real Postgres connection, before either fix landed.
 ///
 /// Runs against E2E_POSTGRES_CONNECTION — the same disposable Postgres container the rest of
 /// Tests.E2E already requires (see .github/workflows/_e2e-tests.yml and E2EWebAppFactory), never
@@ -84,7 +90,7 @@ public class MasterDataImportCrashTests : IAsyncLifetime
     }
 
     private static MasterDataController CreateController(ApplicationDbContext context) =>
-        new(context);
+        new(context, NullLogger<MasterDataController>.Instance);
 
     private static IFormFile ToFormFile(XLWorkbook workbook)
     {
@@ -140,23 +146,42 @@ public class MasterDataImportCrashTests : IAsyncLifetime
         return workbook;
     }
 
-    // TEMPORARY: reproduces the reported crash against the CURRENT, unfixed MasterDataController
-    // — Import() has no try/catch anywhere around the sheet-import calls, and nothing validates a
-    // cell's length before it reaches SaveChangesAsync, so this real Postgres connection throws a
-    // DbUpdateException (wrapping Npgsql.PostgresException, SqlState 22001: "value too long for
-    // type character varying(20)") straight out of the action — exactly the unhandled exception
-    // that produced the live site's generic "An error occurred while processing your request"
-    // page. This assertion is intentionally the opposite of what the shipped test asserts; the
-    // very next commit on this branch fixes MasterDataController and replaces this with a test
-    // that asserts the crash is GONE (a friendly per-row error instead) — this commit exists only
-    // to prove, in CI against real Postgres, that the crash is genuine before touching the fix.
     [Fact]
-    public async Task Import_OversizedUnitTypeCell_CurrentlyCrashes()
+    public async Task Import_OversizedUnitTypeCell_ShowsRowError_DoesNotCrash()
     {
         using var workbook = BuildReportedWorkbook();
         var file = ToFormFile(workbook);
         var controller = CreateController(_context);
 
-        await Assert.ThrowsAsync<DbUpdateException>(() => controller.Import(file));
+        // Must not throw. Against the unfixed controller, this line threw a DbUpdateException
+        // (see this class's remarks, and the standalone reproduction proved in the previous
+        // commit) — exactly the unhandled exception that produced the live site's generic error
+        // page.
+        var actionResult = await controller.Import(file);
+
+        var viewResult = Assert.IsType<ViewResult>(actionResult);
+        var model = Assert.IsType<MasterDataImportResult>(viewResult.Model);
+
+        Assert.Null(model.FatalError);
+
+        // The offending row is rejected with a specific, actionable message — not silently
+        // truncated, and not swallowed into a single generic "something went wrong".
+        Assert.Contains(model.Errors, e =>
+            e.Contains("Size Groups row 2", StringComparison.Ordinal) &&
+            e.Contains("Unit / Type", StringComparison.Ordinal) &&
+            e.Contains("20", StringComparison.Ordinal));
+        Assert.Equal(0, model.SizeGroupsCreated);
+
+        // Cascading, and correct: none of the four Sizes rows can resolve "HAT" as a Size Group
+        // Code, because the row that would have created it was rejected above — same as any other
+        // Sizes row whose Size Group Code genuinely doesn't exist yet.
+        Assert.Equal(4, model.Errors.Count(e => e.Contains("Sizes row", StringComparison.Ordinal)));
+        Assert.Equal(0, model.SizesCreated);
+
+        await using var verifyContext = new ApplicationDbContext(
+            new DbContextOptionsBuilder<ApplicationDbContext>()
+                .UseNpgsql($"{ConnectionString};Search Path={SchemaName}")
+                .Options);
+        Assert.False(await verifyContext.SizeGroups.AsNoTracking().AnyAsync(g => g.Code == "HAT"));
     }
 }

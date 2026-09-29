@@ -16,10 +16,12 @@ namespace WorldLinkMaster.Web.Areas.Admin.Controllers;
 public class MasterDataController : AdminBaseController
 {
     private readonly ApplicationDbContext _context;
+    private readonly ILogger<MasterDataController> _logger;
 
-    public MasterDataController(ApplicationDbContext context)
+    public MasterDataController(ApplicationDbContext context, ILogger<MasterDataController> logger)
     {
         _context = context;
+        _logger = logger;
     }
 
     public IActionResult Index()
@@ -61,34 +63,56 @@ public class MasterDataController : AdminBaseController
         }
         using var _ = workbook;
 
-        if (workbook.Worksheets.Contains("Brands"))
+        // Per-row problems (an unrecognized code, a value that's too long for its column, a bad
+        // Action) are validated before ever reaching the database and always land in
+        // result.Errors — that row is skipped, nothing else is affected. This try/catch is the
+        // backstop for anything NOT caught by that per-row validation (an unexpected constraint
+        // violation, a transient connectivity failure, ClosedXML choking on a malformed cell,
+        // etc.): every sheet below writes to a shared production database, so any of them can
+        // throw, and an uncaught exception here previously propagated all the way out of the
+        // action to ASP.NET Core's generic "An error occurred while processing your request" page
+        // instead of ever reaching this view.
+        try
         {
-            await ImportBrandsAsync(workbook.Worksheet("Brands"), result);
-        }
+            if (workbook.Worksheets.Contains("Brands"))
+            {
+                await ImportBrandsAsync(workbook.Worksheet("Brands"), result);
+            }
 
-        if (workbook.Worksheets.Contains("Categories"))
-        {
-            await ImportCategoriesAsync(workbook.Worksheet("Categories"), result);
-        }
+            if (workbook.Worksheets.Contains("Categories"))
+            {
+                await ImportCategoriesAsync(workbook.Worksheet("Categories"), result);
+            }
 
-        if (workbook.Worksheets.Contains("Colors"))
-        {
-            await ImportColorsAsync(workbook.Worksheet("Colors"), result);
-        }
+            if (workbook.Worksheets.Contains("Colors"))
+            {
+                await ImportColorsAsync(workbook.Worksheet("Colors"), result);
+            }
 
-        if (workbook.Worksheets.Contains("Size Groups"))
-        {
-            await ImportSizeGroupsAsync(workbook.Worksheet("Size Groups"), result);
-        }
+            if (workbook.Worksheets.Contains("Size Groups"))
+            {
+                await ImportSizeGroupsAsync(workbook.Worksheet("Size Groups"), result);
+            }
 
-        if (workbook.Worksheets.Contains("Sizes"))
-        {
-            await ImportSizesAsync(workbook.Worksheet("Sizes"), result);
-        }
+            if (workbook.Worksheets.Contains("Sizes"))
+            {
+                await ImportSizesAsync(workbook.Worksheet("Sizes"), result);
+            }
 
-        if (workbook.Worksheets.Contains("Attribute Dictionary"))
+            if (workbook.Worksheets.Contains("Attribute Dictionary"))
+            {
+                await ImportAttributeDictionaryAsync(workbook.Worksheet("Attribute Dictionary"), result);
+            }
+        }
+        catch (Exception ex)
         {
-            await ImportAttributeDictionaryAsync(workbook.Worksheet("Attribute Dictionary"), result);
+            // Each sheet above calls SaveChangesAsync independently (not one shared transaction),
+            // so whichever sheets already succeeded before this exception stay committed — unlike
+            // Bulk Update (ProductsController.BulkUpdate), this import was never all-or-nothing.
+            // The counts already recorded in `result` before the failure reflect that.
+            _logger.LogError(ex, "Master Data import failed unexpectedly partway through.");
+            result.FatalError = $"The import stopped after an unexpected error: {ex.Message}. Any sheets processed before this point were still saved.";
+            return View("Index", result);
         }
 
         return View("Index", result);
@@ -106,6 +130,25 @@ public class MasterDataController : AdminBaseController
         }
         errors.Add($"{sheetName} row {rowNum}: Action '{action}' isn't supported (only ADD/UPDATE) — row skipped.");
         return false;
+    }
+
+    // Checks every (value, maxLength, fieldName) tuple and appends one error per field that's too
+    // long — a hand-typed cell overflowing its column (e.g. a long free-text "Unit / Type") is a
+    // data-entry mistake, not a crash: see ExcelImportHelpers.ValidateLength for why this can't be
+    // left to the database to catch. Returns false (and the row must be skipped) if any field failed.
+    private static bool ValidateRowLengths(List<string> errors, string sheetName, int rowNum, params (string? Value, int MaxLength, string FieldName)[] fields)
+    {
+        var ok = true;
+        foreach (var (value, maxLength, fieldName) in fields)
+        {
+            var error = ValidateLength(value, maxLength, fieldName);
+            if (error != null)
+            {
+                errors.Add($"{sheetName} row {rowNum}: {error}");
+                ok = false;
+            }
+        }
+        return ok;
     }
 
     private async Task ImportBrandsAsync(IXLWorksheet sheet, MasterDataImportResult result)
@@ -146,19 +189,27 @@ public class MasterDataController : AdminBaseController
                 result.Errors.Add($"Brands row {rowNum}: Brand Code and Brand Name EN are required.");
                 continue;
             }
+
+            var nameAr = GetString(sheet, rowNum, nameArCol);
+            var website = GetString(sheet, rowNum, websiteCol);
+            if (!ValidateRowLengths(result.Errors, "Brands", rowNum,
+                    (code, 20, "Brand Code"), (name, 80, "Brand Name EN"), (nameAr, 80, "Brand Name AR"), (website, 300, "Website")))
+            {
+                continue;
+            }
+
             if (!seenCodes.Add(code))
             {
                 result.Errors.Add($"Brands row {rowNum}: duplicate Brand Code '{code}' in this sheet.");
                 continue;
             }
 
-            var website = GetString(sheet, rowNum, websiteCol);
             var active = ReadYesNo(sheet, rowNum, activeCol, true);
 
             if (existing.TryGetValue(code, out var brand))
             {
                 brand.Name = name;
-                brand.NameAr = GetString(sheet, rowNum, nameArCol);
+                brand.NameAr = nameAr;
                 brand.Website = website;
                 brand.Active = active;
                 result.BrandsUpdated++;
@@ -166,7 +217,7 @@ public class MasterDataController : AdminBaseController
             else if (existingByName.TryGetValue(name, out brand))
             {
                 brand.Code = code;
-                brand.NameAr = GetString(sheet, rowNum, nameArCol);
+                brand.NameAr = nameAr;
                 brand.Website = website;
                 brand.Active = active;
                 existing[code] = brand;
@@ -179,7 +230,7 @@ public class MasterDataController : AdminBaseController
                 {
                     Code = code,
                     Name = name,
-                    NameAr = GetString(sheet, rowNum, nameArCol),
+                    NameAr = nameAr,
                     Slug = UniqueSlug(name, usedSlugs),
                     Website = website,
                     Active = active
@@ -242,6 +293,14 @@ public class MasterDataController : AdminBaseController
                 result.Errors.Add($"Categories row {rowNum}: Category Code and Name EN are required.");
                 continue;
             }
+
+            var nameAr = GetString(sheet, rowNum, nameArCol);
+            if (!ValidateRowLengths(result.Errors, "Categories", rowNum,
+                    (code, 20, "Category Code"), (name, 100, "Name EN"), (nameAr, 100, "Name AR")))
+            {
+                continue;
+            }
+
             if (!seenCodes.Add(code))
             {
                 result.Errors.Add($"Categories row {rowNum}: duplicate Category Code '{code}' in this sheet.");
@@ -254,7 +313,7 @@ public class MasterDataController : AdminBaseController
             if (existingCategories.TryGetValue(code, out var category))
             {
                 category.Name = name;
-                category.NameAr = GetString(sheet, rowNum, nameArCol);
+                category.NameAr = nameAr;
                 category.DisplayOrder = displayOrder;
                 category.Active = active;
                 result.CategoriesUpdated++;
@@ -262,7 +321,7 @@ public class MasterDataController : AdminBaseController
             else if (existingCategoriesByName.TryGetValue(name, out category))
             {
                 category.Code = code;
-                category.NameAr = GetString(sheet, rowNum, nameArCol);
+                category.NameAr = nameAr;
                 category.DisplayOrder = displayOrder;
                 category.Active = active;
                 existingCategories[code] = category;
@@ -275,7 +334,7 @@ public class MasterDataController : AdminBaseController
                 {
                     Code = code,
                     Name = name,
-                    NameAr = GetString(sheet, rowNum, nameArCol),
+                    NameAr = nameAr,
                     Slug = UniqueSlug(name, categorySlugs),
                     DisplayOrder = displayOrder,
                     Active = active
@@ -305,6 +364,14 @@ public class MasterDataController : AdminBaseController
                 result.Errors.Add($"Categories row {rowNum}: Category Code and Name EN are required.");
                 continue;
             }
+
+            var nameAr = GetString(sheet, rowNum, nameArCol);
+            if (!ValidateRowLengths(result.Errors, "Categories", rowNum,
+                    (code, 20, "Category Code"), (name, 150, "Name EN"), (nameAr, 150, "Name AR")))
+            {
+                continue;
+            }
+
             if (!seenCodes.Add(code))
             {
                 result.Errors.Add($"Categories row {rowNum}: duplicate Category Code '{code}' in this sheet.");
@@ -323,7 +390,7 @@ public class MasterDataController : AdminBaseController
             if (existingSubcategories.TryGetValue(code, out var subcategory))
             {
                 subcategory.Name = name;
-                subcategory.NameAr = GetString(sheet, rowNum, nameArCol);
+                subcategory.NameAr = nameAr;
                 subcategory.CategoryId = parentCategory.Id;
                 subcategory.DisplayOrder = displayOrder;
                 subcategory.Active = active;
@@ -332,7 +399,7 @@ public class MasterDataController : AdminBaseController
             else if (existingSubcategoriesByName.TryGetValue(name, out subcategory))
             {
                 subcategory.Code = code;
-                subcategory.NameAr = GetString(sheet, rowNum, nameArCol);
+                subcategory.NameAr = nameAr;
                 subcategory.CategoryId = parentCategory.Id;
                 subcategory.DisplayOrder = displayOrder;
                 subcategory.Active = active;
@@ -346,7 +413,7 @@ public class MasterDataController : AdminBaseController
                 {
                     Code = code,
                     Name = name,
-                    NameAr = GetString(sheet, rowNum, nameArCol),
+                    NameAr = nameAr,
                     Slug = UniqueSlug(name, subcategorySlugs),
                     CategoryId = parentCategory.Id,
                     DisplayOrder = displayOrder,
@@ -412,20 +479,28 @@ public class MasterDataController : AdminBaseController
                 result.Errors.Add($"Colors row {rowNum}: Color Code and Name EN are required.");
                 continue;
             }
+
+            var nameAr = GetString(sheet, rowNum, nameArCol);
+            var hex = GetString(sheet, rowNum, hexCol) ?? "#808080";
+            if (!ValidateRowLengths(result.Errors, "Colors", rowNum,
+                    (code, 20, "Color Code"), (name, 40, "Name EN"), (nameAr, 40, "Name AR"), (hex, 7, "Hex Code")))
+            {
+                continue;
+            }
+
             if (!seenCodes.Add(code))
             {
                 result.Errors.Add($"Colors row {rowNum}: duplicate Color Code '{code}' in this sheet.");
                 continue;
             }
 
-            var hex = GetString(sheet, rowNum, hexCol) ?? "#808080";
             var active = ReadYesNo(sheet, rowNum, activeCol, true);
             TryReadInt(sheet, rowNum, orderCol, out var displayOrder);
 
             if (existing.TryGetValue(code, out var color))
             {
                 color.Name = name;
-                color.NameAr = GetString(sheet, rowNum, nameArCol);
+                color.NameAr = nameAr;
                 color.HexCode = hex;
                 color.DisplayOrder = displayOrder;
                 color.Active = active;
@@ -434,7 +509,7 @@ public class MasterDataController : AdminBaseController
             else if (existingByName.TryGetValue(name, out color))
             {
                 color.Code = code;
-                color.NameAr = GetString(sheet, rowNum, nameArCol);
+                color.NameAr = nameAr;
                 color.HexCode = hex;
                 color.DisplayOrder = displayOrder;
                 color.Active = active;
@@ -448,7 +523,7 @@ public class MasterDataController : AdminBaseController
                 {
                     Code = code,
                     Name = name,
-                    NameAr = GetString(sheet, rowNum, nameArCol),
+                    NameAr = nameAr,
                     HexCode = hex,
                     DisplayOrder = displayOrder,
                     Active = active
@@ -495,6 +570,17 @@ public class MasterDataController : AdminBaseController
                 result.Errors.Add($"Size Groups row {rowNum}: Size Group Code and Group Name EN are required.");
                 continue;
             }
+
+            var nameAr = GetString(sheet, rowNum, nameArCol);
+            var unitType = GetString(sheet, rowNum, unitCol);
+            var notes = GetString(sheet, rowNum, notesCol);
+            if (!ValidateRowLengths(result.Errors, "Size Groups", rowNum,
+                    (code, 30, "Size Group Code"), (name, 80, "Group Name EN"), (nameAr, 80, "Group Name AR"),
+                    (unitType, 20, "Unit / Type"), (notes, 250, "Notes")))
+            {
+                continue;
+            }
+
             if (!seenCodes.Add(code))
             {
                 result.Errors.Add($"Size Groups row {rowNum}: duplicate Size Group Code '{code}' in this sheet.");
@@ -506,9 +592,9 @@ public class MasterDataController : AdminBaseController
             if (existing.TryGetValue(code, out var group))
             {
                 group.NameEn = name;
-                group.NameAr = GetString(sheet, rowNum, nameArCol);
-                group.UnitType = GetString(sheet, rowNum, unitCol);
-                group.Notes = GetString(sheet, rowNum, notesCol);
+                group.NameAr = nameAr;
+                group.UnitType = unitType;
+                group.Notes = notes;
                 group.Active = active;
                 result.SizeGroupsUpdated++;
             }
@@ -518,9 +604,9 @@ public class MasterDataController : AdminBaseController
                 {
                     Code = code,
                     NameEn = name,
-                    NameAr = GetString(sheet, rowNum, nameArCol),
-                    UnitType = GetString(sheet, rowNum, unitCol),
-                    Notes = GetString(sheet, rowNum, notesCol),
+                    NameAr = nameAr,
+                    UnitType = unitType,
+                    Notes = notes,
                     Active = active
                 };
                 _context.SizeGroups.Add(group);
@@ -569,6 +655,15 @@ public class MasterDataController : AdminBaseController
                 result.Errors.Add($"Sizes row {rowNum}: Size Code, Size Group Code, and Display Name EN are required.");
                 continue;
             }
+
+            var nameAr = GetString(sheet, rowNum, nameArCol);
+            var unit = GetString(sheet, rowNum, unitCol);
+            if (!ValidateRowLengths(result.Errors, "Sizes", rowNum,
+                    (code, 20, "Size Code"), (name, 20, "Display Name EN"), (nameAr, 20, "Display Name AR"), (unit, 20, "Unit")))
+            {
+                continue;
+            }
+
             if (!seenCodes.Add(code))
             {
                 result.Errors.Add($"Sizes row {rowNum}: duplicate Size Code '{code}' in this sheet.");
@@ -588,10 +683,10 @@ public class MasterDataController : AdminBaseController
             if (existing.TryGetValue(code, out var size))
             {
                 size.Label = name;
-                size.LabelAr = GetString(sheet, rowNum, nameArCol);
+                size.LabelAr = nameAr;
                 size.SizeGroupId = sizeGroup.Id;
                 size.NumericValue = numericValue;
-                size.Unit = GetString(sheet, rowNum, unitCol);
+                size.Unit = unit;
                 size.SortOrder = sortOrder;
                 size.Active = active;
                 result.SizesUpdated++;
@@ -602,10 +697,10 @@ public class MasterDataController : AdminBaseController
                 {
                     Code = code,
                     Label = name,
-                    LabelAr = GetString(sheet, rowNum, nameArCol),
+                    LabelAr = nameAr,
                     SizeGroupId = sizeGroup.Id,
                     NumericValue = numericValue,
-                    Unit = GetString(sheet, rowNum, unitCol),
+                    Unit = unit,
                     SortOrder = sortOrder,
                     Active = active
                 };
@@ -651,6 +746,15 @@ public class MasterDataController : AdminBaseController
                 result.Errors.Add($"Attribute Dictionary row {rowNum}: Attribute Code and Name EN are required.");
                 continue;
             }
+
+            var nameAr = GetString(sheet, rowNum, nameArCol);
+            var dataType = GetString(sheet, rowNum, dataTypeCol);
+            if (!ValidateRowLengths(result.Errors, "Attribute Dictionary", rowNum,
+                    (code, 40, "Attribute Code"), (name, 80, "Name EN"), (nameAr, 80, "Name AR"), (dataType, 20, "Data Type")))
+            {
+                continue;
+            }
+
             if (!seenCodes.Add(code))
             {
                 result.Errors.Add($"Attribute Dictionary row {rowNum}: duplicate Attribute Code '{code}' in this sheet.");
@@ -663,8 +767,8 @@ public class MasterDataController : AdminBaseController
             if (existing.TryGetValue(code, out var attr))
             {
                 attr.NameEn = name;
-                attr.NameAr = GetString(sheet, rowNum, nameArCol);
-                attr.DataType = GetString(sheet, rowNum, dataTypeCol);
+                attr.NameAr = nameAr;
+                attr.DataType = dataType;
                 attr.Filterable = filterable;
                 attr.Active = active;
                 result.AttributesUpdated++;
@@ -675,8 +779,8 @@ public class MasterDataController : AdminBaseController
                 {
                     Code = code,
                     NameEn = name,
-                    NameAr = GetString(sheet, rowNum, nameArCol),
-                    DataType = GetString(sheet, rowNum, dataTypeCol),
+                    NameAr = nameAr,
+                    DataType = dataType,
                     Filterable = filterable,
                     Active = active
                 };
