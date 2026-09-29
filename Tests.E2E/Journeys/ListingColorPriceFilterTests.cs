@@ -39,6 +39,22 @@ public class ListingColorPriceFilterTests : E2ETestBase
     private ILocator AgilityPantCard =>
         Page.Locator(".product-card").Filter(new LocatorFilterOptions { HasText = "24-7 Agility Pant" });
 
+    // Views/Products/Index.cshtml only shows the first 5 color-family checkboxes; the rest carry
+    // class="filter-extra" (site.css: display: none) until this button is clicked (site.js
+    // toggles filter-extra-visible). Families here are ordered by match COUNT desc, then Name
+    // (Controllers/ProductsController.cs's RunVariantFacetsAsync), not display order — scoping to
+    // "24-7 Agility Pant" alone (via ?search=) means every family it matches ties at Count=1, so
+    // alphabetical tie-breaking can easily push "Green/Olive" past position 5. Real shoppers hit
+    // this exact "Show more" click too; it's not something worth avoiding, so the test does it.
+    private async Task RevealExtraColorCheckboxesIfNeededAsync()
+    {
+        var showMoreButton = Page.Locator("#colorFacetList .filter-show-more");
+        if (await showMoreButton.CountAsync() > 0)
+        {
+            await showMoreButton.ClickAsync();
+        }
+    }
+
     [Fact]
     public async Task CheckingGreenOliveFilter_SwitchesCardToRangerGreen_PriceAndSwatch()
     {
@@ -46,6 +62,7 @@ public class ListingColorPriceFilterTests : E2ETestBase
         await Assertions.Expect(AgilityPantCard).ToBeVisibleAsync();
         await Assertions.Expect(AgilityPantCard.Locator(".price")).ToHaveTextAsync(new System.Text.RegularExpressions.Regex(BasePriceDisplayed));
 
+        await RevealExtraColorCheckboxesIfNeededAsync();
         await Page.Locator("#colorFacetList input[type='checkbox'][value='green-olive']").CheckAsync();
         await Page.WaitForURLAsync(url => url.Contains("colors=green-olive"));
 
@@ -53,7 +70,9 @@ public class ListingColorPriceFilterTests : E2ETestBase
         await Assertions.Expect(AgilityPantCard.Locator(".price")).ToHaveTextAsync(new System.Text.RegularExpressions.Regex(RangerGreenPriceDisplayed));
         await Assertions.Expect(AgilityPantCard.Locator(".product-card-swatch[data-color='Ranger Green']")).ToHaveClassAsync(new System.Text.RegularExpressions.Regex("active"));
 
-        // Unchecking returns the card to its default (base-priced) color.
+        // Unchecking returns the card to its default (base-priced) color. The page reloaded
+        // after the check above, so "Show more" (a client-side toggle) needs revealing again.
+        await RevealExtraColorCheckboxesIfNeededAsync();
         await Page.Locator("#colorFacetList input[type='checkbox'][value='green-olive']").UncheckAsync();
         await Page.WaitForURLAsync(url => !url.Contains("colors=green-olive"));
         await Assertions.Expect(AgilityPantCard.Locator(".price")).ToHaveTextAsync(new System.Text.RegularExpressions.Regex(BasePriceDisplayed));
