@@ -529,6 +529,14 @@
         }
     }
 
+    // Set by syncColorFromThumb just before it dispatches a color "change" event on behalf of a
+    // specific thumbnail (a direct click, or the main-image/lightbox arrows landing on a
+    // different color's photo) — read and cleared by the color-change handler below so it can
+    // show THIS exact item instead of resetting to that color's main image. A genuine swatch
+    // click never goes through syncColorFromThumb at all, so this stays null for it, which is
+    // exactly what makes "pick a swatch -> jump to that color's main image" still happen.
+    var pendingActiveThumbUrl = null;
+
     // Selects the color swatch a thumbnail belongs to (via data-color-id) so the picture shown
     // and the selected color stay in sync — used both by direct thumbnail clicks and by the
     // main-image/lightbox prev-next arrows, which can land on a different color's photo too.
@@ -538,6 +546,7 @@
         if (!colorId) return;
         var matchingInput = document.querySelector('input[name="color"][data-color-id="' + colorId + '"]');
         if (matchingInput && !matchingInput.checked) {
+            pendingActiveThumbUrl = thumb.getAttribute("data-full");
             matchingInput.checked = true;
             matchingInput.dispatchEvent(new Event("change", { bubbles: true }));
         }
@@ -564,14 +573,22 @@
     // Rebuilds only the COLOR portion of the strip (elements without [data-shared]) for a new
     // active color — the shared/detail photos appended after them are never touched, so their
     // DOM nodes (and the customer's scroll position relative to them) persist untouched across
-    // color changes. If activeColorId is given (the fixed one-photo-per-color list), the active
-    // item is whichever one matches that color; otherwise falls back to the item flagged
-    // "active" (per-color angle lists), then the first item.
-    function renderGallery(items, activeColorId) {
+    // color changes. preferredUrl (set via pendingActiveThumbUrl whenever this color change was
+    // triggered BY navigating to a specific thumbnail — a direct click, or the main-image/
+    // lightbox arrows crossing a color boundary) takes priority when given, so that exact item
+    // stays shown instead of jumping to the color's main photo; a genuine swatch click never
+    // sets it, which is what makes THAT still jump to the color's main image specifically
+    // (activeColorId, matching the color's first/main item — colorThumbItems is always ordered
+    // main-first within each color). Falls back to the item flagged "active" (per-color angle
+    // lists), then the first item.
+    function renderGallery(items, activeColorId, preferredUrl) {
         if (!thumbsContainer || !items || items.length === 0) return;
 
         var activeIndex = -1;
-        if (activeColorId != null) {
+        if (preferredUrl) {
+            activeIndex = items.findIndex(function (item) { return item.url === preferredUrl; });
+        }
+        if (activeIndex < 0 && activeColorId != null) {
             activeIndex = items.findIndex(function (item) { return item.colorId === String(activeColorId); });
         }
         if (activeIndex < 0) {
@@ -924,6 +941,11 @@
             }
 
             var colorId = input.getAttribute("data-color-id");
+            // Consumed once per change event regardless of source, so a stale value from an
+            // earlier thumbnail interaction can never leak into a later, unrelated color change
+            // (e.g. a genuine swatch click) — see pendingActiveThumbUrl's own remarks.
+            var preferredThumbUrl = pendingActiveThumbUrl;
+            pendingActiveThumbUrl = null;
 
             // Gallery (main image + thumbnails) first, before any size-picker rebuild below —
             // deliberately not dependent on it succeeding. The size pickers have their own
@@ -932,7 +954,7 @@
             // problem worth its own fix, but it's no reason the photo the customer is looking at
             // should also fail to update for a color that has perfectly good gallery data.
             if (colorThumbItems && colorThumbItems.length > 0) {
-                renderGallery(colorThumbItems, colorId);
+                renderGallery(colorThumbItems, colorId, preferredThumbUrl);
             } else {
                 var items = galleryByColorId && colorId ? galleryByColorId[colorId] : null;
                 if (items && items.length > 0) {

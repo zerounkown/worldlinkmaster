@@ -179,6 +179,38 @@ public class PdpGalleryAllColorImagesTests : E2ETestBase
         await Assertions.Expect(detail.SelectedColorLabel).ToHaveTextAsync("Black");
     }
 
+    // Crossing a color boundary BACKWARD lands on the previous color's LAST photo (Black
+    // bottom), not its main one — the mirror image of the forward case above, and the one the
+    // forward-only test can't catch: the color-change event a boundary crossing triggers used to
+    // unconditionally reset the shown image to that color's MAIN photo (see
+    // pendingActiveThumbUrl's remarks in product-gallery.js), which happens to coincide with the
+    // right answer going forward (arriving at a new color always means arriving at its first/
+    // main item) but is flatly wrong going backward (arriving at a new color from behind means
+    // arriving at its LAST item).
+    [Fact]
+    public async Task MainImageArrowPrev_CrossingAColorBoundaryBackward_LandsOnThatColorsLastPhoto_NotItsMain()
+    {
+        var detail = await OpenProductAsync();
+
+        // Wrap-around Prev from the very first item (Black main) goes to the last item overall
+        // (Khaki bottom).
+        await detail.MainImageArrowPrev.ClickAsync();
+        await Assertions.Expect(detail.MainImage).ToHaveAttributeAsync("src", KhakiBottomUrl);
+        await Assertions.Expect(detail.SelectedColorLabel).ToHaveTextAsync("Khaki");
+
+        // Khaki bottom -> Khaki main: same color, steps backward within it.
+        await detail.MainImageArrowPrev.ClickAsync();
+        await Assertions.Expect(detail.MainImage).ToHaveAttributeAsync("src", KhakiMainUrl);
+        await Assertions.Expect(detail.SelectedColorLabel).ToHaveTextAsync("Khaki");
+
+        // Khaki main -> Black bottom: crosses the boundary backward — must land on Black's LAST
+        // photo, not reset to Black's main.
+        await detail.MainImageArrowPrev.ClickAsync();
+        await Assertions.Expect(detail.MainImage).ToHaveAttributeAsync("src", BlackBottomUrl);
+        await Assertions.Expect(detail.SelectedColorLabel).ToHaveTextAsync("Black");
+        await Assertions.Expect(detail.ActiveThumb).ToHaveAttributeAsync("data-full", BlackBottomUrl);
+    }
+
     [Fact]
     public async Task ClickingASecondaryThumbnail_SelectsThatImagesColor_AndSwatchClick_JumpsBackToMainImage()
     {
@@ -227,6 +259,32 @@ public class PdpGalleryAllColorImagesTests : E2ETestBase
         // last navigated to inside the lightbox, not whatever it was opened on.
         await Page.Keyboard.PressAsync("Escape");
         await Assertions.Expect(detail.MainImage).ToHaveAttributeAsync("src", BlackMainUrl);
+        await Assertions.Expect(detail.SelectedColorLabel).ToHaveTextAsync("Black");
+    }
+
+    // Mirrors MainImageArrowPrev_CrossingAColorBoundaryBackward_LandsOnThatColorsLastPhoto_NotItsMain
+    // for the lightbox (Prev button and keyboard ArrowLeft both funnel through the same
+    // lightboxPrev -> lightboxGoTo -> renderLightboxImage path) — crossing a color boundary
+    // backward must land on that color's LAST photo, not reset to its main one.
+    [Fact]
+    public async Task LightboxPrevAndArrowLeft_CrossingAColorBoundaryBackward_LandsOnThatColorsLastPhoto()
+    {
+        var detail = await OpenProductAsync();
+        await detail.OpenLightboxAsync();
+
+        // Wrap-around Prev from the first item (Black main) goes to the last item overall
+        // (Khaki bottom).
+        await detail.LightboxPrev.ClickAsync();
+        await Assertions.Expect(detail.LightboxImage).ToHaveAttributeAsync("src", KhakiBottomUrl);
+        await Assertions.Expect(detail.SelectedColorLabel).ToHaveTextAsync("Khaki");
+
+        // Keyboard ArrowLeft: Khaki bottom -> Khaki main (same color) -> Black bottom (crosses
+        // the boundary backward — must be Black's LAST photo, not its main).
+        await Page.Keyboard.PressAsync("ArrowLeft");
+        await Assertions.Expect(detail.LightboxImage).ToHaveAttributeAsync("src", KhakiMainUrl);
+        await Assertions.Expect(detail.SelectedColorLabel).ToHaveTextAsync("Khaki");
+        await Page.Keyboard.PressAsync("ArrowLeft");
+        await Assertions.Expect(detail.LightboxImage).ToHaveAttributeAsync("src", BlackBottomUrl);
         await Assertions.Expect(detail.SelectedColorLabel).ToHaveTextAsync("Black");
     }
 
