@@ -3361,6 +3361,16 @@ a:hover {
   transition: opacity 0.1s ease, transform 0.3s ease;
 }
 
+/* .card-product-image is shared with .featured-product-card-media (_FeaturedProductCard.cshtml),
+   which keeps the plain cover/no-blend look above — scope contain + multiply to the catalog/
+   search/related/wishlist card (.product-card-media, from _ProductCard.cshtml) only. Product
+   photos are shot on white; multiply lets that white blend into the grey tile
+   (.product-card-tilt's background) instead of sitting on top of it as a visible box. */
+.product-card-media .card-product-image {
+  object-fit: contain;
+  mix-blend-mode: multiply;
+}
+
 /* Second-image crossfade on hover (product-card grids, related products, featured products) —
    only wired up when a product has a genuinely different image to swap to; see
    ProductCardImageExtensions.GetHoverImageUrl. Guarded by (hover: hover) so touch devices, which
@@ -4680,16 +4690,26 @@ a:hover {
   aspect-ratio: 4 / 5;
   overflow: hidden;
   border-radius: 8px;
+  background-color: #f4f4f4;
 }
 
 .product-card-tilt {
   display: block;
+  position: relative;
   width: 100%;
   height: 100%;
   border-radius: 8px;
   transition: transform 0.2s ease, box-shadow 0.2s ease;
   transform-style: preserve-3d;
   will-change: transform;
+  /* Background lives here (not just on .product-card-media) so .card-product-image's
+     mix-blend-mode: multiply has something to blend against within this element's own
+     stacking context (will-change: transform isolates it from the grandparent's background).
+     position: relative makes this the containing block for .card-product-image-hover's
+     inset: 0, so the crossfade image respects the same padding as the default image. */
+  background-color: #f4f4f4;
+  padding: 16px;
+  box-sizing: border-box;
 }
 
 .product-card-tilt:hover {
