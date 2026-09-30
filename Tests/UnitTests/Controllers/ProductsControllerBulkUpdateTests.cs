@@ -923,4 +923,186 @@ public class ProductsControllerBulkUpdateTests
         // Must NOT be 105 x 1.05 = 110.25 — that would be double-applying VAT.
         Assert.Equal(105.00m, product.Price);
     }
+
+    // --- ProductColor backfill -----------------------------------------------------------
+    // Bug report: product F5519 "Tactical Boonie" (created via Bulk Update, 8 variants across
+    // Black/Khaki) has no "Vendor Color Codes" table on its Edit page at all — Bulk Update's
+    // ImportVariantsSheet only ever sets ProductVariant.ColorId, never creates the ProductColor
+    // join row that table (and Details.cshtml's per-color gallery/SKU/price lookups) requires.
+    // See ProductsController.BackfillProductColorsFromVariants.
+
+    [Fact]
+    public async Task BulkUpdate_NewProductWithColorVariants_CreatesProductColorRowsAndLinksVariants()
+    {
+        var (context, connection) = CreateContext();
+        using var _ = connection;
+        using var __ = context;
+        SeedCategoryAndMerchant(context);
+
+        using var workbook = NewWorkbookWithHeaders();
+        WriteProductRow(workbook.Worksheet("Products"), 2, "F5519", "Tactical Boonie", "Tactical Apparel", 40m, 0);
+        var variantsSheet = workbook.Worksheet("Variants");
+        WriteVariantRow(variantsSheet, 2, "F5519", "F5519-BLK-S", 5, color: "Black", size: "S");
+        WriteVariantRow(variantsSheet, 3, "F5519", "F5519-BLK-M", 5, color: "Black", size: "M");
+        WriteVariantRow(variantsSheet, 4, "F5519", "F5519-KHK-S", 5, color: "Khaki", size: "S");
+        WriteVariantRow(variantsSheet, 5, "F5519", "F5519-KHK-M", 5, color: "Khaki", size: "M");
+
+        var controller = CreateController(context);
+        var model = Assert.IsType<BulkImportResult>(Assert.IsType<ViewResult>(await controller.BulkUpdate(ToFormFile(workbook))).Model);
+
+        Assert.Null(model.FatalError);
+        Assert.Empty(model.Errors);
+        Assert.Equal(1, model.CreatedCount);
+        Assert.Equal(4, model.VariantsCreatedCount);
+        Assert.Equal(2, model.ProductColorsCreated); // one per distinct color, not per variant
+
+        var product = await context.Products.AsNoTracking().FirstAsync(p => p.Sku == "F5519");
+        var productColors = await context.ProductColors.AsNoTracking().Include(pc => pc.Color)
+            .Where(pc => pc.ProductId == product.Id).ToListAsync();
+        Assert.Equal(2, productColors.Count);
+        Assert.Contains(productColors, pc => pc.Color!.Name == "Black");
+        Assert.Contains(productColors, pc => pc.Color!.Name == "Khaki");
+        // Globally-unique Code, generated from the product's own SKU — never left blank (Required).
+        Assert.All(productColors, pc => Assert.StartsWith("F5519-", pc.Code));
+        Assert.Equal(productColors.Select(pc => pc.Code).Distinct().Count(), productColors.Count);
+        // Exactly one default, since the product started with none.
+        Assert.Single(productColors, pc => pc.DefaultColor);
+
+        // Every variant's ProductColorId links to the matching color's row — required so
+        // Details.cshtml's ProductColorId-keyed SKU/price lookups work once ANY ProductColor
+        // exists for this product (see BackfillProductColorsFromVariants's remarks).
+        var variants = await context.ProductVariants.AsNoTracking().Where(v => v.ProductId == product.Id).ToListAsync();
+        Assert.Equal(4, variants.Count);
+        Assert.All(variants, v =>
+        {
+            Assert.NotNull(v.ProductColorId);
+            var owningColor = productColors.First(pc => pc.Id == v.ProductColorId);
+            Assert.Equal(v.ColorId, owningColor.ColorId);
+        });
+    }
+
+    // The whole-catalog side effect this needs to work at all: re-running Bulk Update with a file
+    // that never mentions "24-7 Agility Pant" must still backfill ITS ProductColor rows, the same
+    // way it already backfills stock sums for every product system-wide (ImportVariantsSheet's
+    // existingVariants query loads the WHOLE ProductVariants table, not just matched rows) — this
+    // is what satisfies "or re-running Bulk Update" as an alternative to visiting the Edit page.
+    [Fact]
+    public async Task BulkUpdate_FileDoesNotMentionProduct_StillBackfillsThatProductsColorsToo()
+    {
+        var (context, connection) = CreateContext();
+        using var _ = connection;
+        using var __ = context;
+        var (category, merchant) = SeedCategoryAndMerchant(context);
+
+        // Mirrors "24-7 Agility Pant": seeded directly (not via Bulk Update), 7 distinct colors,
+        // Ranger Green priced differently from the rest, zero ProductColor rows — exactly the
+        // shape Data/SeedData.cs produces, and exactly what the task asks to confirm isn't broken.
+        var black = new Color { Name = "Black", HexCode = "#1c1c1c" };
+        var coyoteTan = new Color { Name = "Coyote Tan", HexCode = "#b08d57" };
+        var rangerGreen = new Color { Name = "Ranger Green", HexCode = "#4b5320" };
+        var navy = new Color { Name = "Navy", HexCode = "#1b263b" };
+        var khaki = new Color { Name = "Khaki", HexCode = "#c3b091" };
+        var slateGray = new Color { Name = "Slate Gray", HexCode = "#6c757d" };
+        var arcticWhite = new Color { Name = "Arctic White", HexCode = "#eef1ee" };
+        context.Colors.AddRange(black, coyoteTan, rangerGreen, navy, khaki, slateGray, arcticWhite);
+        var agilityPant = new Product
+        {
+            Sku = "WLM-APP-006", Name = "24-7 Agility Pant", Slug = "24-7-agility-pant", Price = 530.25m,
+            StockQuantity = 90, CategoryId = category.Id, MerchantId = merchant.Id
+        };
+        context.Products.Add(agilityPant);
+        context.SaveChanges();
+        foreach (var color in new[] { black, coyoteTan, rangerGreen, navy, khaki, slateGray, arcticWhite })
+        {
+            context.ProductVariants.Add(new ProductVariant
+            {
+                ProductId = agilityPant.Id,
+                ColorId = color.Id,
+                Sku = $"WLM-APP-006-{color.Name.Replace(" ", "")}",
+                StockQuantity = 12,
+                Price = color == rangerGreen ? 472.50m : null // untouched base price for every other color
+            });
+        }
+        context.SaveChanges();
+
+        // An unrelated new product — the uploaded file's only row — still needs a Variants sheet
+        // present so ImportVariantsSheet (and its whole-table load) actually runs.
+        using var workbook = NewWorkbookWithHeaders();
+        WriteProductRow(workbook.Worksheet("Products"), 2, "UNRELATED-001", "Unrelated Product", "Tactical Apparel", 20m, 5);
+
+        var controller = CreateController(context);
+        var model = Assert.IsType<BulkImportResult>(Assert.IsType<ViewResult>(await controller.BulkUpdate(ToFormFile(workbook))).Model);
+
+        Assert.Null(model.FatalError);
+        Assert.Empty(model.Errors);
+        Assert.Equal(7, model.ProductColorsCreated);
+
+        var productColors = await context.ProductColors.AsNoTracking().Include(pc => pc.Color)
+            .Where(pc => pc.ProductId == agilityPant.Id).ToListAsync();
+        Assert.Equal(7, productColors.Count);
+        Assert.Contains(productColors, pc => pc.Color!.Name == "Ranger Green");
+
+        // Nothing about the variants themselves changed beyond gaining a ProductColorId — Ranger
+        // Green's price override survives untouched, and the product's own base Price is untouched.
+        var variants = await context.ProductVariants.AsNoTracking().Where(v => v.ProductId == agilityPant.Id).ToListAsync();
+        Assert.All(variants, v => Assert.NotNull(v.ProductColorId));
+        var rangerGreenVariant = variants.First(v => v.ColorId == rangerGreen.Id);
+        Assert.Equal(472.50m, rangerGreenVariant.Price);
+        var reloadedProduct = await context.Products.AsNoTracking().FirstAsync(p => p.Id == agilityPant.Id);
+        Assert.Equal(530.25m, reloadedProduct.Price);
+
+        // Each variant's ProductColorId points at the row for ITS OWN color, not a mismatched one.
+        foreach (var variant in variants)
+        {
+            var owningColor = productColors.First(pc => pc.Id == variant.ProductColorId);
+            Assert.Equal(variant.ColorId, owningColor.ColorId);
+        }
+    }
+
+    [Fact]
+    public async Task BulkUpdate_ProductAlreadyHasSomeProductColors_OnlyBackfillsTheMissingColor_KeepsExistingDefault()
+    {
+        var (context, connection) = CreateContext();
+        using var _ = connection;
+        using var __ = context;
+        var (category, merchant) = SeedCategoryAndMerchant(context);
+
+        var black = new Color { Name = "Black", HexCode = "#1c1c1c" };
+        var khaki = new Color { Name = "Khaki", HexCode = "#c3b091" };
+        context.Colors.AddRange(black, khaki);
+        var product = new Product
+        {
+            Sku = "F5519", Name = "Tactical Boonie", Slug = "tactical-boonie", Price = 40m,
+            StockQuantity = 10, CategoryId = category.Id, MerchantId = merchant.Id
+        };
+        context.Products.Add(product);
+        context.SaveChanges();
+        // Black already has a real ProductColor row (e.g. from an earlier Product Importer run)
+        // and is already the default — that must survive untouched.
+        var existingBlackProductColor = new ProductColor { Code = "F5519-BLACK-EXISTING", ProductId = product.Id, ColorId = black.Id, DefaultColor = true, DisplayOrder = 0 };
+        context.ProductColors.Add(existingBlackProductColor);
+        context.SaveChanges(); // must commit before referencing .Id below — it's still 0 until this runs
+        context.ProductVariants.AddRange(
+            new ProductVariant { ProductId = product.Id, ColorId = black.Id, ProductColorId = existingBlackProductColor.Id, Sku = "F5519-BLK", StockQuantity = 5 },
+            new ProductVariant { ProductId = product.Id, ColorId = khaki.Id, Sku = "F5519-KHK", StockQuantity = 5 }); // Khaki never got its ProductColor row
+        context.SaveChanges();
+
+        using var workbook = NewWorkbookWithHeaders();
+        WriteProductRow(workbook.Worksheet("Products"), 2, "F5519", "Tactical Boonie", "Tactical Apparel", 40m, 10);
+
+        var controller = CreateController(context);
+        var model = Assert.IsType<BulkImportResult>(Assert.IsType<ViewResult>(await controller.BulkUpdate(ToFormFile(workbook))).Model);
+
+        Assert.Null(model.FatalError);
+        Assert.Equal(1, model.ProductColorsCreated); // only Khaki
+
+        var productColors = await context.ProductColors.AsNoTracking().Include(pc => pc.Color)
+            .Where(pc => pc.ProductId == product.Id).ToListAsync();
+        Assert.Equal(2, productColors.Count);
+        var reloadedBlack = productColors.First(pc => pc.ColorId == black.Id);
+        Assert.Equal("F5519-BLACK-EXISTING", reloadedBlack.Code); // untouched, not recreated
+        Assert.True(reloadedBlack.DefaultColor);
+        var newKhaki = productColors.First(pc => pc.ColorId == khaki.Id);
+        Assert.False(newKhaki.DefaultColor); // Black already had the default — Khaki doesn't steal it
+    }
 }

@@ -145,6 +145,36 @@ public class ProductsController : AdminBaseController
             return NotFound();
         }
 
+        // Self-healing backfill: Bulk Update (below) and the original curated/bulk-generated
+        // catalog in Data/SeedData.cs both only ever set ProductVariant.ColorId — never the
+        // ProductColor join row this page's "Vendor Color Codes" table (further down this view)
+        // requires at least one of to render at all. Runs every time this page loads (cheap —
+        // one query when there's nothing to do) so a product self-heals the moment an admin opens
+        // its Edit page, without needing SQL or a fresh Bulk Update upload. See
+        // BackfillProductColorsFromVariants for why this is more than just inserting a row.
+        var variantsWithColor = await _context.ProductVariants
+            .Include(v => v.Color)
+            .Where(v => v.ProductId == id && v.ColorId != null)
+            .ToListAsync();
+        if (variantsWithColor.Count > 0)
+        {
+            var existingProductColors = await _context.ProductColors
+                .Where(pc => pc.ProductId == id)
+                .ToListAsync();
+            var variantsByColor = variantsWithColor
+                .Where(v => v.Color != null)
+                .GroupBy(v => v.Color!)
+                .ToDictionary(g => g.Key, g => g.ToList());
+            var addedAny = BackfillProductColorsFromVariants(product, variantsByColor, existingProductColors, out var newProductColors);
+            if (addedAny)
+            {
+                var usedCodes = new HashSet<string>(await _context.ProductColors.Select(pc => pc.Code).ToListAsync(), StringComparer.OrdinalIgnoreCase);
+                AssignProductColorCodes(product.Sku, newProductColors, usedCodes);
+                _context.ProductColors.AddRange(newProductColors);
+                await _context.SaveChangesAsync();
+            }
+        }
+
         ViewBag.Categories = await _context.Categories.OrderBy(c => c.Name).ToListAsync();
         ViewBag.Subcategories = await _context.Subcategories.OrderBy(s => s.Name).ToListAsync();
         ViewBag.ProductColors = await _context.ProductColors
@@ -189,11 +219,14 @@ public class ProductsController : AdminBaseController
         }
 
         existing.Name = product.Name;
+        existing.NameAr = product.NameAr;
         existing.Slug = product.Slug;
         existing.CategoryId = product.CategoryId;
         existing.SubcategoryId = product.SubcategoryId;
         existing.ShortDescription = product.ShortDescription;
+        existing.ShortDescriptionAr = product.ShortDescriptionAr;
         existing.Description = product.Description;
+        existing.DescriptionAr = product.DescriptionAr;
         existing.Price = product.Price;
         existing.WholesalePrice = product.WholesalePrice;
         existing.Sku = product.Sku;
@@ -781,6 +814,18 @@ public class ProductsController : AdminBaseController
                 // upload touched — which is what makes the sum correct for a partial re-upload.
                 var productsById = products.ToDictionary(p => p.Id);
                 var variantStockByProduct = new Dictionary<Product, int>();
+                // Same (product, color) -> variants grouping BackfillProductColorsFromVariants
+                // needs, built from this same ChangeTracker pass rather than a second one — see
+                // that method's own remarks for why this can't just query product.Variants/
+                // product.ProductColors: a product created earlier in this same attempt has no
+                // database row to query yet, and — same reasoning as owningProduct below — a
+                // pre-existing product was never queried with .Include(p => p.Variants) either.
+                // Keyed by the Color OBJECT, not ColorId: a color created earlier in this same
+                // attempt (see ImportVariantsSheet) has Id 0 until SaveChanges runs, same as a
+                // brand-new product's Id above — an int key would collide every new color onto
+                // the same "0" bucket. colorsByName in ImportVariantsSheet reuses one Color
+                // instance per name throughout a run, so reference equality here is reliable.
+                var variantsByProductAndColor = new Dictionary<Product, Dictionary<Color, List<ProductVariant>>>();
                 foreach (var entry in _context.ChangeTracker.Entries<ProductVariant>())
                 {
                     var trackedVariant = entry.Entity;
@@ -797,6 +842,27 @@ public class ProductsController : AdminBaseController
                     }
 
                     variantStockByProduct[owningProduct] = variantStockByProduct.GetValueOrDefault(owningProduct) + trackedVariant.StockQuantity;
+
+                    // A variant just created in this attempt has its Color NAVIGATION set (see
+                    // ImportVariantsSheet: `Color = color`) but not necessarily the ColorId
+                    // scalar (EF only resolves that from the navigation at SaveChanges time), so
+                    // .Color is the only reliable signal for that case. A pre-existing variant now
+                    // always has .Color populated too (ImportVariantsSheet's existingVariants
+                    // query Include()s it), so this covers both without needing a ColorId fallback.
+                    if (trackedVariant.Color is { } trackedColor)
+                    {
+                        if (!variantsByProductAndColor.TryGetValue(owningProduct, out var byColor))
+                        {
+                            byColor = new Dictionary<Color, List<ProductVariant>>();
+                            variantsByProductAndColor[owningProduct] = byColor;
+                        }
+                        if (!byColor.TryGetValue(trackedColor, out var colorVariants))
+                        {
+                            colorVariants = new List<ProductVariant>();
+                            byColor[trackedColor] = colorVariants;
+                        }
+                        colorVariants.Add(trackedVariant);
+                    }
                 }
 
                 foreach (var (productWithVariants, totalVariantStock) in variantStockByProduct)
@@ -804,7 +870,39 @@ public class ProductsController : AdminBaseController
                     productWithVariants.StockQuantity = totalVariantStock;
                 }
 
-                if (result.UpdatedCount > 0 || result.CreatedCount > 0 || result.VariantsUpdatedCount > 0 || result.VariantsCreatedCount > 0)
+                // Backfills ProductColor rows for EVERY product with a color-bearing variant, not
+                // just ones this file's rows mention — a natural, deliberate consequence of
+                // variantsByProductAndColor being built from the whole tracked ProductVariant set
+                // above (same as the stock-sum backfill it piggybacks on). This is what lets
+                // "re-running Bulk Update" (even with a file that doesn't mention a given product)
+                // heal that product's missing Vendor Color Codes table, same as visiting its Edit
+                // page does — see BackfillProductColorsFromVariants's own remarks.
+                if (variantsByProductAndColor.Count > 0)
+                {
+                    var touchedExistingProductIds = variantsByProductAndColor.Keys.Where(p => p.Id != 0).Select(p => p.Id).ToHashSet();
+                    var existingProductColorsByProductId = touchedExistingProductIds.Count == 0
+                        ? new Dictionary<int, List<ProductColor>>()
+                        : (await _context.ProductColors.Where(pc => touchedExistingProductIds.Contains(pc.ProductId)).ToListAsync())
+                            .GroupBy(pc => pc.ProductId)
+                            .ToDictionary(g => g.Key, g => g.ToList());
+                    var usedProductColorCodes = new HashSet<string>(
+                        await _context.ProductColors.Select(pc => pc.Code).ToListAsync(), StringComparer.OrdinalIgnoreCase);
+
+                    foreach (var (productWithColors, byColor) in variantsByProductAndColor)
+                    {
+                        var existingColors = productWithColors.Id != 0 && existingProductColorsByProductId.TryGetValue(productWithColors.Id, out var epc)
+                            ? epc
+                            : new List<ProductColor>();
+                        if (BackfillProductColorsFromVariants(productWithColors, byColor, existingColors, out var newProductColors))
+                        {
+                            AssignProductColorCodes(productWithColors.Sku, newProductColors, usedProductColorCodes);
+                            _context.ProductColors.AddRange(newProductColors);
+                            result.ProductColorsCreated += newProductColors.Count;
+                        }
+                    }
+                }
+
+                if (result.UpdatedCount > 0 || result.CreatedCount > 0 || result.VariantsUpdatedCount > 0 || result.VariantsCreatedCount > 0 || result.ProductColorsCreated > 0)
                 {
                     await _context.SaveChangesAsync();
                 }
@@ -845,6 +943,92 @@ public class ProductsController : AdminBaseController
         }
 
         return View(result);
+    }
+
+    // Bulk Update (ImportVariantsSheet, below) and the original curated/bulk-generated catalog
+    // in Data/SeedData.cs both only ever set ProductVariant.ColorId, never the ProductColor join
+    // row — but Views/Products/Details.cshtml's per-color gallery/SKU/price lookups all switch to
+    // keying by ProductColorId the moment a product has ANY ProductColor row at all
+    // (hasProductColors), and Areas/Admin/Views/Products/Edit.cshtml's "Vendor Color Codes" table
+    // only renders when ProductColors.Count > 0. A product with variants but zero ProductColor
+    // rows gets neither — this backfills one ProductColor row per (product, color) a variant
+    // references that has no ProductColor row yet, links every matching variant's ProductColor to
+    // it (critical: without this second half, a product that already had SOME ProductColor rows
+    // would flip into the ProductColorId-keyed PDP code path the moment even one more color is
+    // backfilled, while its OTHER variants' ProductColorId stayed null — breaking their SKU/price
+    // lookups), and returns whether anything was added. Code is deliberately left unset here —
+    // see AssignProductColorCodes — since callers gather the codes-uniqueness set differently
+    // (BulkUpdate backfills many products in one pass and loads it once; Edit backfills one).
+    internal static bool BackfillProductColorsFromVariants(
+        Product product,
+        IReadOnlyDictionary<Color, List<ProductVariant>> variantsByColor,
+        IReadOnlyList<ProductColor> existingProductColors,
+        out List<ProductColor> newProductColors)
+    {
+        newProductColors = new List<ProductColor>();
+        var existingColorIds = existingProductColors.Select(pc => pc.ColorId).ToHashSet();
+        var hasExistingDefault = existingProductColors.Any(pc => pc.DefaultColor);
+        var nextDisplayOrder = existingProductColors.Count == 0 ? 0 : existingProductColors.Max(pc => pc.DisplayOrder) + 1;
+
+        foreach (var (color, variants) in variantsByColor)
+        {
+            // color.Id is 0 for a color created earlier in this same Bulk Update attempt (no
+            // database row yet — see ImportVariantsSheet) — which can never already be in
+            // existingColorIds (a real ProductColor.ColorId always references a saved Color), so
+            // this check is correct for both a brand-new and an already-saved color alike.
+            if (existingColorIds.Contains(color.Id))
+            {
+                continue;
+            }
+
+            var productColor = new ProductColor
+            {
+                Product = product,
+                Color = color,
+                DisplayOrder = nextDisplayOrder++,
+                DefaultColor = !hasExistingDefault && newProductColors.Count == 0,
+                Active = true
+            };
+            product.ProductColors.Add(productColor);
+            newProductColors.Add(productColor);
+
+            foreach (var variant in variants)
+            {
+                variant.ProductColor = productColor;
+            }
+        }
+
+        return newProductColors.Count > 0;
+    }
+
+    // ProductColor.Code has a database-wide unique index (see ApplicationDbContext), not one
+    // scoped per product — generated from this product's own (already-unique) Sku plus the
+    // color's own Code or name, so a collision with an unrelated product is effectively
+    // impossible; the numeric-suffix fallback below only guards the theoretical case where it
+    // still happens, same defensive style as UniqueSlug elsewhere in this file.
+    internal static void AssignProductColorCodes(string productSku, IEnumerable<ProductColor> newProductColors, HashSet<string> usedCodes)
+    {
+        foreach (var productColor in newProductColors)
+        {
+            productColor.Code = GenerateProductColorCode(productSku, productColor.Color!, usedCodes);
+        }
+    }
+
+    private static string GenerateProductColorCode(string productSku, Color color, HashSet<string> usedCodes)
+    {
+        var colorPart = Slugify(!string.IsNullOrWhiteSpace(color.Code) ? color.Code! : color.Name).ToUpperInvariant();
+        var baseCode = $"{productSku}-{colorPart}";
+        if (baseCode.Length > 60)
+        {
+            baseCode = baseCode[..60];
+        }
+        var candidate = baseCode;
+        var suffix = 2;
+        while (!usedCodes.Add(candidate))
+        {
+            candidate = $"{baseCode}-{suffix++}";
+        }
+        return candidate;
     }
 
     // Known launch-catalog color names mapped to their real swatch hex — used when a bulk
@@ -909,7 +1093,12 @@ public class ProductsController : AdminBaseController
             return;
         }
 
-        var existingVariants = (await _context.ProductVariants.ToListAsync())
+        // .Include(v => v.Color): loaded here, not just for this sheet's own row processing below
+        // (which never touches Color/Size on an update) — BackfillProductColorsFromVariants
+        // (called from BulkUpdate, after this method returns) needs every tracked variant's Color
+        // navigation populated to name a backfilled ProductColor row after, including variants
+        // this file's rows don't even mention (see that method's remarks).
+        var existingVariants = (await _context.ProductVariants.Include(v => v.Color).ToListAsync())
             .GroupBy(v => v.Sku.Trim(), StringComparer.OrdinalIgnoreCase)
             .ToDictionary(g => g.Key, g => g.First(), StringComparer.OrdinalIgnoreCase);
 

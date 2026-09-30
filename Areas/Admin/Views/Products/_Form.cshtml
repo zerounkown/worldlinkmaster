@@ -22,6 +22,11 @@
     <span asp-validation-for="Name" class="text-danger"></span>
 </div>
 <div class="mb-3">
+    <label asp-for="NameAr" class="form-label">@Localizer["Name (Arabic)"]</label>
+    <input asp-for="NameAr" class="form-control" dir="rtl" />
+    <span asp-validation-for="NameAr" class="text-danger"></span>
+</div>
+<div class="mb-3">
     <label asp-for="Slug" class="form-label">@Localizer["Slug"]</label>
     <input asp-for="Slug" class="form-control" />
     <span asp-validation-for="Slug" class="text-danger"></span>
@@ -41,8 +46,16 @@
     <input asp-for="ShortDescription" class="form-control" />
 </div>
 <div class="mb-3">
+    <label asp-for="ShortDescriptionAr" class="form-label">@Localizer["Short Description (Arabic)"]</label>
+    <input asp-for="ShortDescriptionAr" class="form-control" dir="rtl" />
+</div>
+<div class="mb-3">
     <label asp-for="Description" class="form-label">@Localizer["Description"]</label>
     <textarea asp-for="Description" class="form-control" rows="4"></textarea>
+</div>
+<div class="mb-3">
+    <label asp-for="DescriptionAr" class="form-label">@Localizer["Description (Arabic)"]</label>
+    <textarea asp-for="DescriptionAr" class="form-control" rows="4" dir="rtl"></textarea>
 </div>
 <div class="row">
     <div class="col-12 col-sm-4 mb-3">

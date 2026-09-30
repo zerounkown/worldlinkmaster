@@ -2,7 +2,7 @@
 @model BulkImportResult
 @{
     ViewData["Title"] = Localizer["Bulk Update (Excel)"];
-    var hasResult = Model.UpdatedCount > 0 || Model.CreatedCount > 0 || Model.VariantsUpdatedCount > 0 || Model.VariantsCreatedCount > 0 || Model.Errors.Count > 0;
+    var hasResult = Model.UpdatedCount > 0 || Model.CreatedCount > 0 || Model.VariantsUpdatedCount > 0 || Model.VariantsCreatedCount > 0 || Model.ProductColorsCreated > 0 || Model.Errors.Count > 0;
 }
 
 <h1>@Localizer["Bulk Update & Add Products (Excel)"]</h1>
@@ -35,6 +35,10 @@
         <div><strong>@Localizer["{0} new product(s) created.", Model.CreatedCount]</strong></div>
         <div><strong>@Localizer["{0} variant(s) updated.", Model.VariantsUpdatedCount]</strong></div>
         <div><strong>@Localizer["{0} new variant(s) created.", Model.VariantsCreatedCount]</strong></div>
+        @if (Model.ProductColorsCreated > 0)
+        {
+            <div><strong>@Localizer["{0} product color(s) backfilled from variant colors.", Model.ProductColorsCreated]</strong></div>
+        }
         <div class="mt-2 text-muted small">@Localizer["Reminder: any product that has variants always has its Stock Quantity set to the sum of its variants' stock — the Products sheet's Stock Quantity value is ignored for that product."]</div>
 
         @if (Model.Errors.Count > 0)
