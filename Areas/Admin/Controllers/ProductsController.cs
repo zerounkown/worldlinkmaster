@@ -368,6 +368,18 @@ public class ProductsController : AdminBaseController
             .OrderBy(p => p.Category!.Name).ThenBy(p => p.Name)
             .ToListAsync();
 
+        // Product.StockQuantity is only ever RE-synced to the sum of its variants' stock as a
+        // side effect of a successful Bulk Update run (see the ChangeTracker-based backfill in
+        // BulkUpdate) — it isn't a computed column, so it can legitimately go stale (e.g. a
+        // variant's stock edited some other way, or a past import that never got that far). A
+        // GROUP BY aggregate, not .Include(p => p.Variants), so this stays one extra query
+        // returning one row per product-with-variants rather than loading every variant row in
+        // full just to sum one field.
+        var variantStockByProductId = await _context.ProductVariants
+            .GroupBy(v => v.ProductId)
+            .Select(g => new { ProductId = g.Key, TotalStock = g.Sum(v => v.StockQuantity) })
+            .ToDictionaryAsync(x => x.ProductId, x => x.TotalStock);
+
         using var workbook = new XLWorkbook();
         var sheet = workbook.Worksheets.Add("Products");
 
@@ -393,7 +405,7 @@ public class ProductsController : AdminBaseController
                 sheet.Cell(row, 6).Value = Math.Round(product.WholesalePrice.Value / 1.05m, 2);
                 sheet.Cell(row, 7).Value = product.WholesalePrice.Value;
             }
-            sheet.Cell(row, 8).Value = product.StockQuantity;
+            sheet.Cell(row, 8).Value = variantStockByProductId.TryGetValue(product.Id, out var summedVariantStock) ? summedVariantStock : product.StockQuantity;
             sheet.Cell(row, 9).Value = product.ImageUrl;
             sheet.Cell(row, 10).Value = product.NameAr;
             sheet.Cell(row, 11).Value = product.ShortDescription;
@@ -664,6 +676,39 @@ public class ProductsController : AdminBaseController
                 var usedSlugs = new HashSet<string>(products.Select(p => p.Slug), StringComparer.OrdinalIgnoreCase);
                 var newProducts = new List<Product>();
 
+                // A product that has variants always has its Stock Quantity set to the sum of
+                // its variants' stock (see the ChangeTracker-based backfill after
+                // ImportVariantsSheet runs, further down) — so the Products sheet's own Stock
+                // Quantity cell for such a product is never actually USED, and shouldn't be
+                // REQUIRED either: a blank cell (the natural thing to leave blank on an export,
+                // since the site itself ignores it) must not fail the whole row. Two sources
+                // count as "has variants": already does, in the database (from a previous
+                // import) — productIdsWithExistingVariants — or will, once this same file's
+                // Variants sheet is processed — skusWithVariantsInFile, scanned here (rather than
+                // waiting for ImportVariantsSheet, which runs AFTER this loop and needs
+                // productsBySku fully populated first, including brand-new products this loop
+                // itself creates) since only the raw "Product Sku (Parent)" column text is needed.
+                var skusWithVariantsInFile = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                if (workbook.Worksheets.Contains("Variants"))
+                {
+                    var variantsSheetForScan = workbook.Worksheet("Variants");
+                    var variantsHeadersForScan = MapHeaders(variantsSheetForScan);
+                    var parentSkuColForScan = FindColumn(variantsHeadersForScan, "Product Sku (Parent)", "Parent Sku", "SKU الأساسي");
+                    if (parentSkuColForScan != null)
+                    {
+                        foreach (var variantRow in variantsSheetForScan.RowsUsed().Skip(1))
+                        {
+                            var parentSkuForScan = variantRow.Cell(parentSkuColForScan.Value).GetString().Trim();
+                            if (!string.IsNullOrWhiteSpace(parentSkuForScan))
+                            {
+                                skusWithVariantsInFile.Add(parentSkuForScan);
+                            }
+                        }
+                    }
+                }
+                var productIdsWithExistingVariants = new HashSet<int>(
+                    await _context.ProductVariants.Select(v => v.ProductId).Distinct().ToListAsync());
+
                 foreach (var row in sheet.RowsUsed().Skip(1))
                 {
                     var rowNum = row.RowNumber();
@@ -699,10 +744,22 @@ public class ProductsController : AdminBaseController
                     }
                     decimal? wholesale = hasWholesaleCell ? wholesaleValue : null;
 
-                    if (!TryReadInt(row.Cell(stockCol.Value), out var stock) || stock < 0)
+                    // For a product that has (or, per skusWithVariantsInFile, is about to gain)
+                    // variants, this cell is read on a best-effort basis only — never required,
+                    // never grounds to skip the row — since its value is always overridden by the
+                    // variant-sum backfill regardless of what ends up here. stock is left at 0
+                    // (a harmless placeholder) when the cell is blank/invalid for such a product.
+                    var stockCellReadOk = TryReadInt(row.Cell(stockCol.Value), out var stock) && stock >= 0;
+                    var willHaveVariants = skusWithVariantsInFile.Contains(sku)
+                        || (productsBySku.TryGetValue(sku, out var productForVariantCheck) && productIdsWithExistingVariants.Contains(productForVariantCheck.Id));
+                    if (!stockCellReadOk)
                     {
-                        result.Errors.Add($"Products row {rowNum} (SKU {sku}): invalid Stock Quantity value.");
-                        continue;
+                        if (!willHaveVariants)
+                        {
+                            result.Errors.Add($"Products row {rowNum} (SKU {sku}): invalid Stock Quantity value.");
+                            continue;
+                        }
+                        stock = 0;
                     }
 
                     // Optional classification columns. Blank means "leave unchanged" on an update
