@@ -38,7 +38,7 @@
 
 @if (showCategoryHero)
 {
-    <div class="page-banner page-banner-category @(heroHasImage ? "page-banner-category-photo" : "")" style="@(heroHasImage ? $"background-image: linear-gradient(90deg, rgba(5,5,5,0.75) 0%, rgba(5,5,5,0.45) 55%, rgba(5,5,5,0.15) 100%), url('{heroImageUrl}');" : "")">
+    <div class="page-banner page-banner-compact page-banner-category @(heroHasImage ? "page-banner-category-photo" : "")" style="@(heroHasImage ? $"background-image: linear-gradient(90deg, rgba(5,5,5,0.75) 0%, rgba(5,5,5,0.45) 55%, rgba(5,5,5,0.15) 100%), url('{heroImageUrl}');" : "")">
         <div class="container-listing">
             <h1 class="category-hero-title">@(currentSubcategory?.LocalizedName() ?? currentCategory!.LocalizedName())</h1>
             @if (!string.IsNullOrWhiteSpace(heroDescription))
@@ -97,7 +97,7 @@
 }
 else
 {
-    <div class="page-banner">
+    <div class="page-banner page-banner-compact">
         <div class="container-listing">
             <h1>@(selectedBrandForTitle?.LocalizedName() ?? Localizer["All Products"])</h1>
             @if (!string.IsNullOrWhiteSpace(Model.SearchTerm))
