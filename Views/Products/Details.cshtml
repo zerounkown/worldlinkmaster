@@ -102,21 +102,32 @@
         // swatch even when the thumbnail came from Shared media, so clicking a thumbnail can
         // select the matching color button and keep the two controls in sync.
         //
-        // Also builds colorThumbItems: exactly one representative (front/IsColorMain) photo per
-        // color, fixed regardless of which color is selected. The left gallery panel for
-        // multi-color products always shows these Model.ProductColors.Count items — no per-color
-        // angle swapping — with clicking one selecting that color, same as the swatches above
-        // Size. (This intentionally diverges from Media Rules M002/M003 for the Count > 1 case;
-        // single-color products are untouched and keep full multi-angle browsing below.)
+        // Also builds colorThumbItems: EVERY one of a color's own real photos (front, then any
+        // extra "-2"/"-3" angles, main first — same DisplayOrder ProductMediaOrderingHelper
+        // maintains), for every color in Model.ProductColors order, concatenated one color after
+        // another. This used to be exactly one representative (front/IsColorMain) photo per
+        // color — the actual bug this loop now fixes was that a color's OTHER real photos never
+        // appeared anywhere in the gallery at all, only its first one. A color with no real Media
+        // of its own still contributes exactly one item, via the same SwatchImageUrl ->
+        // variant-image -> Product.ImageUrl fallback "combined" below uses — so a product with
+        // only ever one photo per color (e.g. "24-7 Agility Pant", which has zero ProductMedia
+        // rows at all — see Data/SeedData.cs) still gets exactly one thumbnail per color,
+        // unchanged from before this fix. Every item is tagged with its OWNING color's Id
+        // directly (not looked up by URL the way ToGalleryItem below does) so a secondary angle
+        // is exactly as reliably traceable back to its color as the main one is — without that,
+        // navigating onto a non-main thumbnail of a color OTHER than the one currently selected
+        // would leave the page's selected-color state stale (see syncColorFromThumb in
+        // product-gallery.js, which silently no-ops on a null colorId).
         var colorIdByUrl = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
         foreach (var pc in Model.ProductColors)
         {
-            var ownMedia = Model.Media
+            var ownMediaItems = Model.Media
                 .Where(m => m.ProductColorId == pc.Id && m.ShowInGallery && ImagePlaceholder.IsRealImageUrl(m.MediaUrl))
                 .OrderByDescending(m => m.IsColorMain)
                 .ThenBy(m => m.DisplayOrder)
-                .FirstOrDefault();
-            var ownUrl = ownMedia?.MediaUrl
+                .ToList();
+
+            var ownUrl = ownMediaItems.FirstOrDefault()?.MediaUrl
                 ?? (ImagePlaceholder.IsRealImageUrl(pc.SwatchImageUrl) ? pc.SwatchImageUrl : null)
                 ?? (variantImageByColorId.TryGetValue(pc.ColorId, out var thumbFallbackUrl) ? thumbFallbackUrl : null)
                 ?? (ImagePlaceholder.IsRealImageUrl(Model.ImageUrl) ? Model.ImageUrl : null);
@@ -125,14 +136,31 @@
                 colorIdByUrl[ownUrl] = pc.Id;
             }
 
-            colorThumbItems.Add(new Dictionary<string, string?>
+            if (ownMediaItems.Count > 0)
             {
-                ["type"] = ownMedia?.MediaType ?? "Image",
-                ["url"] = ownUrl ?? ImagePlaceholder.DataUri,
-                ["thumb"] = ownMedia?.ThumbnailUrl ?? ownUrl ?? ImagePlaceholder.DataUri,
-                ["alt"] = pc.Color?.Name,
-                ["colorId"] = pc.Id.ToString()
-            });
+                foreach (var media in ownMediaItems)
+                {
+                    colorThumbItems.Add(new Dictionary<string, string?>
+                    {
+                        ["type"] = media.MediaType,
+                        ["url"] = media.MediaUrl,
+                        ["thumb"] = media.ThumbnailUrl ?? media.MediaUrl,
+                        ["alt"] = (isArabicUi ? (media.AltTextAr ?? media.AltTextEn) : (media.AltTextEn ?? media.AltTextAr)) ?? pc.Color?.Name,
+                        ["colorId"] = pc.Id.ToString()
+                    });
+                }
+            }
+            else
+            {
+                colorThumbItems.Add(new Dictionary<string, string?>
+                {
+                    ["type"] = "Image",
+                    ["url"] = ownUrl ?? ImagePlaceholder.DataUri,
+                    ["thumb"] = ownUrl ?? ImagePlaceholder.DataUri,
+                    ["alt"] = pc.Color?.Name,
+                    ["colorId"] = pc.Id.ToString()
+                });
+            }
         }
 
         Dictionary<string, string?> ToGalleryItem(ProductMedia m) => new()

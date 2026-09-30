@@ -813,8 +813,11 @@
 
     // Fades the lightbox image out, swaps src, fades back in — 0.3s each way, matching the
     // main image's own transition on #zoomLightbox img. Also keeps the underlying page's main
-    // image + active thumb in sync live, so closing the lightbox (by any method) always leaves
-    // the page showing whatever the customer last navigated to, not the image it was opened on.
+    // image + active thumb + selected color in sync live, so closing the lightbox (by any
+    // method) always leaves the page showing whatever the customer last navigated to, not the
+    // image (or color) it was opened on — lightbox prev/next, keyboard arrows, and swipe all
+    // funnel through here (see lightboxGoTo), so this one call covers all three the same way
+    // navigateMain already covers the main-image arrows.
     function renderLightboxImage(withFade) {
         var item = lightboxItems[lightboxIndex];
         if (!item) return;
@@ -832,6 +835,7 @@
         showMainItem(item.url, item.type);
         var matchingThumb = thumbsContainer ? thumbsContainer.querySelector('.product-thumb[data-full="' + CSS.escape(item.url) + '"]') : null;
         setActiveThumb(matchingThumb);
+        syncColorFromThumb(matchingThumb);
     }
 
     function lightboxGoTo(index) {
