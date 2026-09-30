@@ -1651,4 +1651,179 @@ public class ProductsControllerBulkUpdateTests
         Assert.Equal(0, model.VariantsCreatedCount);
         Assert.False(await context.ProductVariants.AnyAsync(v => v.Sku == "F5519-NOCOLOR"));
     }
+
+    // --- Products sheet Stock Quantity, for a product that has (or gains) variants -----------
+    // Bug report: F5519 has variants, so its own Stock Quantity is supposed to be ignored (the
+    // site always uses the sum of its variants' stock instead — see the ChangeTracker backfill
+    // in BulkUpdate). But a blank Stock Quantity cell for F5519 failed the WHOLE row with
+    // "invalid Stock Quantity value" — the validation never accounted for "this product has
+    // variants, so this cell doesn't matter" at all, requiring a value regardless.
+
+    [Fact]
+    public async Task BulkUpdate_ProductAlreadyHasVariantsInDatabase_BlankStockQuantityCell_DoesNotFailTheRow()
+    {
+        var (context, connection) = CreateContext();
+        using var _ = connection;
+        using var __ = context;
+        var (category, merchant) = SeedCategoryAndMerchant(context);
+
+        var product = new Product
+        {
+            Sku = "F5519", Name = "Tactical Boonie", Slug = "tactical-boonie", Price = 40m,
+            StockQuantity = 999, CategoryId = category.Id, MerchantId = merchant.Id
+        };
+        context.Products.Add(product);
+        context.SaveChanges();
+        context.ProductVariants.AddRange(
+            new ProductVariant { ProductId = product.Id, Sku = "F5519-BLK", StockQuantity = 20 },
+            new ProductVariant { ProductId = product.Id, Sku = "F5519-KHK", StockQuantity = 13 });
+        context.SaveChanges();
+
+        using var workbook = NewWorkbookWithHeaders();
+        // Stock Quantity (column F) deliberately left blank — the exact bug report shape. Only a
+        // Products sheet row; no Variants sheet row for F5519 in this file at all (matching the
+        // report: this file is just fixing OTHER columns, not touching variants).
+        WriteProductRow(workbook.Worksheet("Products"), 2, "F5519", "Tactical Boonie", "Tactical Apparel", 45m, 0);
+        workbook.Worksheet("Products").Cell(2, ColumnOf(workbook.Worksheet("Products"), "Stock Quantity")).Clear();
+
+        var controller = CreateController(context);
+        var model = Assert.IsType<BulkImportResult>(Assert.IsType<ViewResult>(await controller.BulkUpdate(ToFormFile(workbook))).Model);
+
+        Assert.Null(model.FatalError);
+        Assert.Empty(model.Errors);
+        Assert.Equal(1, model.UpdatedCount);
+
+        var reloaded = await context.Products.AsNoTracking().FirstAsync(p => p.Sku == "F5519");
+        Assert.Equal(45m, reloaded.Price); // the rest of the row still applied
+        Assert.Equal(33, reloaded.StockQuantity); // sum of variants (20+13), never the blank cell
+    }
+
+    [Fact]
+    public async Task BulkUpdate_ProductGainingVariantsInThisSameFile_BlankStockQuantityCell_DoesNotFailTheRow()
+    {
+        var (context, connection) = CreateContext();
+        using var _ = connection;
+        using var __ = context;
+        SeedCategoryAndMerchant(context);
+
+        using var workbook = NewWorkbookWithHeaders();
+        var productsSheet = workbook.Worksheet("Products");
+        WriteProductRow(productsSheet, 2, "NEW-VAR-001", "New Boonie", "Tactical Apparel", 45m, 0);
+        productsSheet.Cell(2, ColumnOf(productsSheet, "Stock Quantity")).Clear();
+        WriteVariantRow(workbook.Worksheet("Variants"), 2, "NEW-VAR-001", "NEW-VAR-001-BLK", 20);
+        WriteVariantRow(workbook.Worksheet("Variants"), 3, "NEW-VAR-001", "NEW-VAR-001-KHK", 13);
+
+        var controller = CreateController(context);
+        var model = Assert.IsType<BulkImportResult>(Assert.IsType<ViewResult>(await controller.BulkUpdate(ToFormFile(workbook))).Model);
+
+        Assert.Null(model.FatalError);
+        Assert.Empty(model.Errors);
+        Assert.Equal(1, model.CreatedCount);
+        Assert.Equal(2, model.VariantsCreatedCount);
+
+        var reloaded = await context.Products.AsNoTracking().FirstAsync(p => p.Sku == "NEW-VAR-001");
+        Assert.Equal(33, reloaded.StockQuantity);
+    }
+
+    // Regression guard: a product with NO variants (and not gaining any in this file) must keep
+    // requiring a valid Stock Quantity — this fix only relaxes the rule for products variants
+    // actually make the cell moot for.
+    [Fact]
+    public async Task BulkUpdate_ProductWithNoVariants_BlankStockQuantityCell_StillFailsTheRow()
+    {
+        var (context, connection) = CreateContext();
+        using var _ = connection;
+        using var __ = context;
+        var (category, merchant) = SeedCategoryAndMerchant(context);
+        var product = new Product
+        {
+            Sku = "152", Name = "Field Pants", Slug = "field-pants", Price = 100m,
+            StockQuantity = 50, CategoryId = category.Id, MerchantId = merchant.Id
+        };
+        context.Products.Add(product);
+        context.SaveChanges();
+
+        using var workbook = NewWorkbookWithHeaders();
+        var productsSheet = workbook.Worksheet("Products");
+        WriteProductRow(productsSheet, 2, "152", "Field Pants", "Tactical Apparel", 150m, 0);
+        productsSheet.Cell(2, ColumnOf(productsSheet, "Stock Quantity")).Clear();
+
+        var controller = CreateController(context);
+        var model = Assert.IsType<BulkImportResult>(Assert.IsType<ViewResult>(await controller.BulkUpdate(ToFormFile(workbook))).Model);
+
+        Assert.Null(model.FatalError);
+        Assert.Single(model.Errors);
+        Assert.Contains("invalid Stock Quantity value", model.Errors[0]);
+        Assert.Equal(0, model.UpdatedCount);
+
+        var reloaded = await context.Products.AsNoTracking().FirstAsync(p => p.Sku == "152");
+        Assert.Equal(100m, reloaded.Price); // whole row skipped, nothing applied
+        Assert.Equal(50, reloaded.StockQuantity);
+    }
+
+    // --- Export: Stock Quantity reflects the LIVE variant sum, not a possibly-stale field -----
+    // Bug report continuation: the exported Stock Quantity cell for F5519 didn't show its real
+    // (summed) stock. Product.StockQuantity is only ever re-synced to that sum as a side effect
+    // of a successful Bulk Update run — it's a plain stored field, not a computed one — so it can
+    // legitimately go stale (e.g. every recent import attempt for F5519 failing on the bug above
+    // meant its stored field never got the chance to catch up). Export now computes the sum
+    // directly instead of trusting the stored field.
+
+    [Fact]
+    public async Task ExportExcel_ProductWithVariants_WritesTheLiveSummedStock_NotTheStaleStoredField()
+    {
+        var (context, connection) = CreateContext();
+        using var _ = connection;
+        using var __ = context;
+        var (category, merchant) = SeedCategoryAndMerchant(context);
+
+        var product = new Product
+        {
+            Sku = "F5519", Name = "Tactical Boonie", Slug = "tactical-boonie", Price = 40m,
+            StockQuantity = 999, // deliberately stale/wrong — variants below actually sum to 33
+            CategoryId = category.Id, MerchantId = merchant.Id
+        };
+        context.Products.Add(product);
+        context.SaveChanges();
+        context.ProductVariants.AddRange(
+            new ProductVariant { ProductId = product.Id, Sku = "F5519-BLK", StockQuantity = 20 },
+            new ProductVariant { ProductId = product.Id, Sku = "F5519-KHK", StockQuantity = 13 });
+        context.SaveChanges();
+
+        var controller = CreateController(context);
+        var fileResult = Assert.IsType<FileContentResult>(await controller.ExportExcel());
+        using var exported = new XLWorkbook(new MemoryStream(fileResult.FileContents));
+        var sheet = exported.Worksheet("Products");
+        var stockCol = ColumnOf(sheet, "Stock Quantity");
+        var row = sheet.RowsUsed().Skip(1).First(r => r.Cell(ColumnOf(sheet, "Sku")).GetString().Trim() == "F5519");
+
+        Assert.Equal(33, row.Cell(stockCol).GetValue<int>());
+    }
+
+    // Regression guard: a product with no variants at all still exports its own plain
+    // StockQuantity field — there's no variant sum to prefer it over.
+    [Fact]
+    public async Task ExportExcel_ProductWithNoVariants_WritesItsOwnStockQuantityField()
+    {
+        var (context, connection) = CreateContext();
+        using var _ = connection;
+        using var __ = context;
+        var (category, merchant) = SeedCategoryAndMerchant(context);
+        var product = new Product
+        {
+            Sku = "152", Name = "Field Pants", Slug = "field-pants", Price = 100m,
+            StockQuantity = 371, CategoryId = category.Id, MerchantId = merchant.Id
+        };
+        context.Products.Add(product);
+        context.SaveChanges();
+
+        var controller = CreateController(context);
+        var fileResult = Assert.IsType<FileContentResult>(await controller.ExportExcel());
+        using var exported = new XLWorkbook(new MemoryStream(fileResult.FileContents));
+        var sheet = exported.Worksheet("Products");
+        var stockCol = ColumnOf(sheet, "Stock Quantity");
+        var row = sheet.RowsUsed().Skip(1).First(r => r.Cell(ColumnOf(sheet, "Sku")).GetString().Trim() == "152");
+
+        Assert.Equal(371, row.Cell(stockCol).GetValue<int>());
+    }
 }
