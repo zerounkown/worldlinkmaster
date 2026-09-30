@@ -175,6 +175,26 @@ public class ProductsController : AdminBaseController
             }
         }
 
+        // Self-healing, same reasoning as the ProductColor backfill above: ProductPhotosController
+        // (Admin -> Product Photos) had a bug where uploading more than one photo for the same
+        // color in one batch left every one of them marked IsColorMain and collided their
+        // DisplayOrder — see ProductMediaOrderingHelper's remarks. NormalizeColorMediaOrdering is
+        // a pure function of each row's own MediaUrl, so re-running it here, on every Edit page
+        // load, converges an already-broken product on the correct state without needing a fresh
+        // photo re-upload — "just open the Edit page" is enough.
+        var productMediaWithColor = await _context.ProductMedia
+            .Where(m => m.ProductId == id && m.ProductColorId != null)
+            .ToListAsync();
+        if (productMediaWithColor.Count > 0)
+        {
+            foreach (var colorGroup in productMediaWithColor.GroupBy(m => m.ProductColorId!.Value))
+            {
+                ProductMediaOrderingHelper.NormalizeColorMediaOrdering(colorGroup);
+            }
+            await _context.SaveChangesAsync();
+            await ProductMediaOrderingHelper.SyncStorefrontDisplayFieldsAsync(_context, new[] { id });
+        }
+
         ViewBag.Categories = await _context.Categories.OrderBy(c => c.Name).ToListAsync();
         ViewBag.Subcategories = await _context.Subcategories.OrderBy(s => s.Name).ToListAsync();
         ViewBag.ProductColors = await _context.ProductColors
@@ -1094,11 +1114,13 @@ public class ProductsController : AdminBaseController
         }
 
         // .Include(v => v.Color): loaded here, not just for this sheet's own row processing below
-        // (which never touches Color/Size on an update) — BackfillProductColorsFromVariants
-        // (called from BulkUpdate, after this method returns) needs every tracked variant's Color
-        // navigation populated to name a backfilled ProductColor row after, including variants
-        // this file's rows don't even mention (see that method's remarks).
-        var existingVariants = (await _context.ProductVariants.Include(v => v.Color).ToListAsync())
+        // — BackfillProductColorsFromVariants (called from BulkUpdate, after this method returns)
+        // needs every tracked variant's Color navigation populated to name a backfilled
+        // ProductColor row after, including variants this file's rows don't even mention (see
+        // that method's remarks). .Include(v => v.Product): so the update branch below can scope
+        // its Size re-resolution to the OWNING product's Size Group (see ResolveSize) without a
+        // second query per row.
+        var existingVariants = (await _context.ProductVariants.Include(v => v.Color).Include(v => v.Product).ToListAsync())
             .GroupBy(v => v.Sku.Trim(), StringComparer.OrdinalIgnoreCase)
             .ToDictionary(g => g.Key, g => g.First(), StringComparer.OrdinalIgnoreCase);
 
@@ -1114,9 +1136,63 @@ public class ProductsController : AdminBaseController
         var colorsByName = (await _context.Colors.ToListAsync())
             .GroupBy(c => c.Name.Trim(), StringComparer.OrdinalIgnoreCase)
             .ToDictionary(g => g.Key, g => g.OrderBy(c => c.Id).First(), StringComparer.OrdinalIgnoreCase);
-        var sizesByKey = (await _context.Sizes.ToListAsync())
+
+        // Sizes are matched/created WITHIN the owning product's own Size Group first, never
+        // across groups — a short, common label like "7" can easily already exist in a totally
+        // unrelated group (a footwear size, say), and silently cross-linking a variant to that
+        // Size doesn't just misname it: Views/Products/Details.cshtml orders a product's sizes by
+        // Size.SortOrder, so the variant also displays in whatever position that UNRELATED
+        // group's own numbering happens to give it. A product with no Size Group at all
+        // (SizeGroupId null — every product that predates Size Groups, or was never assigned one)
+        // keeps matching/creating globally by label, exactly as before this fix — see ResolveSize.
+        var allSizes = await _context.Sizes.ToListAsync();
+        var sizesByGroupAndKey = allSizes
+            .Where(s => s.SizeGroupId.HasValue)
+            .GroupBy(s => (GroupId: s.SizeGroupId!.Value, Key: NormalizeSizeKey(s.Label)))
+            .ToDictionary(g => g.Key, g => g.OrderBy(s => s.Id).First());
+        var ungroupedSizesByKey = allSizes
+            .Where(s => !s.SizeGroupId.HasValue)
             .GroupBy(s => NormalizeSizeKey(s.Label))
             .ToDictionary(g => g.Key, g => g.OrderBy(s => s.Id).First());
+
+        // Shared by both the new-variant and existing-variant-update branches below, so a
+        // re-upload of the same file re-resolves (and can correct) an EXISTING variant's Size the
+        // same way a brand-new one would — needed so re-running Bulk Update can heal a variant
+        // that was already cross-linked to the wrong group's Size before this fix, without SQL.
+        Size ResolveSize(string label, Product? owningProduct)
+        {
+            var sizeKey = NormalizeSizeKey(label);
+            var groupId = owningProduct?.SizeGroupId;
+
+            if (groupId.HasValue)
+            {
+                var groupKey = (GroupId: groupId.Value, Key: sizeKey);
+                if (sizesByGroupAndKey.TryGetValue(groupKey, out var existingGrouped))
+                {
+                    return existingGrouped;
+                }
+
+                var createdInGroup = new Size
+                {
+                    Label = label,
+                    SizeGroupId = groupId.Value,
+                    SortOrder = sizesByGroupAndKey.Keys.Count(k => k.GroupId == groupId.Value)
+                };
+                sizesByGroupAndKey[groupKey] = createdInGroup;
+                _context.Sizes.Add(createdInGroup);
+                return createdInGroup;
+            }
+
+            if (ungroupedSizesByKey.TryGetValue(sizeKey, out var existingUngrouped))
+            {
+                return existingUngrouped;
+            }
+
+            var createdUngrouped = new Size { Label = label, SortOrder = ungroupedSizesByKey.Count };
+            ungroupedSizesByKey[sizeKey] = createdUngrouped;
+            _context.Sizes.Add(createdUngrouped);
+            return createdUngrouped;
+        }
 
         // Barcode is unique across ALL variants (enforced by a DB index too — see
         // ApplicationDbContext — this dictionary just turns a violation into a friendly per-row
@@ -1169,6 +1245,13 @@ public class ProductsController : AdminBaseController
                 barcode = null;
             }
 
+            // Read once, shared by both branches below — an existing variant re-resolves its Size
+            // the same way a brand-new one would (see ResolveSize), so a re-upload of the same
+            // file can correct a variant that's currently cross-linked to the wrong group's Size.
+            var sizeText = sizeCol == null || row.Cell(sizeCol.Value).IsEmpty() ? null : row.Cell(sizeCol.Value).GetString().Trim();
+            var lengthText = lengthCol == null || row.Cell(lengthCol.Value).IsEmpty() ? null : row.Cell(lengthCol.Value).GetString().Trim();
+            var sizeLabel = string.IsNullOrWhiteSpace(sizeText) ? null : CombineSizeAndLength(sizeText, string.IsNullOrWhiteSpace(lengthText) ? null : lengthText);
+
             if (existingVariants.TryGetValue(variantSku, out var existingVariant))
             {
                 if (barcode != null)
@@ -1195,6 +1278,12 @@ public class ProductsController : AdminBaseController
                 if (!string.IsNullOrWhiteSpace(imageUrl))
                 {
                     existingVariant.ImageUrl = imageUrl;
+                }
+                // else: blank Size/Length cells — leave the existing value unchanged, same
+                // "blank means don't touch it" convention as every other cell on this sheet.
+                if (sizeLabel != null)
+                {
+                    existingVariant.Size = ResolveSize(sizeLabel, existingVariant.Product);
                 }
                 result.VariantsUpdatedCount++;
                 continue;
@@ -1225,20 +1314,7 @@ public class ProductsController : AdminBaseController
                 }
             }
 
-            Size? size = null;
-            var sizeText = sizeCol == null || row.Cell(sizeCol.Value).IsEmpty() ? null : row.Cell(sizeCol.Value).GetString().Trim();
-            var lengthText = lengthCol == null || row.Cell(lengthCol.Value).IsEmpty() ? null : row.Cell(lengthCol.Value).GetString().Trim();
-            var sizeLabel = string.IsNullOrWhiteSpace(sizeText) ? null : CombineSizeAndLength(sizeText, string.IsNullOrWhiteSpace(lengthText) ? null : lengthText);
-            if (sizeLabel != null)
-            {
-                var sizeKey = NormalizeSizeKey(sizeLabel);
-                if (!sizesByKey.TryGetValue(sizeKey, out size))
-                {
-                    size = new Size { Label = sizeLabel, SortOrder = sizesByKey.Count };
-                    sizesByKey[sizeKey] = size;
-                    _context.Sizes.Add(size);
-                }
-            }
+            var size = sizeLabel != null ? ResolveSize(sizeLabel, parentProduct) : null;
 
             var newVariant = new ProductVariant
             {

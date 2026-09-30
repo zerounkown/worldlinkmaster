@@ -29,11 +29,14 @@ public class ProductPhotosController : AdminBaseController
     {
         ".webp", ".jpg", ".jpeg", ".png"
     };
-    private static readonly Regex FileNamePattern = new(
-        @"^(?<sku>[A-Za-z0-9]{2,20})-(?<color>[A-Za-z0-9]{2,10})(?:-[A-Za-z0-9]+)?\.(?<ext>webp|jpe?g|png)$",
+    // internal, and "suffix" is a named capturing group (not the original non-capturing one): so
+    // ProductMediaOrderingHelper.IsMainMediaUrl can re-derive "is this the color's main photo"
+    // (no suffix) straight from an already-stored MediaUrl, using the exact same rule this
+    // pattern enforces at upload time, rather than a second, potentially-drifting copy of it.
+    internal static readonly Regex FileNamePattern = new(
+        @"^(?<sku>[A-Za-z0-9]{2,20})-(?<color>[A-Za-z0-9]{2,10})(?<suffix>-[A-Za-z0-9]+)?\.(?<ext>webp|jpe?g|png)$",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
-    private const string PlaceholderMediaUrl = "TBD - needs hosted URL";
     private const string ContainerName = "product-photos";
 
     private readonly ApplicationDbContext _context;
@@ -73,6 +76,26 @@ public class ProductPhotosController : AdminBaseController
         await containerClient.CreateIfNotExistsAsync(Azure.Storage.Blobs.Models.PublicAccessType.Blob);
 
         var touchedProductIds = new HashSet<int>();
+
+        // Cache of (product, color) -> its ProductMedia rows, populated lazily from the database
+        // and then kept in sync in-memory for the rest of this request — SaveChangesAsync only
+        // runs once, after the whole loop, so a plain per-file DB query here would be stale for
+        // every file after the first one in the SAME (product, color): it would never see media
+        // this SAME upload batch already added a moment ago, making every file in a color look
+        // like "the first ever upload" for it. That was the actual bug — see the remarks below.
+        var mediaByProductColor = new Dictionary<int, List<ProductMedia>>();
+
+        async Task<List<ProductMedia>> GetMediaForColorAsync(int productId, int productColorId)
+        {
+            if (!mediaByProductColor.TryGetValue(productColorId, out var media))
+            {
+                media = await _context.ProductMedia
+                    .Where(m => m.ProductId == productId && m.ProductColorId == productColorId)
+                    .ToListAsync();
+                mediaByProductColor[productColorId] = media;
+            }
+            return media;
+        }
 
         foreach (var file in files)
         {
@@ -143,40 +166,46 @@ public class ProductPhotosController : AdminBaseController
             }
             var mediaUrl = blobClient.Uri.ToString();
 
-            var existingMedia = await _context.ProductMedia
-                .Where(m => m.ProductId == product.Id && m.ProductColorId == productColor.Id)
-                .ToListAsync();
+            var existingMedia = await GetMediaForColorAsync(product.Id, productColor.Id);
 
             var alreadyPresent = existingMedia.Any(m => m.MediaUrl == mediaUrl);
-            var placeholder = existingMedia.FirstOrDefault(m => m.MediaUrl == PlaceholderMediaUrl);
-            var hasRealMedia = existingMedia.Any(m => m.MediaUrl != PlaceholderMediaUrl);
+            var placeholder = existingMedia.FirstOrDefault(m => m.MediaUrl == ProductMediaOrderingHelper.PlaceholderMediaUrl);
 
             var replaced = false;
             if (alreadyPresent)
             {
-                // Re-upload of the same file — nothing to do.
+                // Re-upload of the same file — the URL (and therefore IsColorMain/DisplayOrder,
+                // both re-derived from it below) is already correct; nothing to do here. This is
+                // also how re-uploading the exact same files repairs a color whose OTHER rows are
+                // still wrong from before this fix — NormalizeColorMediaOrdering, below, runs
+                // over every row this color has, not just this one.
             }
             else if (placeholder != null)
             {
                 placeholder.MediaUrl = mediaUrl;
-                placeholder.IsColorMain = true;
                 replaced = true;
             }
             else
             {
-                var maxOrder = existingMedia.Count == 0 ? 0 : existingMedia.Max(m => m.DisplayOrder);
-                _context.ProductMedia.Add(new ProductMedia
+                var newMedia = new ProductMedia
                 {
                     ProductId = product.Id,
                     ProductColorId = productColor.Id,
                     MediaScope = "Color",
                     MediaType = "Image",
                     MediaUrl = mediaUrl,
-                    DisplayOrder = maxOrder + 1,
-                    IsColorMain = !hasRealMedia,
+                    // IsColorMain/DisplayOrder are placeholders here — NormalizeColorMediaOrdering
+                    // (below, once per color, after every file in this batch is matched)
+                    // overwrites both from the final MediaUrl alone.
                     ShowInGallery = true,
                     Active = true
-                });
+                };
+                _context.ProductMedia.Add(newMedia);
+                // Keep the cache in sync for the REST of this request — the whole reason
+                // existingMedia is cached rather than re-queried per file (see
+                // GetMediaForColorAsync's remarks): a later file for this same color, still in
+                // this same request, must see this row even though nothing's saved yet.
+                existingMedia.Add(newMedia);
             }
 
             touchedProductIds.Add(product.Id);
@@ -184,76 +213,14 @@ public class ProductPhotosController : AdminBaseController
                 file.FileName, product.Name, product.Sku, productColor.Color?.Name ?? "", mediaUrl, replaced));
         }
 
-        await _context.SaveChangesAsync();
-        await SyncStorefrontDisplayFieldsAsync(touchedProductIds);
-
-        return View("Index", result);
-    }
-
-    // Mirrors ProductImportController.SyncStorefrontDisplayFieldsAsync, scoped to just the
-    // products this upload touched, so listing/PDP image fields don't go stale between a full
-    // Product Import run and incremental photo uploads like this one.
-    private async Task SyncStorefrontDisplayFieldsAsync(HashSet<int> productIds)
-    {
-        if (productIds.Count == 0) return;
-
-        var products = await _context.Products.Where(p => productIds.Contains(p.Id)).ToListAsync();
-        var media = await _context.ProductMedia
-            .Where(m => productIds.Contains(m.ProductId) && m.Active && m.MediaType == "Image")
-            .OrderBy(m => m.DisplayOrder)
-            .ToListAsync();
-        var productColors = await _context.ProductColors.Where(pc => productIds.Contains(pc.ProductId)).ToListAsync();
-        var existingImages = await _context.ProductImages.Where(pi => productIds.Contains(pi.ProductId)).ToListAsync();
-        _context.ProductImages.RemoveRange(existingImages);
-        var variants = await _context.ProductVariants
-            .Where(v => productIds.Contains(v.ProductId) && v.ProductColorId != null)
-            .ToListAsync();
-
-        foreach (var product in products)
+        foreach (var colorMedia in mediaByProductColor.Values)
         {
-            var productMedia = media.Where(m => m.ProductId == product.Id).ToList();
-            if (productMedia.Count == 0) continue;
-
-            var defaultColor = productColors.FirstOrDefault(pc => pc.ProductId == product.Id && pc.DefaultColor)
-                ?? productColors.FirstOrDefault(pc => pc.ProductId == product.Id);
-
-            var sharedImages = productMedia.Where(m => m.ProductColorId == null).OrderBy(m => m.DisplayOrder).ToList();
-            var defaultColorImages = defaultColor == null
-                ? new List<ProductMedia>()
-                : productMedia.Where(m => m.ProductColorId == defaultColor.Id).OrderBy(m => m.DisplayOrder).ToList();
-
-            var galleryImages = sharedImages.Concat(defaultColorImages).ToList();
-            if (galleryImages.Count > 0)
-            {
-                product.ImageUrl = galleryImages[0].MediaUrl;
-
-                var sortOrder = 0;
-                foreach (var img in galleryImages)
-                {
-                    _context.ProductImages.Add(new ProductImage
-                    {
-                        ProductId = product.Id,
-                        ImageUrl = img.MediaUrl,
-                        Label = img.MediaRole,
-                        SortOrder = sortOrder++
-                    });
-                }
-            }
-
-            foreach (var colorGroup in productColors.Where(pc => pc.ProductId == product.Id))
-            {
-                var mainImage = productMedia.FirstOrDefault(m => m.ProductColorId == colorGroup.Id && m.IsColorMain)
-                    ?? productMedia.FirstOrDefault(m => m.ProductColorId == colorGroup.Id);
-                var imageUrl = mainImage?.MediaUrl ?? colorGroup.SwatchImageUrl;
-                if (imageUrl == null) continue;
-
-                foreach (var variant in variants.Where(v => v.ProductColorId == colorGroup.Id))
-                {
-                    variant.ImageUrl = imageUrl;
-                }
-            }
+            ProductMediaOrderingHelper.NormalizeColorMediaOrdering(colorMedia);
         }
 
         await _context.SaveChangesAsync();
+        await ProductMediaOrderingHelper.SyncStorefrontDisplayFieldsAsync(_context, touchedProductIds);
+
+        return View("Index", result);
     }
 }
