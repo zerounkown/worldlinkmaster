@@ -334,20 +334,27 @@ public class ProductsController : AdminBaseController
     // TryResolvePriceCells). Both sheets use the identical pair for both Price and Wholesale
     // Price so the same header never means two different things depending on which sheet it's
     // on — see the fix note in TryResolvePriceCells for why that mattered.
+    // Short Description/Description (and their Arabic siblings) can be multi-line — ClosedXML's
+    // Cell.Value/GetString round-trip an embedded "\n" as-is (Excel's own native in-cell line
+    // break), and .Trim() (used throughout this file/ImportVariantsSheet) only strips leading/
+    // trailing whitespace, never touches embedded newlines or an LRM/RLM mark. Nothing special is
+    // needed here for either to survive export -> re-import, beyond just not doing anything to
+    // the string besides that same outer .Trim() every other text column already gets.
     private static readonly string[] ExcelHeaders =
     {
         "Sku", "Name", "Category", "Price (AED)", "Price+VAT", "Wholesale Price (AED)", "Wholesale Price+VAT", "Stock Quantity", "Image URL",
-        "Name (Arabic)", "Brand", "Subcategory", "Size Group", "Published"
+        "Name (Arabic)", "Short Description", "Short Description (Arabic)", "Description", "Description (Arabic)", "Vendor SKU",
+        "Brand", "Subcategory", "Size Group", "Published"
     };
     // Column order otherwise matches the supplier reference format exactly — this is the layout
     // a new supplier's own spreadsheet already comes in, not just our own export/re-import shape.
-    // See ImportVariantsSheet for what each column means (Internal Barcode, Size+Length, and the
-    // Price (AED)/Price+VAT and Wholesale Price (AED)/Wholesale Price+VAT pairs all have rules of
-    // their own).
+    // See ImportVariantsSheet for what each column means (Internal Barcode, Size+Length, Vendor
+    // Color Code, and the Price (AED)/Price+VAT and Wholesale Price (AED)/Wholesale Price+VAT
+    // pairs all have rules of their own).
     private static readonly string[] VariantExcelHeaders =
     {
         "Product Sku (Parent)", "Internal Barcode", "Variant Sku", "Color", "Size", "Length",
-        "Price (AED)", "Price+VAT", "Wholesale Price (AED)", "Wholesale Price+VAT", "Stock Quantity", "Image URL"
+        "Price (AED)", "Price+VAT", "Wholesale Price (AED)", "Wholesale Price+VAT", "Stock Quantity", "Image URL", "Vendor Color Code"
     };
 
     /// <summary>Downloads the full catalog as an .xlsx (Products + Variants sheets) — the same file layout <see cref="BulkUpdate(IFormFile?)"/> expects back.</summary>
@@ -389,10 +396,15 @@ public class ProductsController : AdminBaseController
             sheet.Cell(row, 8).Value = product.StockQuantity;
             sheet.Cell(row, 9).Value = product.ImageUrl;
             sheet.Cell(row, 10).Value = product.NameAr;
-            sheet.Cell(row, 11).Value = product.Brand?.Name;
-            sheet.Cell(row, 12).Value = product.Subcategory?.Name;
-            sheet.Cell(row, 13).Value = product.SizeGroup?.NameEn;
-            sheet.Cell(row, 14).Value = product.IsPublished ? "Yes" : "No";
+            sheet.Cell(row, 11).Value = product.ShortDescription;
+            sheet.Cell(row, 12).Value = product.ShortDescriptionAr;
+            sheet.Cell(row, 13).Value = product.Description;
+            sheet.Cell(row, 14).Value = product.DescriptionAr;
+            sheet.Cell(row, 15).Value = product.VendorSku;
+            sheet.Cell(row, 16).Value = product.Brand?.Name;
+            sheet.Cell(row, 17).Value = product.Subcategory?.Name;
+            sheet.Cell(row, 18).Value = product.SizeGroup?.NameEn;
+            sheet.Cell(row, 19).Value = product.IsPublished ? "Yes" : "No";
             row++;
         }
 
@@ -403,6 +415,7 @@ public class ProductsController : AdminBaseController
             .Include(v => v.Product)
             .Include(v => v.Color)
             .Include(v => v.Size)
+            .Include(v => v.ProductColor)
             .OrderBy(v => v.Product!.Sku).ThenBy(v => v.Sku)
             .ToListAsync();
 
@@ -444,6 +457,7 @@ public class ProductsController : AdminBaseController
             }
             variantSheet.Cell(vRow, 11).Value = variant.StockQuantity;
             variantSheet.Cell(vRow, 12).Value = variant.ImageUrl;
+            variantSheet.Cell(vRow, 13).Value = variant.ProductColor?.VendorColorCode;
             vRow++;
         }
 
@@ -560,6 +574,11 @@ public class ProductsController : AdminBaseController
         // All optional — an older export, or a supplier file that never had these columns,
         // still imports fine without them.
         var nameArCol = FindColumn(headers, "Name (Arabic)", "Name Ar", "الاسم بالعربية", "الاسم العربي");
+        var shortDescriptionCol = FindColumn(headers, "Short Description", "الوصف المختصر");
+        var shortDescriptionArCol = FindColumn(headers, "Short Description (Arabic)", "الوصف المختصر بالعربية");
+        var descriptionCol = FindColumn(headers, "Description", "الوصف");
+        var descriptionArCol = FindColumn(headers, "Description (Arabic)", "الوصف بالعربية");
+        var vendorSkuCol = FindColumn(headers, "Vendor SKU", "رمز المورد");
         var brandCol = FindColumn(headers, "Brand", "العلامة التجارية", "الماركة");
         var subcategoryCol = FindColumn(headers, "Subcategory", "الفئة الفرعية", "القسم الفرعي");
         var sizeGroupCol = FindColumn(headers, "Size Group", "مجموعة المقاسات");
@@ -690,6 +709,14 @@ public class ProductsController : AdminBaseController
                     // row (never wipe a value just because the cell is empty) and "use the
                     // default" on a new-product row.
                     var nameAr = nameArCol == null || row.Cell(nameArCol.Value).IsEmpty() ? null : row.Cell(nameArCol.Value).GetString().Trim();
+                    // Short Description/Description (English and Arabic) can be multi-line —
+                    // .Trim() only strips leading/trailing whitespace, never embedded line breaks
+                    // or an LRM/RLM mark, so both survive exactly as typed.
+                    var shortDescription = shortDescriptionCol == null || row.Cell(shortDescriptionCol.Value).IsEmpty() ? null : row.Cell(shortDescriptionCol.Value).GetString().Trim();
+                    var shortDescriptionAr = shortDescriptionArCol == null || row.Cell(shortDescriptionArCol.Value).IsEmpty() ? null : row.Cell(shortDescriptionArCol.Value).GetString().Trim();
+                    var description = descriptionCol == null || row.Cell(descriptionCol.Value).IsEmpty() ? null : row.Cell(descriptionCol.Value).GetString().Trim();
+                    var descriptionAr = descriptionArCol == null || row.Cell(descriptionArCol.Value).IsEmpty() ? null : row.Cell(descriptionArCol.Value).GetString().Trim();
+                    var vendorSku = vendorSkuCol == null || row.Cell(vendorSkuCol.Value).IsEmpty() ? null : row.Cell(vendorSkuCol.Value).GetString().Trim();
                     var brandName = brandCol == null || row.Cell(brandCol.Value).IsEmpty() ? null : row.Cell(brandCol.Value).GetString().Trim();
                     var subcategoryName = subcategoryCol == null || row.Cell(subcategoryCol.Value).IsEmpty() ? null : row.Cell(subcategoryCol.Value).GetString().Trim();
                     var sizeGroupName = sizeGroupCol == null || row.Cell(sizeGroupCol.Value).IsEmpty() ? null : row.Cell(sizeGroupCol.Value).GetString().Trim();
@@ -733,6 +760,11 @@ public class ProductsController : AdminBaseController
                         }
                         product.StockQuantity = stock; // overridden below for any product that ends up with variants
                         if (nameAr != null) product.NameAr = nameAr;
+                        if (shortDescription != null) product.ShortDescription = shortDescription;
+                        if (shortDescriptionAr != null) product.ShortDescriptionAr = shortDescriptionAr;
+                        if (description != null) product.Description = description;
+                        if (descriptionAr != null) product.DescriptionAr = descriptionAr;
+                        if (vendorSku != null) product.VendorSku = vendorSku;
                         if (brandName != null) product.BrandId = brand!.Id;
                         if (subcategoryName != null) product.SubcategoryId = subcategory!.Id;
                         if (sizeGroupName != null) product.SizeGroupId = sizeGroup!.Id;
@@ -791,6 +823,11 @@ public class ProductsController : AdminBaseController
                     {
                         Name = name,
                         NameAr = nameAr,
+                        ShortDescription = shortDescription,
+                        ShortDescriptionAr = shortDescriptionAr,
+                        Description = description,
+                        DescriptionAr = descriptionAr,
+                        VendorSku = vendorSku,
                         Slug = slug,
                         Sku = sku,
                         CategoryId = category.Id,
@@ -816,11 +853,22 @@ public class ProductsController : AdminBaseController
                     _context.Products.AddRange(newProducts);
                 }
 
+                // Shared with the ProductColor backfill below (after ImportVariantsSheet returns):
+                // ImportVariantsSheet's own Vendor Color Code handling resolves/creates a
+                // ProductColor directly, per row, since it needs it immediately — but those rows
+                // have no database row yet when the backfill's own DB queries run, so without
+                // this shared cache the backfill can't see them and would create a SECOND
+                // ProductColor for the same (product, color), violating the (ProductId, ColorId)
+                // unique index at SaveChanges time. Keyed by object reference (not by ProductId/
+                // ColorId ints), same reason variantsByProductAndColor below is: a product or
+                // color created earlier in this same attempt has no real Id yet either.
+                var productColorsByProductAndColor = new Dictionary<(Product Product, Color Color), ProductColor>();
+
                 // Optional second sheet: per color/size combo pricing and stock. Absent entirely
                 // on older exports (or a Products-only re-upload) — that's fine, nothing to do.
                 if (workbook.Worksheets.Contains("Variants"))
                 {
-                    await ImportVariantsSheet(workbook.Worksheet("Variants"), productsBySku, result);
+                    await ImportVariantsSheet(workbook.Worksheet("Variants"), productsBySku, result, productColorsByProductAndColor);
                 }
 
                 // Any product that has variants always has its Stock Quantity set to the sum of
@@ -907,12 +955,45 @@ public class ProductsController : AdminBaseController
                             .ToDictionary(g => g.Key, g => g.ToList());
                     var usedProductColorCodes = new HashSet<string>(
                         await _context.ProductColors.Select(pc => pc.Code).ToListAsync(), StringComparer.OrdinalIgnoreCase);
+                    // Both queries above only see already-SAVED ProductColor rows — a row
+                    // ImportVariantsSheet's Vendor Color Code handling already created THIS same
+                    // request (resolved directly per-row, not deferred to here) has no database
+                    // row yet, so it's invisible to them. Without folding productColorsByProductAndColor
+                    // in too, this backfill would create a SECOND ProductColor for the same
+                    // (product, color) — violating the unique (ProductId, ColorId) index at
+                    // SaveChanges — and could generate a Code that collides with one already
+                    // claimed this same request.
+                    foreach (var ((trackedProduct, trackedColor), trackedProductColor) in productColorsByProductAndColor)
+                    {
+                        usedProductColorCodes.Add(trackedProductColor.Code);
+                        if (trackedProduct.Id == 0) continue; // no real ProductId to key existingProductColorsByProductId by yet — fine, see below
+                        if (!existingProductColorsByProductId.TryGetValue(trackedProduct.Id, out var list))
+                        {
+                            list = new List<ProductColor>();
+                            existingProductColorsByProductId[trackedProduct.Id] = list;
+                        }
+                        if (!list.Contains(trackedProductColor))
+                        {
+                            list.Add(trackedProductColor);
+                        }
+                    }
 
                     foreach (var (productWithColors, byColor) in variantsByProductAndColor)
                     {
                         var existingColors = productWithColors.Id != 0 && existingProductColorsByProductId.TryGetValue(productWithColors.Id, out var epc)
                             ? epc
                             : new List<ProductColor>();
+                        // Covers a brand-new product (Id 0, so the ProductId-keyed lookup above
+                        // can never find it): match this SAME cache again, this time by object
+                        // reference, which works regardless of Id.
+                        foreach (var color in byColor.Keys)
+                        {
+                            if (productColorsByProductAndColor.TryGetValue((productWithColors, color), out var alreadyResolved)
+                                && !existingColors.Contains(alreadyResolved))
+                            {
+                                existingColors.Add(alreadyResolved);
+                            }
+                        }
                         if (BackfillProductColorsFromVariants(productWithColors, byColor, existingColors, out var newProductColors))
                         {
                             AssignProductColorCodes(productWithColors.Sku, newProductColors, usedProductColorCodes);
@@ -986,32 +1067,38 @@ public class ProductsController : AdminBaseController
         out List<ProductColor> newProductColors)
     {
         newProductColors = new List<ProductColor>();
-        var existingColorIds = existingProductColors.Select(pc => pc.ColorId).ToHashSet();
         var hasExistingDefault = existingProductColors.Any(pc => pc.DefaultColor);
         var nextDisplayOrder = existingProductColors.Count == 0 ? 0 : existingProductColors.Max(pc => pc.DisplayOrder) + 1;
 
         foreach (var (color, variants) in variantsByColor)
         {
-            // color.Id is 0 for a color created earlier in this same Bulk Update attempt (no
-            // database row yet — see ImportVariantsSheet) — which can never already be in
-            // existingColorIds (a real ProductColor.ColorId always references a saved Color), so
-            // this check is correct for both a brand-new and an already-saved color alike.
-            if (existingColorIds.Contains(color.Id))
+            // Matched by Color object reference first, not just ColorId: a color created earlier
+            // in this same Bulk Update attempt (see ImportVariantsSheet) has ColorId 0 until
+            // SaveChanges runs, same as an as-yet-unsaved ProductColor's own ColorId — comparing
+            // ints alone would false-match any two such rows against each other. The ColorId
+            // fallback only ever fires for a real, already-saved color, where it's unambiguous.
+            var productColor = existingProductColors.FirstOrDefault(pc => pc.Color == color || (color.Id != 0 && pc.ColorId == color.Id));
+
+            if (productColor == null)
             {
-                continue;
+                productColor = new ProductColor
+                {
+                    Product = product,
+                    Color = color,
+                    DisplayOrder = nextDisplayOrder++,
+                    DefaultColor = !hasExistingDefault && newProductColors.Count == 0,
+                    Active = true
+                };
+                product.ProductColors.Add(productColor);
+                newProductColors.Add(productColor);
             }
 
-            var productColor = new ProductColor
-            {
-                Product = product,
-                Color = color,
-                DisplayOrder = nextDisplayOrder++,
-                DefaultColor = !hasExistingDefault && newProductColors.Count == 0,
-                Active = true
-            };
-            product.ProductColors.Add(productColor);
-            newProductColors.Add(productColor);
-
+            // Always links every variant to its (found-or-created) ProductColor, not just for a
+            // newly-created row — a variant whose color's ProductColor was resolved elsewhere
+            // this same request (ImportVariantsSheet's Vendor Color Code handling, which needs
+            // its ProductColor immediately and so doesn't wait for this whole-catalog pass) would
+            // otherwise never get ProductColorId linked at all, since this method used to `continue`
+            // straight past the linking loop whenever a ProductColor already existed.
             foreach (var variant in variants)
             {
                 variant.ProductColor = productColor;
@@ -1082,7 +1169,11 @@ public class ProductsController : AdminBaseController
     /// Wholesale Price (AED)/Wholesale Price+VAT are each resolved to the single VAT-inclusive
     /// value actually stored — see TryResolvePriceCells.
     /// </summary>
-    private async Task ImportVariantsSheet(IXLWorksheet sheet, Dictionary<string, Product> productsBySku, BulkImportResult result)
+    private async Task ImportVariantsSheet(
+        IXLWorksheet sheet,
+        Dictionary<string, Product> productsBySku,
+        BulkImportResult result,
+        Dictionary<(Product Product, Color Color), ProductColor> productColorsByProductAndColor)
     {
         var headers = MapHeaders(sheet);
         var parentSkuCol = FindColumn(headers, "Product Sku (Parent)", "Parent Sku", "SKU الأساسي");
@@ -1097,6 +1188,7 @@ public class ProductsController : AdminBaseController
         var stockCol = FindColumn(headers, "Stock Quantity", "Stock", "الكمية");
         var imageCol = FindColumn(headers, "Image URL", "Image");
         var barcodeCol = FindColumn(headers, "Internal Barcode", "Barcode", "الباركود الداخلي", "الباركود");
+        var vendorColorCodeCol = FindColumn(headers, "Vendor Color Code", "رمز لون المورد");
 
         // No incl.-VAT column anywhere in the sheet at all — not just blank on this row — means
         // this is an older export shape, where the excl.-VAT-named column held the VAT-INCLUSIVE
@@ -1194,6 +1286,83 @@ public class ProductsController : AdminBaseController
             return createdUngrouped;
         }
 
+        // "Vendor Color Code" sets ProductColor.VendorColorCode for the variant's own (product,
+        // color) pair, creating the ProductColor row if it doesn't exist yet — same Code-
+        // generation GenerateProductColorCode already uses for the whole-catalog backfill
+        // (BackfillProductColorsFromVariants, called after this method returns), just resolved
+        // directly here since a row's Vendor Color Code needs its ProductColor available
+        // immediately, not after the fact. usedProductColorCodes is loaded once, up front, since
+        // Code has a database-wide unique index (see ApplicationDbContext), not one scoped per
+        // product. Keyed by the Product/Color OBJECT (not their .Id) for the same reason
+        // BackfillProductColorsFromVariants is: a product or color created earlier in this exact
+        // attempt has Id 0 until SaveChanges runs, and an int-keyed cache would collide every
+        // such new (product, color) pair onto the same "(0, 0)" bucket.
+        var usedProductColorCodes = new HashSet<string>(
+            await _context.ProductColors.Select(pc => pc.Code).ToListAsync(), StringComparer.OrdinalIgnoreCase);
+
+        async Task<ProductColor> GetOrCreateProductColorAsync(Product product, Color color)
+        {
+            var key = (product, color);
+            if (productColorsByProductAndColor.TryGetValue(key, out var cached))
+            {
+                return cached;
+            }
+
+            var existing = product.Id != 0 && color.Id != 0
+                ? await _context.ProductColors.FirstOrDefaultAsync(pc => pc.ProductId == product.Id && pc.ColorId == color.Id)
+                : null;
+            if (existing != null)
+            {
+                productColorsByProductAndColor[key] = existing;
+                return existing;
+            }
+
+            var created = new ProductColor
+            {
+                Code = GenerateProductColorCode(product.Sku, color, usedProductColorCodes),
+                Product = product,
+                Color = color,
+                Active = true
+            };
+            _context.ProductColors.Add(created);
+            productColorsByProductAndColor[key] = created;
+            return created;
+        }
+
+        // Tracks which Vendor Color Code this run has already committed to for each (product,
+        // color) — two DIFFERENT variant rows for the SAME product+color (e.g. two sizes of the
+        // same Black hat) giving DIFFERENT non-blank codes have no sensible way for both to be
+        // right, so that's a per-row error rather than silently letting whichever row comes last
+        // win. A row's code disagreeing with what's already SAVED from a previous import isn't a
+        // conflict, though — same "non-blank cell overwrites" rule as every other column here —
+        // only same-file rows are compared against each other.
+        var vendorColorCodeAssignedThisRun = new Dictionary<(Product Product, Color Color), (string Code, int RowNum)>();
+
+        async Task<bool> TryApplyVendorColorCodeAsync(Product product, Color? color, string? vendorColorCodeText, int rowNum, string variantSku)
+        {
+            if (vendorColorCodeText == null)
+            {
+                return true; // blank cell — leave whatever this (product, color) already has unchanged.
+            }
+            if (color == null)
+            {
+                result.Errors.Add($"Variants row {rowNum} (SKU {variantSku}): Vendor Color Code '{vendorColorCodeText}' given but this variant has no Color.");
+                return false;
+            }
+
+            var key = (product, color);
+            if (vendorColorCodeAssignedThisRun.TryGetValue(key, out var assigned) && !string.Equals(assigned.Code, vendorColorCodeText, StringComparison.Ordinal))
+            {
+                result.Errors.Add($"Variants row {rowNum} (SKU {variantSku}): Vendor Color Code '{vendorColorCodeText}' conflicts with '{assigned.Code}' already given for {product.Sku}/{color.Name} at row {assigned.RowNum}.");
+                return false;
+            }
+            vendorColorCodeAssignedThisRun[key] = (vendorColorCodeText, rowNum);
+
+            var productColor = await GetOrCreateProductColorAsync(product, color);
+            productColor.VendorColorCode = vendorColorCodeText;
+            return true;
+        }
+
         // Barcode is unique across ALL variants (enforced by a DB index too — see
         // ApplicationDbContext — this dictionary just turns a violation into a friendly per-row
         // error instead of a whole-transaction rollback). Grouped-then-first for the same
@@ -1251,6 +1420,7 @@ public class ProductsController : AdminBaseController
             var sizeText = sizeCol == null || row.Cell(sizeCol.Value).IsEmpty() ? null : row.Cell(sizeCol.Value).GetString().Trim();
             var lengthText = lengthCol == null || row.Cell(lengthCol.Value).IsEmpty() ? null : row.Cell(lengthCol.Value).GetString().Trim();
             var sizeLabel = string.IsNullOrWhiteSpace(sizeText) ? null : CombineSizeAndLength(sizeText, string.IsNullOrWhiteSpace(lengthText) ? null : lengthText);
+            var vendorColorCodeText = vendorColorCodeCol == null || row.Cell(vendorColorCodeCol.Value).IsEmpty() ? null : row.Cell(vendorColorCodeCol.Value).GetString().Trim();
 
             if (existingVariants.TryGetValue(variantSku, out var existingVariant))
             {
@@ -1285,6 +1455,14 @@ public class ProductsController : AdminBaseController
                 {
                     existingVariant.Size = ResolveSize(sizeLabel, existingVariant.Product);
                 }
+                // Vendor Color Code targets whatever color THIS variant already has — updating a
+                // variant never changes its Color (see above), so there's no "Color cell on this
+                // row" to read here, only the variant's own already-linked one.
+                if (existingVariant.Product != null &&
+                    !await TryApplyVendorColorCodeAsync(existingVariant.Product, existingVariant.Color, vendorColorCodeText, rowNum, variantSku))
+                {
+                    continue;
+                }
                 result.VariantsUpdatedCount++;
                 continue;
             }
@@ -1312,6 +1490,11 @@ public class ProductsController : AdminBaseController
                     colorsByName[colorName] = color;
                     _context.Colors.Add(color);
                 }
+            }
+
+            if (!await TryApplyVendorColorCodeAsync(parentProduct, color, vendorColorCodeText, rowNum, variantSku))
+            {
+                continue;
             }
 
             var size = sizeLabel != null ? ResolveSize(sizeLabel, parentProduct) : null;
