@@ -215,4 +215,83 @@ public class AdminProductsControllerTests
         Assert.Equal("Wide-brim boonie hat", reloaded.ShortDescription);
         Assert.Equal("A field-tested boonie hat.", reloaded.Description);
     }
+
+    // --- ProductMedia self-heal (opening Edit fixes the gallery without a re-upload) --------
+    // Bug report continuation: ProductPhotosController.Upload's per-color-batch bug (see
+    // ProductMediaOrderingHelperTests) left F5519's Black/Khaki media both marked IsColorMain
+    // with colliding DisplayOrder. Requirement: opening the Edit page must be enough to repair
+    // an already-broken product, no re-upload or SQL required.
+
+    [Fact]
+    public async Task Edit_Get_ProductWithWronglyOrderedMedia_NormalizesIsColorMainAndDisplayOrder()
+    {
+        var (context, connection) = CreateContext();
+        using var _ = connection;
+        using var __ = context;
+        var (category, merchant) = SeedCategoryAndMerchant(context);
+
+        var black = new Color { Name = "Black", HexCode = "#1c1c1c" };
+        context.Colors.Add(black);
+        var product = new Product
+        {
+            Sku = "F5519", Name = "Tactical Boonie", Slug = "tactical-boonie", Price = 40m,
+            StockQuantity = 5, CategoryId = category.Id, MerchantId = merchant.Id
+        };
+        context.Products.Add(product);
+        context.SaveChanges();
+        var productColor = new ProductColor { Code = "F5519-BLACK", ProductId = product.Id, ColorId = black.Id, DefaultColor = true };
+        context.ProductColors.Add(productColor);
+        context.SaveChanges();
+        var variant = new ProductVariant { ProductId = product.Id, ColorId = black.Id, ProductColorId = productColor.Id, Sku = "F5519-BLK", StockQuantity = 5 };
+        context.ProductVariants.Add(variant);
+        // The exact broken state ProductPhotosController.Upload's bug produced: both real
+        // photos for Black marked IsColorMain=true, both DisplayOrder=1.
+        const string mainUrl = "https://blob.example/product-photos/f5519-001.webp";
+        const string bottomUrl = "https://blob.example/product-photos/f5519-001-2.webp";
+        context.ProductMedia.AddRange(
+            new ProductMedia { ProductId = product.Id, ProductColorId = productColor.Id, MediaScope = "Color", MediaType = "Image", MediaUrl = mainUrl, IsColorMain = true, DisplayOrder = 1, ShowInGallery = true, Active = true },
+            new ProductMedia { ProductId = product.Id, ProductColorId = productColor.Id, MediaScope = "Color", MediaType = "Image", MediaUrl = bottomUrl, IsColorMain = true, DisplayOrder = 1, ShowInGallery = true, Active = true });
+        context.SaveChanges();
+
+        var controller = CreateController(context);
+
+        // Just opening the Edit page — no upload, no SQL.
+        await controller.Edit(product.Id);
+
+        var media = await context.ProductMedia.AsNoTracking().Where(m => m.ProductColorId == productColor.Id).ToListAsync();
+        var main = media.First(m => m.MediaUrl == mainUrl);
+        var bottom = media.First(m => m.MediaUrl == bottomUrl);
+        Assert.True(main.IsColorMain);
+        Assert.Equal(1, main.DisplayOrder);
+        Assert.False(bottom.IsColorMain);
+        Assert.Equal(2, bottom.DisplayOrder);
+
+        // Listing card / cart image also gets refreshed to the now-correct main photo.
+        var reloadedVariant = await context.ProductVariants.AsNoTracking().FirstAsync(v => v.Id == variant.Id);
+        Assert.Equal(mainUrl, reloadedVariant.ImageUrl);
+    }
+
+    [Fact]
+    public async Task Edit_Get_ProductWithNoMedia_LeavesProductMediaEmpty_NoWritesMade()
+    {
+        var (context, connection) = CreateContext();
+        using var _ = connection;
+        using var __ = context;
+        var (category, merchant) = SeedCategoryAndMerchant(context);
+
+        // Mirrors "24-7 Agility Pant": no ProductMedia at all (never went through Product Photos
+        // or the Product Importer's Media sheet) — must be completely unaffected.
+        var product = new Product
+        {
+            Sku = "WLM-APP-006", Name = "24-7 Agility Pant", Slug = "24-7-agility-pant", Price = 530.25m,
+            StockQuantity = 90, CategoryId = category.Id, MerchantId = merchant.Id
+        };
+        context.Products.Add(product);
+        context.SaveChanges();
+
+        var controller = CreateController(context);
+        await controller.Edit(product.Id);
+
+        Assert.Equal(0, await context.ProductMedia.CountAsync());
+    }
 }

@@ -1105,4 +1105,241 @@ public class ProductsControllerBulkUpdateTests
         var newKhaki = productColors.First(pc => pc.ColorId == khaki.Id);
         Assert.False(newKhaki.DefaultColor); // Black already had the default — Khaki doesn't steal it
     }
+
+    // --- Size Group-scoped Size matching -----------------------------------------------
+    // Bug report: product F5519 "Tactical Boonie" (Size Group "Hat Size", code HAT) showed sizes
+    // in the wrong order (7 1/4, 7 1/2, 7 3/4, 7 instead of 7, 7 1/4, 7 1/2, 7 3/4) even though
+    // Master Data created them with the correct Sort Order (1-4). Root cause: ImportVariantsSheet
+    // matched a variant's Size by label across ALL Sizes in the database, completely ignoring
+    // Size Group — "7" (a short, common label) matched an unrelated pre-existing Size from a
+    // different group (e.g. a footwear size), and Views/Products/Details.cshtml orders a
+    // product's sizes by Size.SortOrder, so the variant displayed in THAT group's position, not
+    // Hat Size's. See ProductsController.ImportVariantsSheet's local ResolveSize function.
+
+    [Fact]
+    public async Task BulkUpdate_ProductWithSizeGroup_NewVariantMatchesSizeWithinGroup_NotACollidingLabelInAnotherGroup()
+    {
+        var (context, connection) = CreateContext();
+        using var _ = connection;
+        using var __ = context;
+        var (category, merchant) = SeedCategoryAndMerchant(context);
+
+        var hatSizeGroup = new SizeGroup { Code = "HAT", NameEn = "Hat Size" };
+        var footwearGroup = new SizeGroup { Code = "SHOE", NameEn = "Footwear" };
+        context.SizeGroups.AddRange(hatSizeGroup, footwearGroup);
+        context.SaveChanges();
+        // Master Data already created the Hat Size sizes with the real Sort Order (1-4) reported
+        // in the bug — and a completely unrelated "7" already exists in Footwear with a much
+        // higher Sort Order, which is exactly what a naive global-label match would collide with.
+        var hat7 = new Size { Code = "HAT-7", Label = "7", SizeGroupId = hatSizeGroup.Id, SortOrder = 1 };
+        var hat714 = new Size { Code = "HAT-714", Label = "7 1/4", SizeGroupId = hatSizeGroup.Id, SortOrder = 2 };
+        var hat712 = new Size { Code = "HAT-712", Label = "7 1/2", SizeGroupId = hatSizeGroup.Id, SortOrder = 3 };
+        var hat734 = new Size { Code = "HAT-734", Label = "7 3/4", SizeGroupId = hatSizeGroup.Id, SortOrder = 4 };
+        var shoe7 = new Size { Code = "SHOE-7", Label = "7", SizeGroupId = footwearGroup.Id, SortOrder = 20 };
+        context.Sizes.AddRange(hat7, hat714, hat712, hat734, shoe7);
+        var product = new Product
+        {
+            Sku = "F5519", Name = "Tactical Boonie", Slug = "tactical-boonie", Price = 40m,
+            StockQuantity = 0, CategoryId = category.Id, MerchantId = merchant.Id, SizeGroupId = hatSizeGroup.Id
+        };
+        context.Products.Add(product);
+        context.SaveChanges();
+
+        using var workbook = NewWorkbookWithHeaders();
+        WriteProductRow(workbook.Worksheet("Products"), 2, "F5519", "Tactical Boonie", "Tactical Apparel", 40m, 0);
+        var variantsSheet = workbook.Worksheet("Variants");
+        WriteVariantRow(variantsSheet, 2, "F5519", "F5519-7", 5, size: "7");
+        WriteVariantRow(variantsSheet, 3, "F5519", "F5519-714", 5, size: "7 1/4");
+        WriteVariantRow(variantsSheet, 4, "F5519", "F5519-712", 5, size: "7 1/2");
+        WriteVariantRow(variantsSheet, 5, "F5519", "F5519-734", 5, size: "7 3/4");
+
+        var controller = CreateController(context);
+        var model = Assert.IsType<BulkImportResult>(Assert.IsType<ViewResult>(await controller.BulkUpdate(ToFormFile(workbook))).Model);
+
+        Assert.Null(model.FatalError);
+        Assert.Empty(model.Errors);
+        Assert.Equal(4, model.VariantsCreatedCount);
+
+        // No new Size was created — all four already existed in the Hat Size group.
+        Assert.Equal(5, await context.Sizes.CountAsync()); // the 4 Hat sizes + the 1 unrelated Footwear "7"
+
+        var variant7 = await context.ProductVariants.AsNoTracking().Include(v => v.Size).FirstAsync(v => v.Sku == "F5519-7");
+        // The exact regression: must link to the Hat Size group's OWN "7" (SortOrder 1), never
+        // the unrelated Footwear "7" (SortOrder 20) — which is what would put it last, exactly
+        // matching the reported wrong order.
+        Assert.Equal(hat7.Id, variant7.SizeId);
+        Assert.Equal(1, variant7.Size!.SortOrder);
+
+        var variant714 = await context.ProductVariants.AsNoTracking().FirstAsync(v => v.Sku == "F5519-714");
+        var variant712 = await context.ProductVariants.AsNoTracking().FirstAsync(v => v.Sku == "F5519-712");
+        var variant734 = await context.ProductVariants.AsNoTracking().FirstAsync(v => v.Sku == "F5519-734");
+        Assert.Equal(hat714.Id, variant714.SizeId);
+        Assert.Equal(hat712.Id, variant712.SizeId);
+        Assert.Equal(hat734.Id, variant734.SizeId);
+    }
+
+    // Requirement: re-uploading the same file must be enough to fix an already-broken product on
+    // production, without SQL — this reproduces the actual broken state (variant already
+    // cross-linked to Footwear's "7", as it would be on the live site before this fix) and
+    // confirms a plain re-upload corrects it.
+    [Fact]
+    public async Task BulkUpdate_ReUpload_ExistingVariantWronglyLinkedToOtherGroupsSize_GetsRelinkedToCorrectSize()
+    {
+        var (context, connection) = CreateContext();
+        using var _ = connection;
+        using var __ = context;
+        var (category, merchant) = SeedCategoryAndMerchant(context);
+
+        var hatSizeGroup = new SizeGroup { Code = "HAT", NameEn = "Hat Size" };
+        var footwearGroup = new SizeGroup { Code = "SHOE", NameEn = "Footwear" };
+        context.SizeGroups.AddRange(hatSizeGroup, footwearGroup);
+        context.SaveChanges();
+        var hat7 = new Size { Code = "HAT-7", Label = "7", SizeGroupId = hatSizeGroup.Id, SortOrder = 1 };
+        var shoe7 = new Size { Code = "SHOE-7", Label = "7", SizeGroupId = footwearGroup.Id, SortOrder = 20 };
+        context.Sizes.AddRange(hat7, shoe7);
+        var product = new Product
+        {
+            Sku = "F5519", Name = "Tactical Boonie", Slug = "tactical-boonie", Price = 40m,
+            StockQuantity = 5, CategoryId = category.Id, MerchantId = merchant.Id, SizeGroupId = hatSizeGroup.Id
+        };
+        context.Products.Add(product);
+        context.SaveChanges();
+        // The already-broken state: this variant is wrongly linked to Footwear's "7".
+        var brokenVariant = new ProductVariant { ProductId = product.Id, SizeId = shoe7.Id, Sku = "F5519-7", StockQuantity = 5 };
+        context.ProductVariants.Add(brokenVariant);
+        context.SaveChanges();
+
+        using var workbook = NewWorkbookWithHeaders();
+        WriteProductRow(workbook.Worksheet("Products"), 2, "F5519", "Tactical Boonie", "Tactical Apparel", 40m, 5);
+        // The SAME row a real re-upload of the original file would contain — Size "7" again.
+        WriteVariantRow(workbook.Worksheet("Variants"), 2, "F5519", "F5519-7", 5, size: "7");
+
+        var controller = CreateController(context);
+        var model = Assert.IsType<BulkImportResult>(Assert.IsType<ViewResult>(await controller.BulkUpdate(ToFormFile(workbook))).Model);
+
+        Assert.Null(model.FatalError);
+        Assert.Empty(model.Errors);
+        Assert.Equal(1, model.VariantsUpdatedCount);
+        Assert.Equal(0, model.VariantsCreatedCount);
+
+        var reloaded = await context.ProductVariants.AsNoTracking().FirstAsync(v => v.Sku == "F5519-7");
+        Assert.Equal(hat7.Id, reloaded.SizeId); // relinked to the correct group's Size
+        Assert.NotEqual(shoe7.Id, reloaded.SizeId);
+    }
+
+    [Fact]
+    public async Task BulkUpdate_ProductWithSizeGroup_NewSizeNotInGroupYet_AutoCreatedWithinThatGroup()
+    {
+        var (context, connection) = CreateContext();
+        using var _ = connection;
+        using var __ = context;
+        var (category, merchant) = SeedCategoryAndMerchant(context);
+
+        var hatSizeGroup = new SizeGroup { Code = "HAT", NameEn = "Hat Size" };
+        context.SizeGroups.Add(hatSizeGroup);
+        context.SaveChanges(); // must commit before referencing .Id below — it's still 0 until this runs
+        // An UNGROUPED "7 7/8" already exists (e.g. left over from before Size Groups existed) —
+        // must not be reused; the new one has to belong to Hat Size, not stay ungrouped.
+        var ungrouped778 = new Size { Label = "7 7/8" };
+        context.Sizes.Add(ungrouped778);
+        var product = new Product
+        {
+            Sku = "F5519", Name = "Tactical Boonie", Slug = "tactical-boonie", Price = 40m,
+            StockQuantity = 0, CategoryId = category.Id, MerchantId = merchant.Id, SizeGroupId = hatSizeGroup.Id
+        };
+        context.Products.Add(product);
+        context.SaveChanges();
+
+        using var workbook = NewWorkbookWithHeaders();
+        WriteProductRow(workbook.Worksheet("Products"), 2, "F5519", "Tactical Boonie", "Tactical Apparel", 40m, 0);
+        WriteVariantRow(workbook.Worksheet("Variants"), 2, "F5519", "F5519-778", 5, size: "7 7/8");
+
+        var controller = CreateController(context);
+        var model = Assert.IsType<BulkImportResult>(Assert.IsType<ViewResult>(await controller.BulkUpdate(ToFormFile(workbook))).Model);
+
+        Assert.Null(model.FatalError);
+        Assert.Empty(model.Errors);
+        Assert.Equal(1, model.VariantsCreatedCount);
+        Assert.Equal(2, await context.Sizes.CountAsync()); // a NEW size was created — the ungrouped one wasn't reused
+
+        var variant = await context.ProductVariants.AsNoTracking().Include(v => v.Size).FirstAsync(v => v.Sku == "F5519-778");
+        Assert.NotEqual(ungrouped778.Id, variant.SizeId);
+        Assert.Equal(hatSizeGroup.Id, variant.Size!.SizeGroupId);
+    }
+
+    // Confirms "24-7 Agility Pant" (letter clothing sizes, no Size Group at all — the real shape
+    // in Data/SeedData.cs) is unaffected by this fix: with no SizeGroupId, size matching stays
+    // exactly the global, by-label behavior it always was.
+    [Fact]
+    public async Task BulkUpdate_ProductWithNoSizeGroup_StillMatchesSizesGlobally()
+    {
+        var (context, connection) = CreateContext();
+        using var _ = connection;
+        using var __ = context;
+        var (category, merchant) = SeedCategoryAndMerchant(context);
+
+        var existingM = new Size { Label = "M" };
+        context.Sizes.Add(existingM);
+        var product = new Product
+        {
+            Sku = "WLM-APP-006", Name = "24-7 Agility Pant", Slug = "24-7-agility-pant", Price = 530.25m,
+            StockQuantity = 0, CategoryId = category.Id, MerchantId = merchant.Id // SizeGroupId left null, as SeedData.cs leaves it
+        };
+        context.Products.Add(product);
+        context.SaveChanges();
+
+        using var workbook = NewWorkbookWithHeaders();
+        WriteProductRow(workbook.Worksheet("Products"), 2, "WLM-APP-006", "24-7 Agility Pant", "Tactical Apparel", 530.25m, 0);
+        WriteVariantRow(workbook.Worksheet("Variants"), 2, "WLM-APP-006", "WLM-APP-006-M", 5, size: "M");
+
+        var controller = CreateController(context);
+        var model = Assert.IsType<BulkImportResult>(Assert.IsType<ViewResult>(await controller.BulkUpdate(ToFormFile(workbook))).Model);
+
+        Assert.Null(model.FatalError);
+        Assert.Empty(model.Errors);
+        Assert.Equal(1, await context.Sizes.CountAsync()); // reused the existing "M", never duplicated
+        var variant = await context.ProductVariants.AsNoTracking().FirstAsync(v => v.Sku == "WLM-APP-006-M");
+        Assert.Equal(existingM.Id, variant.SizeId);
+    }
+
+    // Covers the OTHER reasonable reading of "make sure 24-7 Agility Pant isn't affected" — in
+    // case it refers to the "Trouser Waist x Length" (TR-WL) Size Group itself (used by
+    // Tests.E2E's VariantPreselectGallerySyncTests fixture, not by the real seeded "24-7 Agility
+    // Pant", which uses plain letter sizes — see the test above) rather than that product by
+    // name: confirms combined Size+Length labels ("28x30") are ALSO matched within their Size
+    // Group correctly, not just plain labels.
+    [Fact]
+    public async Task BulkUpdate_TrouserWaistLengthSizeGroup_CombinedSizeAndLengthMatchedWithinGroup()
+    {
+        var (context, connection) = CreateContext();
+        using var _ = connection;
+        using var __ = context;
+        var (category, merchant) = SeedCategoryAndMerchant(context);
+
+        var trouserGroup = new SizeGroup { Code = "TR-WL", NameEn = "Trouser Waist x Length" };
+        context.SizeGroups.Add(trouserGroup);
+        context.SaveChanges(); // must commit before referencing .Id below — it's still 0 until this runs
+        var existingCombined = new Size { Label = "28x30", SizeGroupId = trouserGroup.Id, SortOrder = 1 };
+        context.Sizes.Add(existingCombined);
+        var product = new Product
+        {
+            Sku = "TRP-001", Name = "Field Trouser", Slug = "field-trouser", Price = 100m,
+            StockQuantity = 0, CategoryId = category.Id, MerchantId = merchant.Id, SizeGroupId = trouserGroup.Id
+        };
+        context.Products.Add(product);
+        context.SaveChanges();
+
+        using var workbook = NewWorkbookWithHeaders();
+        WriteProductRow(workbook.Worksheet("Products"), 2, "TRP-001", "Field Trouser", "Tactical Apparel", 100m, 0);
+        WriteVariantRow(workbook.Worksheet("Variants"), 2, "TRP-001", "TRP-001-2830", 5, size: "28", length: "30");
+
+        var controller = CreateController(context);
+        var model = Assert.IsType<BulkImportResult>(Assert.IsType<ViewResult>(await controller.BulkUpdate(ToFormFile(workbook))).Model);
+
+        Assert.Null(model.FatalError);
+        Assert.Empty(model.Errors);
+        Assert.Equal(1, await context.Sizes.CountAsync()); // matched the existing group Size, no duplicate
+        var variant = await context.ProductVariants.AsNoTracking().FirstAsync(v => v.Sku == "TRP-001-2830");
+        Assert.Equal(existingCombined.Id, variant.SizeId);
+    }
 }
