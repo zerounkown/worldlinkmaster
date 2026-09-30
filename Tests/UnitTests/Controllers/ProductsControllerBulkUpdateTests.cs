@@ -1342,4 +1342,313 @@ public class ProductsControllerBulkUpdateTests
         var variant = await context.ProductVariants.AsNoTracking().FirstAsync(v => v.Sku == "TRP-001-2830");
         Assert.Equal(existingCombined.Id, variant.SizeId);
     }
+
+    // --- Descriptions, Vendor SKU, Vendor Color Code -------------------------------------
+    // New columns: Products sheet gets Short Description / Short Description (Arabic) /
+    // Description / Description (Arabic) / Vendor SKU (after Name (Arabic)); Variants sheet gets
+    // Vendor Color Code. See ExcelHeaders/VariantExcelHeaders and ImportVariantsSheet's
+    // TryApplyVendorColorCodeAsync.
+
+    private static XLWorkbook NewWorkbookWithDescriptionAndVendorColumns()
+    {
+        var workbook = new XLWorkbook();
+        var productsSheet = workbook.Worksheets.Add("Products");
+        string[] productHeaders =
+        {
+            "Sku", "Name", "Category", "Price (AED)", "Wholesale Price (AED)", "Stock Quantity", "Image URL",
+            "Name (Arabic)", "Short Description", "Short Description (Arabic)", "Description", "Description (Arabic)", "Vendor SKU",
+            "Brand", "Subcategory", "Size Group", "Published"
+        };
+        for (var i = 0; i < productHeaders.Length; i++) productsSheet.Cell(1, i + 1).Value = productHeaders[i];
+
+        var variantsSheet = workbook.Worksheets.Add("Variants");
+        string[] variantHeaders =
+        {
+            "Product Sku (Parent)", "Internal Barcode", "Variant Sku", "Color", "Size", "Length",
+            "Price (AED)", "Price+VAT", "Wholesale Price (AED)", "Stock Quantity", "Image URL", "Vendor Color Code"
+        };
+        for (var i = 0; i < variantHeaders.Length; i++) variantsSheet.Cell(1, i + 1).Value = variantHeaders[i];
+
+        return workbook;
+    }
+
+    [Fact]
+    public async Task BulkUpdate_ExportThenReimport_MultiLineAndArabicDescriptionsWithLrm_PreservedExactly()
+    {
+        var (context, connection) = CreateContext();
+        using var _ = connection;
+        using var __ = context;
+        var (category, merchant) = SeedCategoryAndMerchant(context);
+
+        const string shortDesc = "Wide-brim boonie hat\nLightweight ripstop fabric";
+        const string shortDescAr = "قبعة بوني عريضة الحواف\nقماش خفيف الوزن";
+        const string desc = "Line one of the description.\nLine two.\nLine three with more detail.";
+        // ‎ is LRM (Left-to-Right Mark) — wraps an embedded English term inside Arabic text,
+        // exactly the kind of invisible character the task requires survives untouched.
+        const string descAr = "السطر الأول من الوصف.\nالسطر الثاني.\n‎ripstop‎ هو نوع القماش.";
+
+        var product = new Product
+        {
+            Sku = "F5519", Name = "Tactical Boonie", Slug = "tactical-boonie", Price = 40m,
+            StockQuantity = 5, CategoryId = category.Id, MerchantId = merchant.Id,
+            ShortDescription = shortDesc, ShortDescriptionAr = shortDescAr,
+            Description = desc, DescriptionAr = descAr, VendorSku = "VSKU-100"
+        };
+        context.Products.Add(product);
+        context.SaveChanges();
+
+        var controller = CreateController(context);
+
+        // Real export, then a re-upload of that exact file with nothing changed.
+        var exportResult = await controller.ExportExcel();
+        var fileResult = Assert.IsType<FileContentResult>(exportResult);
+        using var exported = new XLWorkbook(new MemoryStream(fileResult.FileContents));
+        var file = ToFormFile(exported);
+
+        var importResult = await controller.BulkUpdate(file);
+        var model = Assert.IsType<BulkImportResult>(Assert.IsType<ViewResult>(importResult).Model);
+
+        Assert.Null(model.FatalError);
+        Assert.Empty(model.Errors);
+        Assert.Equal(1, model.UpdatedCount);
+
+        var reloaded = await context.Products.AsNoTracking().FirstAsync(p => p.Sku == "F5519");
+        Assert.Equal(shortDesc, reloaded.ShortDescription);
+        Assert.Equal(shortDescAr, reloaded.ShortDescriptionAr);
+        Assert.Equal(desc, reloaded.Description);
+        Assert.Equal(descAr, reloaded.DescriptionAr);
+        Assert.Equal("VSKU-100", reloaded.VendorSku);
+    }
+
+    [Fact]
+    public async Task BulkUpdate_NewDescriptionColumns_BlankCellsLeaveExistingValuesUnchanged_NonBlankCellsApply()
+    {
+        var (context, connection) = CreateContext();
+        using var _ = connection;
+        using var __ = context;
+        var (category, merchant) = SeedCategoryAndMerchant(context);
+
+        var product = new Product
+        {
+            Sku = "F5519", Name = "Tactical Boonie", Slug = "tactical-boonie", Price = 40m,
+            StockQuantity = 5, CategoryId = category.Id, MerchantId = merchant.Id,
+            ShortDescription = "Old short description", Description = "Old description", VendorSku = "OLD-VSKU"
+            // ShortDescriptionAr left null on purpose — the row below gives it a value.
+        };
+        context.Products.Add(product);
+        context.SaveChanges();
+
+        using var workbook = NewWorkbookWithDescriptionAndVendorColumns();
+        var sheet = workbook.Worksheet("Products");
+        sheet.Cell(2, ColumnOf(sheet, "Sku")).Value = "F5519";
+        sheet.Cell(2, ColumnOf(sheet, "Name")).Value = "Tactical Boonie";
+        sheet.Cell(2, ColumnOf(sheet, "Category")).Value = "Tactical Apparel";
+        sheet.Cell(2, ColumnOf(sheet, "Price (AED)")).Value = 40m;
+        sheet.Cell(2, ColumnOf(sheet, "Stock Quantity")).Value = 5;
+        // Short Description and Vendor SKU cells left blank — must stay unchanged.
+        sheet.Cell(2, ColumnOf(sheet, "Description")).Value = "New description";
+        sheet.Cell(2, ColumnOf(sheet, "Short Description (Arabic)")).Value = "وصف مختصر جديد بالعربية";
+
+        var controller = CreateController(context);
+        var model = Assert.IsType<BulkImportResult>(Assert.IsType<ViewResult>(await controller.BulkUpdate(ToFormFile(workbook))).Model);
+
+        Assert.Null(model.FatalError);
+        Assert.Empty(model.Errors);
+
+        var reloaded = await context.Products.AsNoTracking().FirstAsync(p => p.Sku == "F5519");
+        Assert.Equal("Old short description", reloaded.ShortDescription); // blank cell — unchanged
+        Assert.Equal("OLD-VSKU", reloaded.VendorSku); // blank cell — unchanged
+        Assert.Equal("New description", reloaded.Description); // non-blank — applied
+        Assert.Equal("وصف مختصر جديد بالعربية", reloaded.ShortDescriptionAr); // non-blank — applied
+    }
+
+    [Fact]
+    public async Task BulkUpdate_OldFormatFileWithoutNewDescriptionColumns_StillImportsCorrectly()
+    {
+        var (context, connection) = CreateContext();
+        using var _ = connection;
+        using var __ = context;
+        var (category, merchant) = SeedCategoryAndMerchant(context);
+
+        var product = new Product
+        {
+            Sku = "152", Name = "Field Pants", Slug = "field-pants", Price = 100m,
+            StockQuantity = 50, CategoryId = category.Id, MerchantId = merchant.Id,
+            ShortDescription = "Existing short description", Description = "Existing description"
+        };
+        context.Products.Add(product);
+        context.SaveChanges();
+
+        using var workbook = NewWorkbookWithHeaders(); // the OLD shape — none of the new columns exist
+        WriteProductRow(workbook.Worksheet("Products"), 2, "152", "Field Pants", "Tactical Apparel", 150m, 999);
+
+        var controller = CreateController(context);
+        var model = Assert.IsType<BulkImportResult>(Assert.IsType<ViewResult>(await controller.BulkUpdate(ToFormFile(workbook))).Model);
+
+        Assert.Null(model.FatalError);
+        Assert.Empty(model.Errors);
+
+        var reloaded = await context.Products.AsNoTracking().FirstAsync(p => p.Sku == "152");
+        Assert.Equal(150m, reloaded.Price); // the row itself still applies
+        Assert.Equal("Existing short description", reloaded.ShortDescription); // untouched — column doesn't exist in this file
+        Assert.Equal("Existing description", reloaded.Description); // untouched
+    }
+
+    [Fact]
+    public async Task BulkUpdate_VariantVendorColorCode_NewVariant_CreatesProductColorWithCode()
+    {
+        var (context, connection) = CreateContext();
+        using var _ = connection;
+        using var __ = context;
+        var (category, merchant) = SeedCategoryAndMerchant(context);
+
+        var product = new Product
+        {
+            Sku = "F5519", Name = "Tactical Boonie", Slug = "tactical-boonie", Price = 40m,
+            StockQuantity = 0, CategoryId = category.Id, MerchantId = merchant.Id
+        };
+        context.Products.Add(product);
+        context.SaveChanges();
+
+        using var workbook = NewWorkbookWithDescriptionAndVendorColumns();
+        var variantsSheet = workbook.Worksheet("Variants");
+        variantsSheet.Cell(2, ColumnOf(variantsSheet, "Product Sku (Parent)")).Value = "F5519";
+        variantsSheet.Cell(2, ColumnOf(variantsSheet, "Variant Sku")).Value = "F5519-BLK";
+        variantsSheet.Cell(2, ColumnOf(variantsSheet, "Color")).Value = "Black";
+        variantsSheet.Cell(2, ColumnOf(variantsSheet, "Stock Quantity")).Value = 5;
+        variantsSheet.Cell(2, ColumnOf(variantsSheet, "Vendor Color Code")).Value = "001";
+
+        var controller = CreateController(context);
+        var model = Assert.IsType<BulkImportResult>(Assert.IsType<ViewResult>(await controller.BulkUpdate(ToFormFile(workbook))).Model);
+
+        Assert.Null(model.FatalError);
+        Assert.Empty(model.Errors);
+        Assert.Equal(1, model.VariantsCreatedCount);
+
+        var productColor = await context.ProductColors.AsNoTracking().Include(pc => pc.Color)
+            .FirstOrDefaultAsync(pc => pc.ProductId == product.Id && pc.Color!.Name == "Black");
+        Assert.NotNull(productColor);
+        Assert.Equal("001", productColor!.VendorColorCode);
+
+        var variant = await context.ProductVariants.AsNoTracking().FirstAsync(v => v.Sku == "F5519-BLK");
+        Assert.Equal(productColor.Id, variant.ProductColorId);
+    }
+
+    [Fact]
+    public async Task BulkUpdate_VariantVendorColorCode_ConflictingCodesForSameProductAndColor_FailsTheConflictingRow()
+    {
+        var (context, connection) = CreateContext();
+        using var _ = connection;
+        using var __ = context;
+        var (category, merchant) = SeedCategoryAndMerchant(context);
+
+        var product = new Product
+        {
+            Sku = "F5519", Name = "Tactical Boonie", Slug = "tactical-boonie", Price = 40m,
+            StockQuantity = 0, CategoryId = category.Id, MerchantId = merchant.Id
+        };
+        context.Products.Add(product);
+        context.SaveChanges();
+
+        using var workbook = NewWorkbookWithDescriptionAndVendorColumns();
+        var variantsSheet = workbook.Worksheet("Variants");
+        void WriteRow(int row, string variantSku, string vendorColorCode)
+        {
+            variantsSheet.Cell(row, ColumnOf(variantsSheet, "Product Sku (Parent)")).Value = "F5519";
+            variantsSheet.Cell(row, ColumnOf(variantsSheet, "Variant Sku")).Value = variantSku;
+            variantsSheet.Cell(row, ColumnOf(variantsSheet, "Color")).Value = "Black";
+            variantsSheet.Cell(row, ColumnOf(variantsSheet, "Stock Quantity")).Value = 5;
+            variantsSheet.Cell(row, ColumnOf(variantsSheet, "Vendor Color Code")).Value = vendorColorCode;
+        }
+        // Two sizes of the same Black hat, disagreeing on the vendor color code.
+        WriteRow(2, "F5519-BLK-S", "001");
+        WriteRow(3, "F5519-BLK-M", "002");
+
+        var controller = CreateController(context);
+        var model = Assert.IsType<BulkImportResult>(Assert.IsType<ViewResult>(await controller.BulkUpdate(ToFormFile(workbook))).Model);
+
+        Assert.Null(model.FatalError);
+        Assert.Single(model.Errors);
+        Assert.Contains("conflicts with", model.Errors[0]);
+        Assert.Equal(1, model.VariantsCreatedCount); // only the first (non-conflicting) row succeeded
+        Assert.False(await context.ProductVariants.AnyAsync(v => v.Sku == "F5519-BLK-M")); // the conflicting row's whole variant was skipped
+
+        var productColor = await context.ProductColors.AsNoTracking().FirstOrDefaultAsync(pc => pc.ProductId == product.Id);
+        Assert.NotNull(productColor);
+        Assert.Equal("001", productColor!.VendorColorCode); // the first (accepted) row's value wins
+    }
+
+    [Fact]
+    public async Task BulkUpdate_VariantVendorColorCode_ExistingVariant_UpdatesProductColorsVendorCode()
+    {
+        var (context, connection) = CreateContext();
+        using var _ = connection;
+        using var __ = context;
+        var (category, merchant) = SeedCategoryAndMerchant(context);
+
+        var black = new Color { Name = "Black", HexCode = "#1c1c1c" };
+        context.Colors.Add(black);
+        var product = new Product
+        {
+            Sku = "F5519", Name = "Tactical Boonie", Slug = "tactical-boonie", Price = 40m,
+            StockQuantity = 5, CategoryId = category.Id, MerchantId = merchant.Id
+        };
+        context.Products.Add(product);
+        context.SaveChanges();
+        var productColor = new ProductColor { Code = "F5519-BLACK", ProductId = product.Id, ColorId = black.Id, VendorColorCode = "OLD-CODE" };
+        context.ProductColors.Add(productColor);
+        context.SaveChanges();
+        context.ProductVariants.Add(new ProductVariant { ProductId = product.Id, ColorId = black.Id, ProductColorId = productColor.Id, Sku = "F5519-BLK", StockQuantity = 5 });
+        context.SaveChanges();
+
+        using var workbook = NewWorkbookWithDescriptionAndVendorColumns();
+        var variantsSheet = workbook.Worksheet("Variants");
+        variantsSheet.Cell(2, ColumnOf(variantsSheet, "Product Sku (Parent)")).Value = "F5519";
+        variantsSheet.Cell(2, ColumnOf(variantsSheet, "Variant Sku")).Value = "F5519-BLK";
+        variantsSheet.Cell(2, ColumnOf(variantsSheet, "Stock Quantity")).Value = 5;
+        variantsSheet.Cell(2, ColumnOf(variantsSheet, "Vendor Color Code")).Value = "NEW-CODE";
+
+        var controller = CreateController(context);
+        var model = Assert.IsType<BulkImportResult>(Assert.IsType<ViewResult>(await controller.BulkUpdate(ToFormFile(workbook))).Model);
+
+        Assert.Null(model.FatalError);
+        Assert.Empty(model.Errors);
+        Assert.Equal(1, model.VariantsUpdatedCount);
+
+        var reloaded = await context.ProductColors.AsNoTracking().FirstAsync(pc => pc.Id == productColor.Id);
+        Assert.Equal("NEW-CODE", reloaded.VendorColorCode);
+    }
+
+    [Fact]
+    public async Task BulkUpdate_VariantVendorColorCode_NoColorOnRow_FailsWithClearError()
+    {
+        var (context, connection) = CreateContext();
+        using var _ = connection;
+        using var __ = context;
+        var (category, merchant) = SeedCategoryAndMerchant(context);
+
+        var product = new Product
+        {
+            Sku = "F5519", Name = "Tactical Boonie", Slug = "tactical-boonie", Price = 40m,
+            StockQuantity = 0, CategoryId = category.Id, MerchantId = merchant.Id
+        };
+        context.Products.Add(product);
+        context.SaveChanges();
+
+        using var workbook = NewWorkbookWithDescriptionAndVendorColumns();
+        var variantsSheet = workbook.Worksheet("Variants");
+        variantsSheet.Cell(2, ColumnOf(variantsSheet, "Product Sku (Parent)")).Value = "F5519";
+        variantsSheet.Cell(2, ColumnOf(variantsSheet, "Variant Sku")).Value = "F5519-NOCOLOR";
+        variantsSheet.Cell(2, ColumnOf(variantsSheet, "Stock Quantity")).Value = 5;
+        variantsSheet.Cell(2, ColumnOf(variantsSheet, "Vendor Color Code")).Value = "001"; // Color cell left blank
+
+        var controller = CreateController(context);
+        var model = Assert.IsType<BulkImportResult>(Assert.IsType<ViewResult>(await controller.BulkUpdate(ToFormFile(workbook))).Model);
+
+        Assert.Null(model.FatalError);
+        Assert.Single(model.Errors);
+        Assert.Contains("no Color", model.Errors[0]);
+        Assert.Equal(0, model.VariantsCreatedCount);
+        Assert.False(await context.ProductVariants.AnyAsync(v => v.Sku == "F5519-NOCOLOR"));
+    }
 }
