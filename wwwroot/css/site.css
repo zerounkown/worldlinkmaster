@@ -5032,6 +5032,18 @@ a:hover {
   margin-bottom: 32px;
 }
 
+/* Shorter banner + tighter gap before the filters/product grid, scoped to the listing/
+   collection/search results pages only (Products/Index — All Products, category,
+   subcategory and search — plus Products/Sales and Products/NewArrivals). .page-banner
+   itself is shared by many unrelated pages (cart, checkout, static pages, etc.) and stays
+   at its original size everywhere else. Only reduces padding/margin, not min-height, so the
+   optional photo hero (.page-banner-category-photo / .page-banner-sale-photo) is unaffected —
+   its height comes from min-height, not padding. */
+.page-banner-compact {
+  padding: 15px 0;
+  margin-bottom: 16px;
+}
+
 /* Edge-to-edge content wrapper, used on specific sections that should run to both screen edges
    instead of sitting in Bootstrap's centered max-width .container: the category/All Products
    page (hero banner, subcategory tile row, filter sidebar, product grid) and the homepage's Shop
