@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Text.RegularExpressions;
 using ClosedXML.Excel;
 
 namespace WorldLinkMaster.Web.Areas.Admin.Controllers;
@@ -7,6 +8,20 @@ namespace WorldLinkMaster.Web.Areas.Admin.Controllers;
 // older simple Bulk Update tool has its own private copies of the same ideas).
 internal static class ExcelImportHelpers
 {
+    // "Does this name already exist" matching key for anything auto-created by name during an
+    // import (Colors, Brands, ...): trims the ends and collapses any run of internal whitespace
+    // (extra spaces, tabs) down to one space. Pair with StringComparer.OrdinalIgnoreCase for
+    // case-insensitivity — this only handles whitespace. A vendor file with "Coyote  Tan"
+    // (double space) or a stray tab used to miss an existing "Coyote Tan" row on whitespace
+    // alone and mint a fresh duplicate every time it was re-imported — see the incident notes on
+    // MasterDataController.ImportColorsAsync/ImportBrandsAsync and
+    // ProductsController.ImportVariantsSheet (Bulk Update)'s colorsByName.
+    private static readonly Regex InternalWhitespacePattern = new(@"\s+", RegexOptions.Compiled);
+
+    public static string NormalizeNameForMatching(string name) =>
+        InternalWhitespacePattern.Replace(name.Trim(), " ");
+
+
     public static Dictionary<string, int> MapHeaders(IXLWorksheet sheet)
     {
         var map = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);

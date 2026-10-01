@@ -1289,9 +1289,17 @@ public class ProductsController : AdminBaseController
         // variant row was read. Keying Sizes by NormalizeSizeKey (not the raw label) means an
         // incoming "30X32" or "30 × 32" also lands on that same existing row below, instead of
         // minting a near-duplicate size that differs only by separator or case.
+        //
+        // Keyed by ExcelImportHelpers.NormalizeNameForMatching (trim + collapse internal
+        // whitespace runs to one space), not just .Trim() — a vendor file with "Coyote  Tan"
+        // (double space) used to miss the existing "Coyote Tan" row on that whitespace
+        // difference alone and mint a fresh duplicate color every time it was re-imported.
+        // Prefers an Active color, then the lowest Id, when more than one existing color shares
+        // a name — matches whichever color an admin would expect "the real one" to be rather
+        // than an arbitrary one.
         var colorsByName = (await _context.Colors.ToListAsync())
-            .GroupBy(c => c.Name.Trim(), StringComparer.OrdinalIgnoreCase)
-            .ToDictionary(g => g.Key, g => g.OrderBy(c => c.Id).First(), StringComparer.OrdinalIgnoreCase);
+            .GroupBy(c => ExcelImportHelpers.NormalizeNameForMatching(c.Name), StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(g => g.Key, g => g.OrderByDescending(c => c.Active).ThenBy(c => c.Id).First(), StringComparer.OrdinalIgnoreCase);
 
         // Sizes are matched/created WITHIN the owning product's own Size Group first, never
         // across groups — a short, common label like "7" can easily already exist in a totally
@@ -1311,6 +1319,16 @@ public class ProductsController : AdminBaseController
             .GroupBy(s => NormalizeSizeKey(s.Label))
             .ToDictionary(g => g.Key, g => g.OrderBy(s => s.Id).First());
 
+        // Parallel to sizesByGroupAndKey/ungroupedSizesByKey above (which match by label), but
+        // grouping ALL of a group's sizes together regardless of label — ComputeSortOrderForNewSize
+        // needs the whole group's current SortOrder values to position a newly-created size
+        // correctly relative to them (see that method), not just a single matched-or-not lookup.
+        var sizesByGroupId = allSizes
+            .Where(s => s.SizeGroupId.HasValue)
+            .GroupBy(s => s.SizeGroupId!.Value)
+            .ToDictionary(g => g.Key, g => g.ToList());
+        var ungroupedSizesList = allSizes.Where(s => !s.SizeGroupId.HasValue).ToList();
+
         // Shared by both the new-variant and existing-variant-update branches below, so a
         // re-upload of the same file re-resolves (and can correct) an EXISTING variant's Size the
         // same way a brand-new one would — needed so re-running Bulk Update can heal a variant
@@ -1328,13 +1346,20 @@ public class ProductsController : AdminBaseController
                     return existingGrouped;
                 }
 
+                if (!sizesByGroupId.TryGetValue(groupId.Value, out var groupSizes))
+                {
+                    groupSizes = new List<Size>();
+                    sizesByGroupId[groupId.Value] = groupSizes;
+                }
+
                 var createdInGroup = new Size
                 {
                     Label = label,
                     SizeGroupId = groupId.Value,
-                    SortOrder = sizesByGroupAndKey.Keys.Count(k => k.GroupId == groupId.Value)
+                    SortOrder = ComputeSortOrderForNewSize(label, groupSizes)
                 };
                 sizesByGroupAndKey[groupKey] = createdInGroup;
+                groupSizes.Add(createdInGroup);
                 _context.Sizes.Add(createdInGroup);
                 return createdInGroup;
             }
@@ -1344,8 +1369,9 @@ public class ProductsController : AdminBaseController
                 return existingUngrouped;
             }
 
-            var createdUngrouped = new Size { Label = label, SortOrder = ungroupedSizesByKey.Count };
+            var createdUngrouped = new Size { Label = label, SortOrder = ComputeSortOrderForNewSize(label, ungroupedSizesList) };
             ungroupedSizesByKey[sizeKey] = createdUngrouped;
+            ungroupedSizesList.Add(createdUngrouped);
             _context.Sizes.Add(createdUngrouped);
             return createdUngrouped;
         }
@@ -1548,10 +1574,11 @@ public class ProductsController : AdminBaseController
             var colorName = colorCol == null ? string.Empty : row.Cell(colorCol.Value).GetString().Trim();
             if (!string.IsNullOrWhiteSpace(colorName))
             {
-                if (!colorsByName.TryGetValue(colorName, out color))
+                var colorKey = ExcelImportHelpers.NormalizeNameForMatching(colorName);
+                if (!colorsByName.TryGetValue(colorKey, out color))
                 {
                     color = new Color { Name = colorName, HexCode = KnownColorHex.GetValueOrDefault(colorName, "#808080") };
-                    colorsByName[colorName] = color;
+                    colorsByName[colorKey] = color;
                     _context.Colors.Add(color);
                 }
             }
@@ -1627,6 +1654,125 @@ public class ProductsController : AdminBaseController
     {
         var match = SizeLengthSplitPattern.Match(label.Trim());
         return match.Success ? (match.Groups[1].Value, match.Groups[2].Value) : (label, null);
+    }
+
+    // Which recognized shape a size label fits — used only to decide where a newly AUTO-CREATED
+    // size belongs within its group (see ComputeSortOrderForNewSize below), not for matching
+    // (NormalizeSizeKey/ResolveSize above already handle that). Comparisons only ever happen
+    // between two ranks of the SAME PatternType — a waist×length size is never compared against
+    // a letter size.
+    private enum SizePatternType { Letter, WaistLength, Numeric }
+
+    private readonly record struct SizeRank(SizePatternType PatternType, decimal Primary, decimal Secondary = 0m)
+    {
+        public int CompareTo(SizeRank other)
+        {
+            var primary = Primary.CompareTo(other.Primary);
+            return primary != 0 ? primary : Secondary.CompareTo(other.Secondary);
+        }
+    }
+
+    // Standard apparel letter-size order the store owner asked for: XXS, XS, S, M, L, XL, then
+    // 2XL through 10XL. XXL/XXXL/XXXXL are accepted as alternate spellings of 2XL/3XL/4XL (common
+    // on vendor sheets that don't use the "NXL" convention) and rank identically to them.
+    private static readonly Dictionary<string, int> LetterSizeOrder = BuildLetterSizeOrder();
+
+    private static Dictionary<string, int> BuildLetterSizeOrder()
+    {
+        var order = new List<string> { "XXS", "XS", "S", "M", "L", "XL" };
+        for (var n = 2; n <= 10; n++)
+        {
+            order.Add($"{n}XL");
+        }
+
+        var map = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        for (var i = 0; i < order.Count; i++)
+        {
+            map[order[i]] = i;
+        }
+
+        map["XXL"] = map["2XL"];
+        map["XXXL"] = map["3XL"];
+        map["XXXXL"] = map["4XL"];
+        return map;
+    }
+
+    // Recognizes exactly the three shapes the store owner described — a standard letter size, a
+    // "waist x length" pair (reusing SizeLengthSplitPattern, same separator rules as everywhere
+    // else sizes are parsed), or a bare number. Anything else (a shoe size with a half ("9.5" IS
+    // covered by the numeric branch, but "One Size" or an un-recognized vendor label is not) comes
+    // back false, and the caller falls back to appending at the end — exactly the old behavior,
+    // never worse than before this fix.
+    private static bool TryGetSizeRank(string label, out SizeRank rank)
+    {
+        var trimmed = label.Trim();
+
+        if (LetterSizeOrder.TryGetValue(trimmed, out var letterIndex))
+        {
+            rank = new SizeRank(SizePatternType.Letter, letterIndex);
+            return true;
+        }
+
+        var waistLengthMatch = SizeLengthSplitPattern.Match(trimmed);
+        if (waistLengthMatch.Success)
+        {
+            rank = new SizeRank(
+                SizePatternType.WaistLength,
+                decimal.Parse(waistLengthMatch.Groups[1].Value, CultureInfo.InvariantCulture),
+                decimal.Parse(waistLengthMatch.Groups[2].Value, CultureInfo.InvariantCulture));
+            return true;
+        }
+
+        if (decimal.TryParse(trimmed, NumberStyles.Number, CultureInfo.InvariantCulture, out var numeric))
+        {
+            rank = new SizeRank(SizePatternType.Numeric, numeric);
+            return true;
+        }
+
+        rank = default;
+        return false;
+    }
+
+    // Positions a newly auto-created size correctly within its group instead of always appending
+    // it at the end (max SortOrder + 1) — the bug report that prompted this: a group's waist×
+    // length sizes ending up in whatever order they happened to be uploaded in, and a letter size
+    // like "XXS" landing after numeric ones instead of first. Only compares the new label against
+    // OTHER sizes already in the group that fit the SAME recognized pattern (a waist×length size
+    // is positioned relative to other waist×length sizes only, etc.) — sizes of a different or
+    // unrecognized shape already in the group are left exactly where they are, just renumbered
+    // (shifted up by one) if the new size needs to land at or before their current SortOrder, so
+    // nothing ever ends up sharing a SortOrder with another size in the same group. A label that
+    // doesn't fit any recognized pattern — same as a group with nothing of the new label's kind to
+    // compare against yet — keeps the old "append at the end" behavior.
+    private static int ComputeSortOrderForNewSize(string label, List<Size> existingSizesInGroup)
+    {
+        var maxSortOrder = existingSizesInGroup.Count == 0 ? -1 : existingSizesInGroup.Max(s => s.SortOrder);
+
+        if (!TryGetSizeRank(label, out var newRank))
+        {
+            return maxSortOrder + 1;
+        }
+
+        var samePatternOrdered = existingSizesInGroup
+            .Select(s => (Size: s, Rank: TryGetSizeRank(s.Label, out var r) ? (SizeRank?)r : null))
+            .Where(x => x.Rank.HasValue && x.Rank.Value.PatternType == newRank.PatternType)
+            .OrderBy(x => x.Rank!.Value.Primary).ThenBy(x => x.Rank!.Value.Secondary)
+            .ToList();
+
+        if (samePatternOrdered.Count == 0)
+        {
+            return maxSortOrder + 1;
+        }
+
+        var after = samePatternOrdered.FirstOrDefault(x => x.Rank!.Value.CompareTo(newRank) > 0).Size;
+        var insertAt = after?.SortOrder ?? (maxSortOrder + 1);
+
+        foreach (var existing in existingSizesInGroup.Where(s => s.SortOrder >= insertAt))
+        {
+            existing.SortOrder++;
+        }
+
+        return insertAt;
     }
 
     // Resolves an excl.-VAT / incl.-VAT column pair (Price (AED)/Price+VAT, or Wholesale Price
