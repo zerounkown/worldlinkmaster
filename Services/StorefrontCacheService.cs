@@ -77,9 +77,12 @@ public class StorefrontCacheService : IStorefrontCacheService
     private async Task<NavMenuData> LoadNavMenuDataAsync()
     {
         // Only the columns Views/Shared/_Layout.cshtml's mega-menu/side-nav actually render —
-        // notably no Description/DescriptionAr, which is what the old Include-based version of
-        // this query used to pull for nothing (Category.Description is small/bounded, but this
-        // keeps the query and the Product-shaped ones below built the same deliberate way).
+        // Includes Description/DescriptionAr on both levels — Category/Subcategory.Description
+        // is small/bounded ([StringLength(400)]), unlike Product's unbounded text fields, and
+        // Subcategory.LocalizedDescription() is what the generic per-category mega-menu dropdown
+        // uses for its promo caption (_Layout.cshtml's megaColumns rendering) — leaving it out
+        // would silently fall back to showing the subcategory's name instead of its real
+        // marketing copy for every category menu except Apparel's own hand-curated one.
         var navCategories = await _context.Categories
             .AsNoTracking()
             .OrderBy(c => c.Name)
@@ -89,6 +92,8 @@ public class StorefrontCacheService : IStorefrontCacheService
                 Name = c.Name,
                 NameAr = c.NameAr,
                 Slug = c.Slug,
+                Description = c.Description,
+                DescriptionAr = c.DescriptionAr,
                 ImageUrl = c.ImageUrl,
                 DisplayOrder = c.DisplayOrder,
                 Subcategories = c.Subcategories
@@ -99,6 +104,8 @@ public class StorefrontCacheService : IStorefrontCacheService
                         Name = s.Name,
                         NameAr = s.NameAr,
                         Slug = s.Slug,
+                        Description = s.Description,
+                        DescriptionAr = s.DescriptionAr,
                         ImageUrl = s.ImageUrl,
                         CategoryId = s.CategoryId,
                         DisplayOrder = s.DisplayOrder,

@@ -392,12 +392,50 @@
                 .ToList())
         };
 
+        // Any subcategory with published products that isn't already linked by one of the hand-
+        // curated garment columns above (T-Shirts/Pants's whole families, Jackets & Outerwear's
+        // and Uniforms & Shirts's real-subcategory links) gets its own auto-generated column
+        // here, in the same (Header, single "View All" link) shape as Pants/T-Shirts — this is
+        // what makes a newly added subcategory (e.g. Headwear) show up in the Apparel menu
+        // automatically instead of needing another hand-written column like the ones above. Same
+        // "only show what actually has data" gate (subcategoriesWithPublishedProducts) every
+        // other part of this menu already uses, and the same leftovers mechanism BuildMegaColumns
+        // already applies for every other category's own mega-menu.
+        var usedSubcategoryIds = tShirtFamilyIds
+            .Concat(pantsFamilyIds)
+            .Concat(combatShirtIds)
+            .Concat(tacticalJacketsSub != null ? new[] { tacticalJacketsSub.Id } : Array.Empty<int>())
+            .Concat(baseLayersSub != null ? new[] { baseLayersSub.Id } : Array.Empty<int>())
+            .ToHashSet();
+        var leftoverColumns = apparelCategory.Subcategories
+            .Where(s => subcategoriesWithPublishedProducts.Contains(s.Id) && !usedSubcategoryIds.Contains(s.Id))
+            .OrderBy(s => s.Name)
+            .Select(s =>
+            {
+                var href = ProductsUrl(new { categoryId = apparelCategory.Id, subcategoryId = s.Id });
+                var promoImage = ImagePlaceholder.IsRealImageUrl(s.ImageUrl) ? s.ImageUrl : apparelCategory.ImageUrl;
+                var promoCaption = s.LocalizedDescription();
+                if (string.IsNullOrWhiteSpace(promoCaption)) { promoCaption = s.LocalizedName(); }
+                return (
+                    Header: s.LocalizedName(),
+                    Groups: OneGroup(new List<(string, string)> { (Localizer["View All"].Value, href) }),
+                    PromoImage: (string?)promoImage,
+                    PromoCaption: (string?)promoCaption,
+                    PromoCtaText: (string?)Localizer["Shop {0}", s.LocalizedName()].Value,
+                    PromoCtaHref: (string?)href);
+            })
+            .ToList();
+
         // Returned in a fixed order the caller relies on to split into two visual rows: the first
         // 5 (garment-type browsing) render as row 1, the last 3 (attribute filtering) as row 2 —
         // see the Take(5)/Skip(5) split in the desktop panel markup below. Only the row-1 columns
         // carry promo data (PromoImage etc.) — hovering a row-2 column leaves the promo panel on
         // whatever was last shown, same as how the panel behaves for every other category today.
-        return new()
+        // Any auto-generated leftover columns (see above) are appended after index 7 — the
+        // desktop column-grouping (apparelMenuColumnGroups, below) gives each one its own
+        // physical column; the mobile side-nav already renders every entry in this list as a
+        // flat stack regardless of count.
+        var columns = new List<(string Header, List<(string? SubHeader, List<(string Label, string Href)> Items)> Groups, string? PromoImage, string? PromoCaption, string? PromoCtaText, string? PromoCtaHref)>
         {
             ("Featured", featured, apparelCategory.ImageUrl, megaMenuPromoCaptionBySlug.GetValueOrDefault(apparelCategory.Slug, apparelCategory.LocalizedName()), $"Shop {navLabelBySlug.GetValueOrDefault(apparelCategory.Slug, apparelCategory.LocalizedName())}", Url.Action("Index", "Products", new { categoryId = apparelCategory.Id })),
             ("T-Shirts", tShirts, PexelsPromo(15814566), "Breathable everyday tees built for the field.", "Shop T-Shirts", tShirts[0].Items.Count > 0 ? tShirts[0].Items[0].Href : ProductsUrl(new { categoryId = apparelCategory.Id })),
@@ -408,6 +446,8 @@
             ("Shop by Size", shopBySize, null, null, null, null),
             ("Colors & Brands", colorsAndBrands, null, null, null, null)
         };
+        columns.AddRange(leftoverColumns);
+        return columns;
     }
 
     var apparelCategoryForMenu = navCategories.FirstOrDefault(c => c.Slug == "tactical-apparel");
@@ -425,6 +465,9 @@
     // run longer than Featured/T-Shirts/Shop by Use, so each tall one is paired with a short
     // one). Mobile's side-nav panel is unaffected — it already renders all 8 as one flat
     // stacked list regardless of this grouping (see apparelMenuColumns.Take/foreach below).
+    // Any BuildApparelMenuAsync entries past index 7 are the auto-generated leftover-subcategory
+    // columns (e.g. Headwear) — each gets its own single-entry group here, so it renders as its
+    // own full physical column rather than needing a hand-picked pairing like the fixed 8 above.
     var apparelMenuColumnGroups = new[]
     {
         new[] { 0, 2 }, // Featured + Pants
@@ -432,7 +475,7 @@
         new[] { 3, 5 }, // Jackets & Outerwear + Shop by Use
         new[] { 6 },    // Shop by Size
         new[] { 7 }     // Colors & Brands
-    };
+    }.Concat(Enumerable.Range(8, Math.Max(0, apparelMenuColumns.Count - 8)).Select(i => new[] { i })).ToArray();
 }
 <!DOCTYPE html>
 <html lang="@currentCulture" dir="@(isRtl ? "rtl" : "ltr")">

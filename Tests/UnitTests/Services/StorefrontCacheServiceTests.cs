@@ -161,6 +161,67 @@ public class StorefrontCacheServiceTests
     }
 
     [Fact]
+    public async Task GetNavMenuDataAsync_NavCategories_PreservesDescriptionAndDescriptionAr()
+    {
+        // Regression guard: an earlier version of LoadNavMenuDataAsync's .Select() projection
+        // omitted Category/Subcategory.Description(Ar) entirely, which silently broke the
+        // generic per-category mega-menu's promo caption (_Layout.cshtml falls back to showing
+        // the subcategory's name instead when LocalizedDescription() comes back empty) for every
+        // category except Apparel's own hand-curated menu.
+        var (context, connection) = CreateContext();
+        using var _ = connection;
+        var category = new Category { Name = "Footwear", Slug = "footwear", Description = "Boots built for the field.", DescriptionAr = "أحذية مصممة للميدان." };
+        context.Categories.Add(category);
+        context.SaveChanges();
+        var subcategory = new Subcategory { Name = "Boots", Slug = "boots", CategoryId = category.Id, Description = "Rugged all-terrain boots.", DescriptionAr = "أحذية وعرة لجميع التضاريس." };
+        context.Subcategories.Add(subcategory);
+        context.SaveChanges();
+
+        var service = new StorefrontCacheService(context, new MemoryCache(new MemoryCacheOptions()));
+        var data = await service.GetNavMenuDataAsync();
+
+        var cachedCategory = Assert.Single(data.NavCategories);
+        Assert.Equal("Boots built for the field.", cachedCategory.Description);
+        Assert.Equal("أحذية مصممة للميدان.", cachedCategory.DescriptionAr);
+        var cachedSubcategory = Assert.Single(cachedCategory.Subcategories);
+        Assert.Equal("Rugged all-terrain boots.", cachedSubcategory.Description);
+        Assert.Equal("أحذية وعرة لجميع التضاريس.", cachedSubcategory.DescriptionAr);
+    }
+
+    [Fact]
+    public async Task GetNavMenuDataAsync_SubcategoryNotInAnyHardcodedFamily_StillHasPublishedProductsFlaggedCorrectly()
+    {
+        // Mirrors the real Headwear bug: a subcategory under Apparel that the hand-curated
+        // Apparel mega-menu (BuildApparelMenuAsync in _Layout.cshtml) never references by slug —
+        // the data this service provides must still correctly flag it as "has published
+        // products" so the view's own leftover-column logic can pick it up. This test covers the
+        // cached DATA only; Tests.E2E/Journeys/ApparelMegaMenuHeadwearTests.cs covers the actual
+        // rendered menu column end to end.
+        var (context, connection) = CreateContext();
+        using var _ = connection;
+        var merchant = SeedMerchant(context);
+        var apparel = new Category { Name = "Tactical Apparel", Slug = "tactical-apparel" };
+        context.Categories.Add(apparel);
+        context.SaveChanges();
+        var headwear = new Subcategory { Name = "Headwear", Slug = "headwear", CategoryId = apparel.Id };
+        context.Subcategories.Add(headwear);
+        context.SaveChanges();
+        context.Products.Add(new Product
+        {
+            Name = "Tactical Boonie", Slug = "tactical-boonie", Sku = "F5519", Price = 59.99m, StockQuantity = 10,
+            IsPublished = true, CategoryId = apparel.Id, SubcategoryId = headwear.Id, MerchantId = merchant.Id
+        });
+        context.SaveChanges();
+
+        var service = new StorefrontCacheService(context, new MemoryCache(new MemoryCacheOptions()));
+        var data = await service.GetNavMenuDataAsync();
+
+        Assert.Contains(headwear.Id, data.SubcategoriesWithPublishedProducts);
+        var cachedApparel = Assert.Single(data.NavCategories);
+        Assert.Contains(cachedApparel.Subcategories, s => s.Slug == "headwear");
+    }
+
+    [Fact]
     public async Task GetNavMenuDataAsync_QuickFilterProducts_OnlyIncludesTShirtAndPantsFamilySubcategories()
     {
         var (context, connection) = CreateContext();
