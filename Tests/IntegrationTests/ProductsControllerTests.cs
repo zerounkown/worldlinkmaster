@@ -87,12 +87,14 @@ public class ProductsControllerTests : IClassFixture<CustomWebApplicationFactory
     }
 
     private const string FullPageRenderSkipReason =
-        "Every full page (any successful View() result) renders _Layout.cshtml, which itself runs " +
-        "Products.Where(p => p.IsFeatured).OrderByDescending(p => p.Rating) for the nav 'specials' " +
-        "preview (_Layout.cshtml ~line 38) — Rating is decimal, and SQLite's EF Core provider " +
+        "Details() calls PromoService.GetTopActiveEventAsync(), which orders PromoEvents by " +
+        "OrderByDescending(e => e.DiscountPercent) (a decimal column) — SQLite's EF Core provider " +
         "cannot translate ORDER BY over decimal columns at all (same limitation as the Index() " +
-        "tests above, not an app bug; Postgres handles this correctly). The NotFound()-returning " +
-        "Details_UnknownSlug test below doesn't render a view and is unaffected.";
+        "tests above, not an app bug; Postgres handles this correctly). Verified empirically: " +
+        "_Layout.cshtml itself no longer queries the database directly at all (see " +
+        "IStorefrontCacheService) and is not the cause despite what an earlier version of this " +
+        "comment said. The NotFound()-returning Details_UnknownSlug test below returns before " +
+        "reaching GetTopActiveEventAsync() and is unaffected.";
 
     [Fact]
     public async Task Details_UnknownSlug_ReturnsNotFound()

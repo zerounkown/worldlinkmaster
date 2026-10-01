@@ -16,6 +16,7 @@ using Stripe;
 using WorldLinkMaster.Web.Data;
 using WorldLinkMaster.Web.HealthChecks;
 using WorldLinkMaster.Web.Hubs;
+using WorldLinkMaster.Web.Middleware;
 using WorldLinkMaster.Web.Models;
 using WorldLinkMaster.Web.Resources;
 using WorldLinkMaster.Web.Services;
@@ -203,6 +204,13 @@ else
 
 builder.Services.AddHttpContextAccessor();
 
+// In-process cache for near-static reference data (categories, brands, the Apparel mega-menu's
+// quick-filter data) that Views/Shared/_Layout.cshtml and ProductsController.Index used to
+// re-query from Postgres on every single request — see IStorefrontCacheService for the egress
+// investigation this came out of and why it's intentionally per-instance (no Redis dependency).
+builder.Services.AddMemoryCache();
+builder.Services.AddScoped<IStorefrontCacheService, StorefrontCacheService>();
+
 // JSON AJAX endpoints (e.g. the checkout wizard) can't carry the antiforgery token as a form
 // field since the request body is JSON, not form-encoded — so validation also accepts it via
 // this header, which the client sets manually on those fetch() calls.
@@ -339,6 +347,11 @@ if (!app.Environment.IsDevelopment() && string.IsNullOrWhiteSpace(redisConnectio
 // ---------------------------------------------------------------------------
 // HTTP request pipeline.
 // ---------------------------------------------------------------------------
+// Must be first: short-circuits Azure "Always On" pings before anything else (forwarded
+// headers, HTTPS redirect, static files, auth, MVC) has a chance to run — see the middleware's
+// own doc comment for why.
+app.UseMiddleware<AlwaysOnShortCircuitMiddleware>();
+
 app.UseForwardedHeaders();
 
 if (app.Environment.IsDevelopment())

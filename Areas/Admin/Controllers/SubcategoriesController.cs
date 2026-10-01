@@ -5,6 +5,7 @@ using Microsoft.Extensions.Localization;
 using WorldLinkMaster.Web.Data;
 using WorldLinkMaster.Web.Models;
 using WorldLinkMaster.Web.Resources;
+using WorldLinkMaster.Web.Services;
 
 namespace WorldLinkMaster.Web.Areas.Admin.Controllers;
 
@@ -12,11 +13,13 @@ public class SubcategoriesController : AdminBaseController
 {
     private readonly ApplicationDbContext _context;
     private readonly IStringLocalizer<SharedResource> _localizer;
+    private readonly IStorefrontCacheService _storefrontCache;
 
-    public SubcategoriesController(ApplicationDbContext context, IStringLocalizer<SharedResource> localizer)
+    public SubcategoriesController(ApplicationDbContext context, IStringLocalizer<SharedResource> localizer, IStorefrontCacheService storefrontCache)
     {
         _context = context;
         _localizer = localizer;
+        _storefrontCache = storefrontCache;
     }
 
     public async Task<IActionResult> Index()
@@ -48,6 +51,7 @@ public class SubcategoriesController : AdminBaseController
 
         _context.Subcategories.Add(subcategory);
         await _context.SaveChangesAsync();
+        _storefrontCache.Invalidate();
         TempData["AdminMessage"] = _localizer["Subcategory '{0}' created.", subcategory.Name].Value;
         return RedirectToAction(nameof(Index));
     }
@@ -82,6 +86,7 @@ public class SubcategoriesController : AdminBaseController
 
         _context.Subcategories.Update(subcategory);
         await _context.SaveChangesAsync();
+        _storefrontCache.Invalidate();
         TempData["AdminMessage"] = _localizer["Subcategory '{0}' updated.", subcategory.Name].Value;
         return RedirectToAction(nameof(Index));
 
@@ -114,6 +119,7 @@ public class SubcategoriesController : AdminBaseController
         {
             _context.Subcategories.Remove(subcategory);
             await _context.SaveChangesAsync();
+            _storefrontCache.Invalidate();
             TempData["AdminMessage"] = _localizer["Subcategory '{0}' deleted.", subcategory.Name].Value;
         }
 

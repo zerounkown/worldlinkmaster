@@ -18,15 +18,76 @@ public class ProductsController : Controller
     private readonly IPromoService _promoService;
     private readonly IProductReviewService _reviewService;
     private readonly UserManager<ApplicationUser> _userManager;
+    private readonly IStorefrontCacheService _storefrontCache;
 
-    public ProductsController(ApplicationDbContext context, IDbContextFactory<ApplicationDbContext> contextFactory, IPromoService promoService, IProductReviewService reviewService, UserManager<ApplicationUser> userManager)
+    public ProductsController(ApplicationDbContext context, IDbContextFactory<ApplicationDbContext> contextFactory, IPromoService promoService, IProductReviewService reviewService, UserManager<ApplicationUser> userManager, IStorefrontCacheService storefrontCache)
     {
         _context = context;
         _contextFactory = contextFactory;
         _promoService = promoService;
         _reviewService = reviewService;
         _userManager = userManager;
+        _storefrontCache = storefrontCache;
     }
+
+    // _ProductCard.cshtml (and the extension methods it calls — GetHoverImageUrl, LocalizedName)
+    // only ever reads the fields projected below, across the whole catalog-grid/related-products
+    // surface this feeds (listing page, related products on the PDP). The plain .Include()-based
+    // materialization this replaces pulled every column on Product, including Description/
+    // DescriptionAr/ShortDescription/ShortDescriptionAr/Overview/OverviewAr (up to ~12KB of text
+    // per row) for data the card never displays. Applied after Skip/Take (paging already
+    // happened), so this only affects the page of rows actually being rendered, not the
+    // filter/sort/count queries built on IQueryable<Product> upstream of it.
+    private static IQueryable<Product> ProjectForCard(IQueryable<Product> source) =>
+        source.Select(p => new Product
+        {
+            Id = p.Id,
+            Name = p.Name,
+            NameAr = p.NameAr,
+            Slug = p.Slug,
+            Price = p.Price,
+            StockQuantity = p.StockQuantity,
+            ImageUrl = p.ImageUrl,
+            IsFeatured = p.IsFeatured,
+            Variants = p.Variants.Select(v => new ProductVariant
+            {
+                Id = v.Id,
+                ColorId = v.ColorId,
+                Color = v.Color == null ? null : new Color { Id = v.Color.Id, Name = v.Color.Name, HexCode = v.Color.HexCode, FamilyId = v.Color.FamilyId },
+                SizeId = v.SizeId,
+                Size = v.Size == null ? null : new Size { Id = v.Size.Id, Label = v.Size.Label },
+                ProductColorId = v.ProductColorId,
+                ProductColor = v.ProductColor == null ? null : new ProductColor { Id = v.ProductColor.Id, SwatchImageUrl = v.ProductColor.SwatchImageUrl },
+                Price = v.Price,
+                StockQuantity = v.StockQuantity,
+                Active = v.Active,
+                ImageUrl = v.ImageUrl
+            }).ToList(),
+            ProductColors = p.ProductColors
+                .Where(pc => pc.Active)
+                .OrderBy(pc => pc.DisplayOrder)
+                .Select(pc => new ProductColor
+                {
+                    Id = pc.Id,
+                    ColorId = pc.ColorId,
+                    DefaultColor = pc.DefaultColor,
+                    SwatchImageUrl = pc.SwatchImageUrl,
+                    Active = pc.Active
+                }).ToList(),
+            Media = p.Media
+                .Where(m => m.Active)
+                .OrderBy(m => m.DisplayOrder)
+                .Select(m => new ProductMedia
+                {
+                    Id = m.Id,
+                    ProductColorId = m.ProductColorId,
+                    MediaType = m.MediaType,
+                    MediaUrl = m.MediaUrl,
+                    DisplayOrder = m.DisplayOrder,
+                    ShowInGallery = m.ShowInGallery,
+                    Active = m.Active
+                }).ToList()
+        });
 
     [OutputCache(PolicyName = "ProductListing")]
     public async Task<IActionResult> Index(
@@ -59,7 +120,7 @@ public class ProductsController : Controller
         // names — the listing-page filter facets on families only; PDP/product-card swatches are
         // untouched and keep showing the specific vendor color.
         var selectedColorFamilyCodes = (colors ?? Array.Empty<string>()).ToList();
-        var allColorFamilies = await _context.ColorFamilies.AsNoTracking().OrderBy(f => f.DisplayOrder).ToListAsync();
+        var allColorFamilies = await _storefrontCache.GetColorFamiliesAsync();
         var colorFamilyByCode = allColorFamilies.ToDictionary(f => f.Code);
         // -1 is a safe placeholder if the "Other" family row is somehow missing (e.g. the
         // ColorFamilies seed hasn't run yet) — it can never equal a real FamilyId, so unmapped
@@ -290,9 +351,9 @@ public class ProductsController : Controller
         var totalPages = Math.Max(1, (int)Math.Ceiling(totalCount / (double)PageSize));
         page = Math.Clamp(page, 1, totalPages);
 
-        var products = await query
+        var products = await ProjectForCard(query
             .Skip((page - 1) * PageSize)
-            .Take(PageSize)
+            .Take(PageSize))
             .ToListAsync();
 
         // Views/Products/Index.cshtml never reads Category.Products or a product count derived
@@ -733,18 +794,10 @@ public class ProductsController : Controller
             return NotFound();
         }
 
-        var related = await _context.Products
+        var related = await ProjectForCard(_context.Products
             .AsNoTracking()
-            .Where(p => p.IsPublished)
-            .Include(p => p.Category)
-            .Include(p => p.Variants).ThenInclude(v => v.Color)
-            .Include(p => p.Variants).ThenInclude(v => v.Size)
-            .Include(p => p.Variants).ThenInclude(v => v.ProductColor)
-            .Include(p => p.ProductColors.Where(pc => pc.Active).OrderBy(pc => pc.DisplayOrder))
-            .Include(p => p.Media.Where(m => m.Active).OrderBy(m => m.DisplayOrder))
-            .AsSplitQuery()
-            .Where(p => p.CategoryId == product.CategoryId && p.Id != product.Id)
-            .Take(4)
+            .Where(p => p.IsPublished && p.CategoryId == product.CategoryId && p.Id != product.Id)
+            .Take(4))
             .ToListAsync();
 
         ViewBag.Related = related;

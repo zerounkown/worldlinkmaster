@@ -2,11 +2,13 @@ using ClosedXML.Excel;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging.Abstractions;
 using WorldLinkMaster.E2E.Infrastructure;
 using WorldLinkMaster.Web.Areas.Admin.Controllers;
 using WorldLinkMaster.Web.Data;
 using WorldLinkMaster.Web.Models.ViewModels;
+using WorldLinkMaster.Web.Services;
 
 namespace WorldLinkMaster.E2E.IntegrationTests;
 
@@ -90,7 +92,7 @@ public class MasterDataImportCrashTests : IAsyncLifetime
     }
 
     private static MasterDataController CreateController(ApplicationDbContext context) =>
-        new(context, NullLogger<MasterDataController>.Instance);
+        new(context, NullLogger<MasterDataController>.Instance, new StorefrontCacheService(context, new MemoryCache(new MemoryCacheOptions())));
 
     private static IFormFile ToFormFile(XLWorkbook workbook)
     {

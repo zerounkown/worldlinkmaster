@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.OutputCaching;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Localization;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
@@ -12,6 +13,7 @@ using WorldLinkMaster.Web.Data;
 using WorldLinkMaster.Web.Models;
 using WorldLinkMaster.Web.Models.ViewModels;
 using WorldLinkMaster.Web.Resources;
+using WorldLinkMaster.Web.Services;
 
 namespace WorldLinkMaster.Tests.UnitTests.Controllers;
 
@@ -51,7 +53,8 @@ public class ProductsControllerBulkUpdateTests
         outputCache.Setup(o => o.EvictByTagAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .Returns(ValueTask.CompletedTask);
 
-        return new ProductsController(context, localizer.Object, outputCache.Object, NullLogger<ProductsController>.Instance)
+        var storefrontCache = new StorefrontCacheService(context, new MemoryCache(new MemoryCacheOptions()));
+        return new ProductsController(context, localizer.Object, outputCache.Object, NullLogger<ProductsController>.Instance, storefrontCache)
         {
             ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() }
         };

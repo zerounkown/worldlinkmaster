@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using WorldLinkMaster.Web.Data;
 using WorldLinkMaster.Web.Models;
 using WorldLinkMaster.Web.Models.ViewModels;
+using WorldLinkMaster.Web.Services;
 using static WorldLinkMaster.Web.Areas.Admin.Controllers.ExcelImportHelpers;
 
 namespace WorldLinkMaster.Web.Areas.Admin.Controllers;
@@ -22,10 +23,12 @@ namespace WorldLinkMaster.Web.Areas.Admin.Controllers;
 public class ProductImportController : AdminBaseController
 {
     private readonly ApplicationDbContext _context;
+    private readonly IStorefrontCacheService _storefrontCache;
 
-    public ProductImportController(ApplicationDbContext context)
+    public ProductImportController(ApplicationDbContext context, IStorefrontCacheService storefrontCache)
     {
         _context = context;
+        _storefrontCache = storefrontCache;
     }
 
     public IActionResult Index()
@@ -116,6 +119,7 @@ public class ProductImportController : AdminBaseController
         // a price/stock update, with no Media rows of its own, must keep its existing gallery.
         await SyncStorefrontDisplayFieldsAsync(mediaTouchedProductCodes, productsBySku);
         await _context.SaveChangesAsync();
+        _storefrontCache.Invalidate();
 
         return View("Index", result);
     }
