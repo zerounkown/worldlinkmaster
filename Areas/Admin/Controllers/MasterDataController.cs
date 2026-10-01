@@ -175,11 +175,20 @@ public class MasterDataController : AdminBaseController
         }
 
         var existing = await _context.Brands.Where(b => b.Code != null).ToDictionaryAsync(b => b.Code!, StringComparer.OrdinalIgnoreCase);
-        // Brands seeded before this importer existed have no Code — match those by Name so a
-        // re-import enriches them instead of creating a parallel duplicate (see incident: the
-        // first Master Data import created 4 duplicate brands, 9 duplicate colors, and 5
-        // duplicate categories this way).
-        var existingByName = await _context.Brands.Where(b => b.Code == null).ToDictionaryAsync(b => b.Name, StringComparer.OrdinalIgnoreCase);
+        // Falls back to matching an existing brand by name (ignoring case and extra whitespace —
+        // see NormalizeNameForMatching) whenever the incoming row's Code doesn't match one
+        // already in the database — covers both brands seeded before this importer existed (no
+        // Code at all) and brands that already have a DIFFERENT Code from an earlier import batch
+        // that used a different coding scheme for the same brand (see incident: the first Master
+        // Data import created 4 duplicate brands, 9 duplicate colors, and 5 duplicate categories
+        // this way — only matching code-less brands left that second case open). When more than
+        // one existing brand shares a name, prefers an Active one, then the lowest Id.
+        var existingByName = (await _context.Brands.ToListAsync())
+            .GroupBy(b => NormalizeNameForMatching(b.Name), StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(
+                g => g.Key,
+                g => g.OrderByDescending(b => b.Active).ThenBy(b => b.Id).First(),
+                StringComparer.OrdinalIgnoreCase);
         var usedSlugs = new HashSet<string>((await _context.Brands.Select(b => b.Slug).ToListAsync()), StringComparer.OrdinalIgnoreCase);
         var seenCodes = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
@@ -221,14 +230,14 @@ public class MasterDataController : AdminBaseController
                 brand.Active = active;
                 result.BrandsUpdated++;
             }
-            else if (existingByName.TryGetValue(name, out brand))
+            else if (existingByName.TryGetValue(NormalizeNameForMatching(name), out brand))
             {
                 brand.Code = code;
                 brand.NameAr = nameAr;
                 brand.Website = website;
                 brand.Active = active;
                 existing[code] = brand;
-                existingByName.Remove(name);
+                existingByName.Remove(NormalizeNameForMatching(name));
                 result.BrandsUpdated++;
             }
             else
@@ -453,23 +462,23 @@ public class MasterDataController : AdminBaseController
         }
 
         var existing = await _context.Colors.Where(c => c.Code != null).ToDictionaryAsync(c => c.Code!, StringComparer.OrdinalIgnoreCase);
-        // Colors seeded before this importer existed have no Code — match those by Name so a
-        // re-import enriches them instead of creating a parallel duplicate. Some names already
-        // have multiple Code-less rows (pre-existing duplicate data); when that happens, enrich
-        // whichever one is actually referenced by the most ProductColors rows (ties broken by
-        // lowest Id) instead of crashing on the duplicate name or picking arbitrarily.
-        var codelessColors = await _context.Colors.Where(c => c.Code == null).ToListAsync();
-        var codelessIds = codelessColors.Select(c => c.Id).ToList();
-        var usageCounts = await _context.ProductColors
-            .Where(pc => codelessIds.Contains(pc.ColorId))
-            .GroupBy(pc => pc.ColorId)
-            .Select(g => new { ColorId = g.Key, Count = g.Count() })
-            .ToDictionaryAsync(x => x.ColorId, x => x.Count);
-        var existingByName = codelessColors
-            .GroupBy(c => c.Name, StringComparer.OrdinalIgnoreCase)
+        // Falls back to matching an existing color by name (ignoring case and extra whitespace —
+        // see NormalizeNameForMatching) whenever the incoming row's Code doesn't match one
+        // already in the database. Covers BOTH colors seeded before this importer existed (no
+        // Code at all) AND colors that already have a DIFFERENT Code from an earlier import whose
+        // Colors sheet used a different coding scheme for the same color — the latter case used
+        // to only check code-less colors, so once a color had been given ANY Code, a later
+        // submission with a different code for the same name would mint a brand-new duplicate
+        // instead of reusing it. That gap is exactly how colors like "Black"/"Charcoal"/"Coyote
+        // Tan" ended up with 5-6 duplicate rows each, created in batches across separate import
+        // runs (see incident: the first Master Data import created 4 duplicate brands, 9
+        // duplicate colors, and 5 duplicate categories the same way). When more than one existing
+        // color shares a name, prefers an Active one, then the lowest Id.
+        var existingByName = (await _context.Colors.ToListAsync())
+            .GroupBy(c => NormalizeNameForMatching(c.Name), StringComparer.OrdinalIgnoreCase)
             .ToDictionary(
                 g => g.Key,
-                g => g.OrderByDescending(c => usageCounts.GetValueOrDefault(c.Id)).ThenBy(c => c.Id).First(),
+                g => g.OrderByDescending(c => c.Active).ThenBy(c => c.Id).First(),
                 StringComparer.OrdinalIgnoreCase);
         var seenCodes = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
@@ -513,7 +522,7 @@ public class MasterDataController : AdminBaseController
                 color.Active = active;
                 result.ColorsUpdated++;
             }
-            else if (existingByName.TryGetValue(name, out color))
+            else if (existingByName.TryGetValue(NormalizeNameForMatching(name), out color))
             {
                 color.Code = code;
                 color.NameAr = nameAr;
@@ -521,7 +530,7 @@ public class MasterDataController : AdminBaseController
                 color.DisplayOrder = displayOrder;
                 color.Active = active;
                 existing[code] = color;
-                existingByName.Remove(name);
+                existingByName.Remove(NormalizeNameForMatching(name));
                 result.ColorsUpdated++;
             }
             else
@@ -646,6 +655,16 @@ public class MasterDataController : AdminBaseController
 
         var sizeGroupsByCode = await _context.SizeGroups.ToDictionaryAsync(g => g.Code, StringComparer.OrdinalIgnoreCase);
         var existing = await _context.Sizes.Where(s => s.Code != null).ToDictionaryAsync(s => s.Code!, StringComparer.OrdinalIgnoreCase);
+        // Same fallback as Colors/Brands above, for the same reason: a Sizes sheet whose Code
+        // values aren't stable across submissions would otherwise mint a fresh duplicate size
+        // every run instead of reusing the one already there. Scoped to (Size Group, normalized
+        // label) — never across groups, since a short label like "M" can legitimately exist in
+        // more than one group. Prefers an Active size, then the lowest Id, when more than one
+        // existing size in the same group shares a label.
+        var existingByGroupAndName = (await _context.Sizes.ToListAsync())
+            .Where(s => s.SizeGroupId.HasValue)
+            .GroupBy(s => (GroupId: s.SizeGroupId!.Value, Key: NormalizeNameForMatching(s.Label).ToLowerInvariant()))
+            .ToDictionary(g => g.Key, g => g.OrderByDescending(s => s.Active).ThenBy(s => s.Id).First());
         var seenCodes = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         foreach (var row in sheet.RowsUsed().Skip(1))
@@ -696,6 +715,18 @@ public class MasterDataController : AdminBaseController
                 size.Unit = unit;
                 size.SortOrder = sortOrder;
                 size.Active = active;
+                result.SizesUpdated++;
+            }
+            else if (existingByGroupAndName.TryGetValue((sizeGroup.Id, NormalizeNameForMatching(name).ToLowerInvariant()), out size))
+            {
+                size.Code = code;
+                size.LabelAr = nameAr;
+                size.NumericValue = numericValue;
+                size.Unit = unit;
+                size.SortOrder = sortOrder;
+                size.Active = active;
+                existing[code] = size;
+                existingByGroupAndName.Remove((sizeGroup.Id, NormalizeNameForMatching(name).ToLowerInvariant()));
                 result.SizesUpdated++;
             }
             else

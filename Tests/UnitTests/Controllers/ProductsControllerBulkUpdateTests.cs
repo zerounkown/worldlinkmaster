@@ -1346,6 +1346,195 @@ public class ProductsControllerBulkUpdateTests
         Assert.Equal(existingCombined.Id, variant.SizeId);
     }
 
+    // --- Color auto-create reuses an existing color instead of duplicating ----------------
+    // Bug report: colors like "Black"/"Coyote Tan"/"Ranger Green" ended up with 5-6 duplicate
+    // rows each in production, created in batches across SEPARATE Bulk Update runs. Root cause:
+    // colorsByName (above) was keyed by .Trim() alone, which handles leading/trailing whitespace
+    // and case but not an incoming name with extra INTERNAL whitespace ("Coyote  Tan", a stray
+    // double space) — that alone was enough to miss the existing row and mint a new one every
+    // time. Fixed by keying on ExcelImportHelpers.NormalizeNameForMatching (trim + collapse
+    // internal whitespace runs), with "prefer Active, then lowest Id" when more than one existing
+    // color already shares a name.
+
+    [Fact]
+    public async Task BulkUpdate_SameColorNameAcrossSeparateRuns_DifferentCaseAndExtraInternalSpaces_ReusesOneColor()
+    {
+        var (context, connection) = CreateContext();
+        using var _ = connection;
+        using var __ = context;
+        var (category, merchant) = SeedCategoryAndMerchant(context);
+
+        var product = new Product
+        {
+            Sku = "COL-001", Name = "Test Jacket", Slug = "test-jacket", Price = 100m,
+            StockQuantity = 0, CategoryId = category.Id, MerchantId = merchant.Id
+        };
+        context.Products.Add(product);
+        context.SaveChanges();
+
+        var controller = CreateController(context);
+
+        using (var workbook1 = NewWorkbookWithHeaders())
+        {
+            WriteProductRow(workbook1.Worksheet("Products"), 2, "COL-001", "Test Jacket", "Tactical Apparel", 100m, 0);
+            WriteVariantRow(workbook1.Worksheet("Variants"), 2, "COL-001", "COL-001-A", 5, color: "Coyote Tan");
+            var model1 = Assert.IsType<BulkImportResult>(Assert.IsType<ViewResult>(await controller.BulkUpdate(ToFormFile(workbook1))).Model);
+            Assert.Empty(model1.Errors);
+        }
+
+        using (var workbook2 = NewWorkbookWithHeaders())
+        {
+            WriteProductRow(workbook2.Worksheet("Products"), 2, "COL-001", "Test Jacket", "Tactical Apparel", 100m, 0);
+            // Different case AND a doubled internal space — the exact shape that used to slip past .Trim() alone.
+            WriteVariantRow(workbook2.Worksheet("Variants"), 2, "COL-001", "COL-001-B", 5, color: "coyote  tan");
+            var model2 = Assert.IsType<BulkImportResult>(Assert.IsType<ViewResult>(await controller.BulkUpdate(ToFormFile(workbook2))).Model);
+            Assert.Empty(model2.Errors);
+        }
+
+        var color = await context.Colors.SingleAsync(); // only one row exists at all
+        Assert.Equal("Coyote Tan", color.Name); // first-created spelling preserved, not overwritten
+        Assert.Equal(2, await context.ProductVariants.CountAsync(v => v.ColorId == color.Id));
+    }
+
+    [Fact]
+    public async Task BulkUpdate_ColorNameMatchesMultipleExistingColors_PrefersActiveThenLowestId()
+    {
+        var (context, connection) = CreateContext();
+        using var _ = connection;
+        using var __ = context;
+        var (category, merchant) = SeedCategoryAndMerchant(context);
+
+        // Two pre-existing colors that collide once case/spacing is ignored — the inactive one
+        // was created first (lower Id), so a naive "lowest Id" tie-break alone would pick the
+        // wrong one; Active must win first.
+        var inactiveOlder = new Color { Name = "Ranger Green", HexCode = "#4b5320", Active = false };
+        context.Colors.Add(inactiveOlder);
+        context.SaveChanges();
+        var activeNewer = new Color { Name = "ranger green", HexCode = "#4b5320", Active = true };
+        context.Colors.Add(activeNewer);
+        context.SaveChanges();
+        Assert.True(inactiveOlder.Id < activeNewer.Id);
+
+        var product = new Product
+        {
+            Sku = "COL-002", Name = "Test Pant", Slug = "test-pant", Price = 100m,
+            StockQuantity = 0, CategoryId = category.Id, MerchantId = merchant.Id
+        };
+        context.Products.Add(product);
+        context.SaveChanges();
+
+        using var workbook = NewWorkbookWithHeaders();
+        WriteProductRow(workbook.Worksheet("Products"), 2, "COL-002", "Test Pant", "Tactical Apparel", 100m, 0);
+        WriteVariantRow(workbook.Worksheet("Variants"), 2, "COL-002", "COL-002-A", 5, color: "Ranger Green");
+
+        var controller = CreateController(context);
+        var model = Assert.IsType<BulkImportResult>(Assert.IsType<ViewResult>(await controller.BulkUpdate(ToFormFile(workbook))).Model);
+
+        Assert.Empty(model.Errors);
+        Assert.Equal(2, await context.Colors.CountAsync()); // neither pre-existing duplicate is touched or removed
+        var variant = await context.ProductVariants.AsNoTracking().SingleAsync(v => v.Sku == "COL-002-A");
+        Assert.Equal(activeNewer.Id, variant.ColorId);
+    }
+
+    // --- Size auto-create lands in the correct position, not always at the end ------------
+    // Bug report: an auto-created size always got SortOrder = (count of sizes already in the
+    // group), i.e. appended last — e.g. in a waist x length group, 26x30/26x32/26x34 ended up
+    // AFTER 46x32 instead of before it, and 48x32/46x34/48x34 landed at the end in whatever order
+    // the file happened to list them, not sorted by waist then length. Fixed by
+    // ComputeSortOrderForNewSize: positions a new size relative to other sizes in the SAME group
+    // that fit the SAME recognized pattern (waist x length / plain numeric / standard letter
+    // order), shifting existing sizes' SortOrder to make room rather than always appending.
+
+    [Fact]
+    public async Task BulkUpdate_AutoCreatedWaistLengthSize_InsertsInNumericOrder_NotAppendedLast()
+    {
+        var (context, connection) = CreateContext();
+        using var _ = connection;
+        using var __ = context;
+        var (category, merchant) = SeedCategoryAndMerchant(context);
+
+        var trouserGroup = new SizeGroup { Code = "TR-WL", NameEn = "Trouser Waist x Length" };
+        context.SizeGroups.Add(trouserGroup);
+        context.SaveChanges();
+        // Mirrors the production shape: 46x32 already exists; 26x30/26x32/26x34 (smaller waist)
+        // need to land BEFORE it once auto-created, not after.
+        var existing46x32 = new Size { Label = "46x32", SizeGroupId = trouserGroup.Id, SortOrder = 0 };
+        context.Sizes.Add(existing46x32);
+        var product = new Product
+        {
+            Sku = "TRP-010", Name = "Field Trouser 2", Slug = "field-trouser-2", Price = 100m,
+            StockQuantity = 0, CategoryId = category.Id, MerchantId = merchant.Id, SizeGroupId = trouserGroup.Id
+        };
+        context.Products.Add(product);
+        context.SaveChanges();
+
+        using var workbook = NewWorkbookWithHeaders();
+        WriteProductRow(workbook.Worksheet("Products"), 2, "TRP-010", "Field Trouser 2", "Tactical Apparel", 100m, 0);
+        WriteVariantRow(workbook.Worksheet("Variants"), 2, "TRP-010", "TRP-010-1", 5, size: "26", length: "30");
+        WriteVariantRow(workbook.Worksheet("Variants"), 3, "TRP-010", "TRP-010-2", 5, size: "26", length: "32");
+        WriteVariantRow(workbook.Worksheet("Variants"), 4, "TRP-010", "TRP-010-3", 5, size: "26", length: "34");
+        WriteVariantRow(workbook.Worksheet("Variants"), 5, "TRP-010", "TRP-010-4", 5, size: "48", length: "32");
+        WriteVariantRow(workbook.Worksheet("Variants"), 6, "TRP-010", "TRP-010-5", 5, size: "46", length: "34");
+        WriteVariantRow(workbook.Worksheet("Variants"), 7, "TRP-010", "TRP-010-6", 5, size: "48", length: "34");
+
+        var controller = CreateController(context);
+        var model = Assert.IsType<BulkImportResult>(Assert.IsType<ViewResult>(await controller.BulkUpdate(ToFormFile(workbook))).Model);
+        Assert.Empty(model.Errors);
+
+        var sizesByLabel = await context.Sizes
+            .Where(s => s.SizeGroupId == trouserGroup.Id)
+            .OrderBy(s => s.SortOrder)
+            .ToDictionaryAsync(s => s.Label, s => s.SortOrder);
+
+        Assert.Equal(7, sizesByLabel.Count);
+        // Correct numeric order by (waist, length): 26x30, 26x32, 26x34, 46x32, 46x34, 48x32, 48x34.
+        var orderedLabels = sizesByLabel.OrderBy(kv => kv.Value).Select(kv => kv.Key).ToList();
+        Assert.Equal(new[] { "26x30", "26x32", "26x34", "46x32", "46x34", "48x32", "48x34" }, orderedLabels);
+    }
+
+    [Fact]
+    public async Task BulkUpdate_AutoCreatedLetterSize_InsertsInStandardLetterOrder()
+    {
+        var (context, connection) = CreateContext();
+        using var _ = connection;
+        using var __ = context;
+        var (category, merchant) = SeedCategoryAndMerchant(context);
+
+        var letterGroup = new SizeGroup { Code = "CLO-LTR", NameEn = "Clothing Letter Sizes" };
+        context.SizeGroups.Add(letterGroup);
+        context.SaveChanges();
+        var existingS = new Size { Label = "S", SizeGroupId = letterGroup.Id, SortOrder = 0 };
+        var existingM = new Size { Label = "M", SizeGroupId = letterGroup.Id, SortOrder = 1 };
+        var existingL = new Size { Label = "L", SizeGroupId = letterGroup.Id, SortOrder = 2 };
+        context.Sizes.AddRange(existingS, existingM, existingL);
+        var product = new Product
+        {
+            Sku = "SHT-010", Name = "Field Shirt", Slug = "field-shirt", Price = 60m,
+            StockQuantity = 0, CategoryId = category.Id, MerchantId = merchant.Id, SizeGroupId = letterGroup.Id
+        };
+        context.Products.Add(product);
+        context.SaveChanges();
+
+        using var workbook = NewWorkbookWithHeaders();
+        WriteProductRow(workbook.Worksheet("Products"), 2, "SHT-010", "Field Shirt", "Tactical Apparel", 60m, 0);
+        // XXS must land FIRST (before S/M/L), and 2XL must land LAST (after S/M/L) — in that one
+        // run, so the fix has to get both directions right, not just append-at-end by luck.
+        WriteVariantRow(workbook.Worksheet("Variants"), 2, "SHT-010", "SHT-010-XXS", 5, size: "XXS");
+        WriteVariantRow(workbook.Worksheet("Variants"), 3, "SHT-010", "SHT-010-2XL", 5, size: "2XL");
+
+        var controller = CreateController(context);
+        var model = Assert.IsType<BulkImportResult>(Assert.IsType<ViewResult>(await controller.BulkUpdate(ToFormFile(workbook))).Model);
+        Assert.Empty(model.Errors);
+
+        var orderedLabels = await context.Sizes
+            .Where(s => s.SizeGroupId == letterGroup.Id)
+            .OrderBy(s => s.SortOrder)
+            .Select(s => s.Label)
+            .ToListAsync();
+
+        Assert.Equal(new[] { "XXS", "S", "M", "L", "2XL" }, orderedLabels);
+    }
+
     // --- Descriptions, Vendor SKU, Vendor Color Code -------------------------------------
     // New columns: Products sheet gets Short Description / Short Description (Arabic) /
     // Description / Description (Arabic) / Vendor SKU (after Name (Arabic)); Variants sheet gets
