@@ -134,7 +134,10 @@ public class ApparelMegaMenuHeadwearTests : E2ETestBase
         await viewAllLink.ClickAsync();
 
         await Page.WaitForURLAsync(url => url.Contains("/Products") && url.Contains($"subcategoryId={_headwearSubcategoryId}"));
-        await Assertions.Expect(Page.GetByText("E2E Boonie Hat")).ToBeVisibleAsync();
+        // Scoped to the product grid's own card title (.product-grid h3 a) — a bare page-wide
+        // text match also hits the side-nav's .category-preview-name for this same product
+        // (the layout's own categoryPreviews row renders on every page, including this one).
+        await Assertions.Expect(Page.Locator(".product-grid h3", new PageLocatorOptions { HasText = "E2E Boonie Hat" })).ToBeVisibleAsync();
     }
 
     [Fact]
@@ -157,6 +160,8 @@ public class ApparelMegaMenuHeadwearTests : E2ETestBase
         await viewAllLink.ClickAsync();
 
         await Page.WaitForURLAsync(url => url.Contains("/Products") && url.Contains($"subcategoryId={_headwearSubcategoryId}"));
-        await Assertions.Expect(Page.GetByText("E2E Boonie Hat")).ToBeVisibleAsync();
+        // Same scoping reason as the desktop test above: avoid colliding with the layout's own
+        // side-nav category-preview-name for this product, which renders on this page too.
+        await Assertions.Expect(Page.Locator(".product-grid h3", new PageLocatorOptions { HasText = "E2E Boonie Hat" })).ToBeVisibleAsync();
     }
 }
