@@ -1,9 +1,11 @@
 using ClosedXML.Excel;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 using WorldLinkMaster.Web.Areas.Admin.Controllers;
 using WorldLinkMaster.Web.Data;
 using WorldLinkMaster.Web.Models;
+using WorldLinkMaster.Web.Services;
 
 namespace WorldLinkMaster.Tests.UnitTests.Controllers;
 
@@ -86,7 +88,7 @@ public class ProductImportControllerTests
         mediaSheet.Cell(2, 7).Value = "Yes";
 
         var file = ToFormFile(workbook);
-        var controller = new ProductImportController(context);
+        var controller = new ProductImportController(context, new StorefrontCacheService(context, new MemoryCache(new MemoryCacheOptions())));
 
         var viewResult = await controller.Import(file);
         var result = Assert.IsType<Microsoft.AspNetCore.Mvc.ViewResult>(viewResult).Model as WorldLinkMaster.Web.Models.ViewModels.ProductImportResult;
@@ -164,7 +166,7 @@ public class ProductImportControllerTests
         mediaSheet.Cell(2, 10).Value = "Yes";
 
         var file = ToFormFile(workbook);
-        var controller = new ProductImportController(context);
+        var controller = new ProductImportController(context, new StorefrontCacheService(context, new MemoryCache(new MemoryCacheOptions())));
 
         var viewResult = await controller.Import(file);
         var result = Assert.IsType<Microsoft.AspNetCore.Mvc.ViewResult>(viewResult).Model as WorldLinkMaster.Web.Models.ViewModels.ProductImportResult;
@@ -217,7 +219,7 @@ public class ProductImportControllerTests
         mediaSheet.Cell(2, 10).Value = "Yes";
 
         var file = ToFormFile(workbook);
-        var controller = new ProductImportController(context);
+        var controller = new ProductImportController(context, new StorefrontCacheService(context, new MemoryCache(new MemoryCacheOptions())));
 
         // Must not throw -- this is the regression this test guards against.
         var viewResult = await controller.Import(file);

@@ -1,12 +1,10 @@
 @using System.Globalization
 @using System.Security.Claims
 @using Microsoft.AspNetCore.Routing
-@using Microsoft.EntityFrameworkCore
-@using WorldLinkMaster.Web.Data
 @using WorldLinkMaster.Web.Extensions
 @using WorldLinkMaster.Web.Services
 @using Microsoft.Extensions.Configuration
-@inject ApplicationDbContext DbContext
+@inject IStorefrontCacheService StorefrontCache
 @inject ICartService CartService
 @inject IFavoriteService FavoriteService
 @inject ICompareService CompareService
@@ -22,18 +20,19 @@
             newWelcomeCoupon = await CouponService.EnsureWelcomeCouponAsync(currentUserId);
         }
     }
-    var navCategories = await DbContext.Categories.Include(c => c.Subcategories.OrderBy(s => s.Name)).OrderBy(c => c.Name).ToListAsync();
+    // Everything below that used to be its own DbContext query (navCategories through
+    // apparelMenuBrands) now comes from one cached, 10-minute-TTL bundle — see
+    // IStorefrontCacheService for why: this view runs on every storefront page, and most of
+    // these queries (plus a per-category N+1 loop for categoryPreviews) were re-hitting Postgres
+    // on every single request for data that only changes through deliberate admin actions.
+    var navMenuData = await StorefrontCache.GetNavMenuDataAsync();
+    var navCategories = navMenuData.NavCategories;
 
     // A subcategory with zero published products is a dead end everywhere it's linked from (mega-
     // menu columns, the "More" leftover bucket, Apparel's hand-curated real-subcategory links) — so
     // every subcategory-driven builder below filters against this set first, same "only show what
     // actually has data" rule already applied to the attr= links further down.
-    var subcategoriesWithPublishedProducts = (await DbContext.Products
-        .Where(p => p.IsPublished && p.SubcategoryId != null)
-        .Select(p => p.SubcategoryId!.Value)
-        .Distinct()
-        .ToListAsync())
-        .ToHashSet();
+    var subcategoriesWithPublishedProducts = navMenuData.SubcategoriesWithPublishedProducts;
 
     // Short one-line promo captions for each category dropdown's image panel — same convention as
     // Welcome.cshtml's collectionsTagBySlug (decorative marketing copy, not core category data,
@@ -132,22 +131,16 @@
         return columns;
     }
 
-    // Mega-menu sub-filter chips (brand / neck type / sleeve length / pants type) — one query for
-    // every subcategory that carries them, grouped in memory below, rather than a query per
-    // subcategory. Reads whatever real values exist; with none seeded yet (see
+    // Mega-menu sub-filter chips (brand / neck type / sleeve length / pants type) — the slugs
+    // here are the same StorefrontCacheService.TShirtFamilySlugs/PantsFamilySlugs the cached
+    // QuickFilterProducts query below was already filtered by, so the query and this grouping
+    // logic can't drift apart. Reads whatever real values exist; with none seeded yet (see
     // Scripts/MockApparelAttributeSeeder.cs) every group below comes back empty and no chips
     // render at all — this is intentionally safe to ship before real data exists.
-    var tShirtFamilySlugs = new HashSet<string> { "t-shirts", "combat-shirts", "combat-shirt", "short-sleeve-t-shirt", "long-sleeve-t-shirt", "short-sleeve-crew-neck-t-shirt", "long-sleeve-crew-neck-t-shirt" };
-    var pantsFamilySlugs = new HashSet<string> { "tactical-pants", "tactical-shorts", "tactical-trousers" };
-    var quickFilterSlugs = tShirtFamilySlugs.Concat(pantsFamilySlugs).ToArray();
+    var tShirtFamilySlugs = StorefrontCacheService.TShirtFamilySlugs.ToHashSet();
+    var pantsFamilySlugs = StorefrontCacheService.PantsFamilySlugs.ToHashSet();
 
-    var quickFilterProducts = await DbContext.Products
-        .Where(p => p.IsPublished && p.Subcategory != null && quickFilterSlugs.Contains(p.Subcategory.Slug))
-        .Include(p => p.Subcategory)
-        .Include(p => p.Brand)
-        .Include(p => p.AttributeValues.Where(a => a.Active)).ThenInclude(a => a.AttributeDefinition)
-        .AsSplitQuery()
-        .ToListAsync();
+    var quickFilterProducts = navMenuData.QuickFilterProducts;
 
     const int QuickFilterCapPerGroup = 3;
 
@@ -156,14 +149,7 @@
     // here is checked against this set before its link is rendered at all, the same "only show
     // what actually has data" rule quickFilterProducts already applies to the T-Shirt/Pants chip
     // row above. Scoped to published products only, same reasoning as quickFilterProducts.
-    var apparelAttrCodes = new[] { "USE-CASE", "NECK-TYPE", "SLEEVE-LENGTH", "MATERIAL", "PANTS-TYPE", "JACKET-TYPE", "WATER_RES", "UNIFORM-TYPE" };
-    var realApparelAttrPairs = (await DbContext.ProductAttributeValues
-        .Where(av => av.Active && av.Product!.IsPublished && av.AttributeDefinition != null && apparelAttrCodes.Contains(av.AttributeDefinition.Code))
-        .Select(av => new { Code = av.AttributeDefinition!.Code, av.ValueEn })
-        .Distinct()
-        .ToListAsync())
-        .Select(x => (x.Code, x.ValueEn))
-        .ToHashSet();
+    var realApparelAttrPairs = navMenuData.RealApparelAttrPairs;
 
     var quickFiltersBySubSlug = quickFilterProducts
         .GroupBy(p => p.Subcategory!.Slug)
@@ -208,16 +194,7 @@
         return result;
     }
 
-    var categoryPreviews = new Dictionary<int, List<Product>>();
-    foreach (var navCategory in navCategories)
-    {
-        categoryPreviews[navCategory.Id] = await DbContext.Products
-            .Where(p => p.IsPublished && p.CategoryId == navCategory.Id && p.StockQuantity > 0)
-            .OrderByDescending(p => p.IsFeatured)
-            .ThenByDescending(p => p.Id)
-            .Take(4)
-            .ToListAsync();
-    }
+    var categoryPreviews = navMenuData.CategoryPreviews;
     var currentCulture = CultureInfo.CurrentUICulture.TwoLetterISOLanguageName;
     var isRtl = currentCulture == "ar";
     var returnUrl = Context.Request.Path + Context.Request.QueryString;
@@ -400,10 +377,8 @@
                 .ToList())
         };
 
-        var apparelMenuBrandCodes = new[] { "WLM", "CON", "PRO", "TRS", "ROT" };
-        var apparelMenuBrands = await DbContext.Brands
-            .Where(b => b.Code != null && apparelMenuBrandCodes.Contains(b.Code))
-            .ToDictionaryAsync(b => b.Code!);
+        var apparelMenuBrandCodes = StorefrontCacheService.ApparelMenuBrandCodes;
+        var apparelMenuBrands = navMenuData.ApparelMenuBrands;
         var colorsAndBrands = new List<(string? SubHeader, List<(string Label, string Href)> Items)>
         {
             ("Shop by Color", new (string Label, string ColorName)[]

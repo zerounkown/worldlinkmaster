@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using WorldLinkMaster.Web.Data;
 using WorldLinkMaster.Web.Models;
 using WorldLinkMaster.Web.Models.ViewModels;
+using WorldLinkMaster.Web.Services;
 using static WorldLinkMaster.Web.Areas.Admin.Controllers.ExcelImportHelpers;
 
 namespace WorldLinkMaster.Web.Areas.Admin.Controllers;
@@ -17,11 +18,13 @@ public class MasterDataController : AdminBaseController
 {
     private readonly ApplicationDbContext _context;
     private readonly ILogger<MasterDataController> _logger;
+    private readonly IStorefrontCacheService _storefrontCache;
 
-    public MasterDataController(ApplicationDbContext context, ILogger<MasterDataController> logger)
+    public MasterDataController(ApplicationDbContext context, ILogger<MasterDataController> logger, IStorefrontCacheService storefrontCache)
     {
         _context = context;
         _logger = logger;
+        _storefrontCache = storefrontCache;
     }
 
     public IActionResult Index()
@@ -112,9 +115,13 @@ public class MasterDataController : AdminBaseController
             // The counts already recorded in `result` before the failure reflect that.
             _logger.LogError(ex, "Master Data import failed unexpectedly partway through.");
             result.FatalError = $"The import stopped after an unexpected error: {ex.Message}. Any sheets processed before this point were still saved.";
+            // Sheets processed before the failure were still saved (see the comment above), so the
+            // menu/listing cache could already be stale even on this error path.
+            _storefrontCache.Invalidate();
             return View("Index", result);
         }
 
+        _storefrontCache.Invalidate();
         return View("Index", result);
     }
 

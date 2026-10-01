@@ -9,6 +9,7 @@ using WorldLinkMaster.Web.Data;
 using WorldLinkMaster.Web.Models;
 using WorldLinkMaster.Web.Models.ViewModels;
 using WorldLinkMaster.Web.Resources;
+using WorldLinkMaster.Web.Services;
 
 namespace WorldLinkMaster.Web.Areas.Admin.Controllers;
 
@@ -20,13 +21,15 @@ public class ProductsController : AdminBaseController
     private readonly IStringLocalizer<SharedResource> _localizer;
     private readonly IOutputCacheStore _outputCacheStore;
     private readonly ILogger<ProductsController> _logger;
+    private readonly IStorefrontCacheService _storefrontCache;
 
-    public ProductsController(ApplicationDbContext context, IStringLocalizer<SharedResource> localizer, IOutputCacheStore outputCacheStore, ILogger<ProductsController> logger)
+    public ProductsController(ApplicationDbContext context, IStringLocalizer<SharedResource> localizer, IOutputCacheStore outputCacheStore, ILogger<ProductsController> logger, IStorefrontCacheService storefrontCache)
     {
         _context = context;
         _localizer = localizer;
         _outputCacheStore = outputCacheStore;
         _logger = logger;
+        _storefrontCache = storefrontCache;
     }
 
     // Deliberately unfiltered by IsPublished at the base query — this is the staff-facing view,
@@ -133,6 +136,7 @@ public class ProductsController : AdminBaseController
         _context.Products.Add(product);
         await _context.SaveChangesAsync();
         await _outputCacheStore.EvictByTagAsync("products", HttpContext.RequestAborted);
+        _storefrontCache.Invalidate();
         TempData["AdminMessage"] = _localizer["Product '{0}' created.", product.Name].Value;
         return RedirectToAction(nameof(Index));
     }
@@ -257,6 +261,7 @@ public class ProductsController : AdminBaseController
 
         await _context.SaveChangesAsync();
         await _outputCacheStore.EvictByTagAsync("products", HttpContext.RequestAborted);
+        _storefrontCache.Invalidate();
         TempData["AdminMessage"] = _localizer["Product '{0}' updated.", existing.Name].Value;
         return RedirectToAction(nameof(Index));
     }
@@ -324,6 +329,7 @@ public class ProductsController : AdminBaseController
         _context.Products.Remove(product);
         await _context.SaveChangesAsync();
         await _outputCacheStore.EvictByTagAsync("products", HttpContext.RequestAborted);
+        _storefrontCache.Invalidate();
         TempData["AdminMessage"] = _localizer["Product '{0}' deleted.", product.Name].Value;
 
         return RedirectToAction(nameof(Index));
@@ -1093,6 +1099,7 @@ public class ProductsController : AdminBaseController
             try
             {
                 await _outputCacheStore.EvictByTagAsync("products", HttpContext.RequestAborted);
+                _storefrontCache.Invalidate();
             }
             catch (Exception ex)
             {

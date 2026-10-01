@@ -4,6 +4,7 @@ using Microsoft.Extensions.Localization;
 using WorldLinkMaster.Web.Data;
 using WorldLinkMaster.Web.Models;
 using WorldLinkMaster.Web.Resources;
+using WorldLinkMaster.Web.Services;
 
 namespace WorldLinkMaster.Web.Areas.Admin.Controllers;
 
@@ -11,11 +12,13 @@ public class CategoriesController : AdminBaseController
 {
     private readonly ApplicationDbContext _context;
     private readonly IStringLocalizer<SharedResource> _localizer;
+    private readonly IStorefrontCacheService _storefrontCache;
 
-    public CategoriesController(ApplicationDbContext context, IStringLocalizer<SharedResource> localizer)
+    public CategoriesController(ApplicationDbContext context, IStringLocalizer<SharedResource> localizer, IStorefrontCacheService storefrontCache)
     {
         _context = context;
         _localizer = localizer;
+        _storefrontCache = storefrontCache;
     }
 
     public async Task<IActionResult> Index()
@@ -40,6 +43,7 @@ public class CategoriesController : AdminBaseController
 
         _context.Categories.Add(category);
         await _context.SaveChangesAsync();
+        _storefrontCache.Invalidate();
         TempData["AdminMessage"] = _localizer["Category '{0}' created.", category.Name].Value;
         return RedirectToAction(nameof(Index));
     }
@@ -71,6 +75,7 @@ public class CategoriesController : AdminBaseController
 
         _context.Categories.Update(category);
         await _context.SaveChangesAsync();
+        _storefrontCache.Invalidate();
         TempData["AdminMessage"] = _localizer["Category '{0}' updated.", category.Name].Value;
         return RedirectToAction(nameof(Index));
     }
@@ -102,6 +107,7 @@ public class CategoriesController : AdminBaseController
         {
             _context.Categories.Remove(category);
             await _context.SaveChangesAsync();
+            _storefrontCache.Invalidate();
             TempData["AdminMessage"] = _localizer["Category '{0}' deleted.", category.Name].Value;
         }
 

@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using WorldLinkMaster.Web.Data;
 using WorldLinkMaster.Web.Models;
 using WorldLinkMaster.Web.Models.ViewModels;
+using WorldLinkMaster.Web.Services;
 
 namespace WorldLinkMaster.Web.Areas.Admin.Controllers;
 
@@ -41,11 +42,13 @@ public class ProductPhotosController : AdminBaseController
 
     private readonly ApplicationDbContext _context;
     private readonly IConfiguration _configuration;
+    private readonly IStorefrontCacheService _storefrontCache;
 
-    public ProductPhotosController(ApplicationDbContext context, IConfiguration configuration)
+    public ProductPhotosController(ApplicationDbContext context, IConfiguration configuration, IStorefrontCacheService storefrontCache)
     {
         _context = context;
         _configuration = configuration;
+        _storefrontCache = storefrontCache;
     }
 
     public IActionResult Index()
@@ -220,6 +223,7 @@ public class ProductPhotosController : AdminBaseController
 
         await _context.SaveChangesAsync();
         await ProductMediaOrderingHelper.SyncStorefrontDisplayFieldsAsync(_context, touchedProductIds);
+        _storefrontCache.Invalidate();
 
         return View("Index", result);
     }
