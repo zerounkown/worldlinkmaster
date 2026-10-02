@@ -3,6 +3,7 @@
 @{
     ViewData["Title"] = Localizer["Edit Product"];
     var productColors = ViewBag.ProductColors as List<ProductColor> ?? new List<ProductColor>();
+    var productMedia = ViewBag.ProductMedia as List<ProductMedia> ?? new List<ProductMedia>();
 }
 
 <h1>@Localizer["Edit Product"]</h1>
@@ -37,4 +38,42 @@
         </table>
         <button type="submit" class="btn btn-primary">@Localizer["Save Vendor Color Codes"]</button>
     </form>
+}
+
+@{
+    // Main photos aren't shown/deletable here — the main photo is the product's primary image,
+    // so removing it needs a replacement, not a bare delete; re-upload over its own filename via
+    // Product Photos instead. Only "extra" (non-main) gallery photos — the "-N" suffixed ones —
+    // get a thumbnail + Delete button.
+    var extrasByColor = productColors
+        .Select(pc => (Color: pc, Extras: productMedia.Where(m => m.ProductColorId == pc.Id && m.Active && !m.IsColorMain).OrderBy(m => m.DisplayOrder).ToList()))
+        .Where(x => x.Extras.Count > 0)
+        .ToList();
+}
+@if (extrasByColor.Count > 0)
+{
+    <hr class="my-4" />
+    <h2 class="h5">@Localizer["Color Photos"]</h2>
+    <p class="text-muted">@Localizer["Extra gallery photos for each color, uploaded via Admin -> Product Photos as \"VendorSku-ColorCode-N.ext\" (N = 2-20). The main photo has no \"-N\" and isn't shown here — replace it by re-uploading over its own filename."]</p>
+    @foreach (var (color, extras) in extrasByColor)
+    {
+        <div class="mb-3">
+            <strong>@color.Color?.Name</strong>
+            <div class="d-flex flex-wrap gap-2 mt-1">
+                @foreach (var media in extras)
+                {
+                    <div class="text-center">
+                        <img src="@media.MediaUrl" alt="" class="img-thumbnail" style="width:80px;height:80px;object-fit:cover;" />
+                        <form asp-area="Admin" asp-controller="ProductPhotos" asp-action="DeleteExtraPhoto" method="post" class="mt-1">
+                            <input type="hidden" name="mediaId" value="@media.Id" />
+                            <input type="hidden" name="productId" value="@Model.Id" />
+                            <button type="submit" class="btn btn-sm btn-outline-danger py-0 px-1 w-100" onclick="return confirm('@Localizer["Delete this photo?"]');">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </form>
+                    </div>
+                }
+            </div>
+        </div>
+    }
 }

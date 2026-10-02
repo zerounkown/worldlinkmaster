@@ -30,7 +30,7 @@ public class ProductMediaOrderingHelperTests
     [Theory]
     [InlineData("https://blob.example/product-photos/f5519-001.webp", true)]
     [InlineData("https://blob.example/product-photos/f5519-001-2.webp", false)]
-    [InlineData("https://blob.example/product-photos/f5519-001-back.webp", false)] // non-numeric suffix is still a suffix
+    [InlineData("https://blob.example/product-photos/f5519-001-back.webp", false)] // non-numeric suffix no longer matches the pattern at all, but that's still "not main"
     [InlineData("https://blob.example/product-photos/101228-002.webp", true)]
     public void IsMainMediaUrl_DerivesFromFilenameSuffixAlone(string url, bool expectedMain)
     {
@@ -103,6 +103,46 @@ public class ProductMediaOrderingHelperTests
         Assert.False(bottom.IsColorMain);
         Assert.Equal(3, back.DisplayOrder);
         Assert.False(back.IsColorMain);
+    }
+
+    // Supports extra gallery photos per product color: a "-N" suffixed photo (N = 2..20) must
+    // order NUMERICALLY, not alphabetically by URL — plain string ordering would put "-10"
+    // between "-1" and "-2", ahead of "-9". This is the same DisplayOrder the PDP gallery
+    // (Views/Products/Details.cshtml's colorThumbItems) renders a color's photos in, so this is
+    // also the regression guard for "gallery shows main first, then extras in order" once a
+    // color has 10 or more photos.
+    [Fact]
+    public void NormalizeColorMediaOrdering_TenOrMorePhotos_OrdersNumericallyNotAlphabetically()
+    {
+        var photo10 = new ProductMedia { MediaUrl = "https://blob.example/product-photos/f5519-001-10.webp" };
+        var photo2 = new ProductMedia { MediaUrl = "https://blob.example/product-photos/f5519-001-2.webp" };
+        var photo9 = new ProductMedia { MediaUrl = "https://blob.example/product-photos/f5519-001-9.webp" };
+        var main = new ProductMedia { MediaUrl = Black001 };
+
+        // Shuffled input, and deliberately in an order a plain alphabetical sort of the URL would
+        // have reproduced anyway ("...-10" < "...-2" < "...-9" as strings) — if the fix regressed
+        // back to string ordering, this would still "accidentally" look right unless the
+        // assertions below check the actual DisplayOrder values, not just relative positions.
+        ProductMediaOrderingHelper.NormalizeColorMediaOrdering(new[] { photo10, main, photo9, photo2 });
+
+        Assert.Equal(1, main.DisplayOrder);
+        Assert.True(main.IsColorMain);
+        Assert.Equal(2, photo2.DisplayOrder);
+        Assert.Equal(3, photo9.DisplayOrder);
+        Assert.Equal(4, photo10.DisplayOrder); // numerically last, not alphabetically first among the extras
+        Assert.False(photo2.IsColorMain);
+        Assert.False(photo9.IsColorMain);
+        Assert.False(photo10.IsColorMain);
+    }
+
+    [Theory]
+    [InlineData("https://blob.example/product-photos/101119-029.jpg", null)] // main photo — no number
+    [InlineData("https://blob.example/product-photos/101119-029-2.jpg", 2)]
+    [InlineData("https://blob.example/product-photos/101119-029-20.jpg", 20)]
+    [InlineData("https://blob.example/product-photos/101119-029-zip-pocket.jpg", null)] // never silently parsed as a number
+    public void GetExtraPhotoNumber_MatchesTryParsePhotoFileNamesOwnRules(string url, int? expected)
+    {
+        Assert.Equal(expected, ProductMediaOrderingHelper.GetExtraPhotoNumber(url));
     }
 
     private static (ApplicationDbContext Context, SqliteConnection Connection) CreateContext()

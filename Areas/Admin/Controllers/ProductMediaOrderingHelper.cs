@@ -37,9 +37,24 @@ internal static class ProductMediaOrderingHelper
     }
 
     /// <summary>
-    /// Re-derives IsColorMain and a clean, gapless DisplayOrder (main first, then every other
-    /// real photo ordered by filename) for one color's ProductMedia rows, from each row's own
-    /// MediaUrl alone — never from upload order, a count of "real" rows seen so far, or any
+    /// The "-N" extra-photo number from an already-uploaded blob URL's filename (e.g. 2 for
+    /// "...-2.webp"), for ordering a color's gallery numerically (2, 3, ..., 20) rather than
+    /// alphabetically by URL — plain string ordering would put "-10" before "-2". Null for the
+    /// main photo (no suffix) or anything that doesn't carry a numeric suffix at all; Upload()
+    /// already refuses to store a non-numeric or out-of-range suffix in the first place, so this
+    /// is only a safe fallback for legacy rows that might predate that validation.
+    /// </summary>
+    internal static int? GetExtraPhotoNumber(string mediaUrl)
+    {
+        var fileName = mediaUrl.Split('/').Last();
+        var match = ProductPhotosController.FileNamePattern.Match(fileName);
+        return match.Success && match.Groups["n"].Success ? int.Parse(match.Groups["n"].Value) : null;
+    }
+
+    /// <summary>
+    /// Re-derives IsColorMain and a clean, gapless DisplayOrder (main first, then every extra
+    /// photo numerically by its "-N" suffix) for one color's ProductMedia rows, from each row's
+    /// own MediaUrl alone — never from upload order, a count of "real" rows seen so far, or any
     /// previously-stored IsColorMain/DisplayOrder value. That's deliberate: those were exactly
     /// the inputs the original bug got wrong (see ProductPhotosController.Upload's remarks on
     /// GetMediaForColorAsync), and a fix built the same way would only have been correct going
@@ -54,6 +69,11 @@ internal static class ProductMediaOrderingHelper
         var ordered = colorMedia
             .Where(m => m.MediaUrl != PlaceholderMediaUrl)
             .OrderByDescending(m => IsMainMediaUrl(m.MediaUrl))
+            // Numeric, not alphabetical — "-10" must sort after "-9", not between "-1" and "-2".
+            // GetExtraPhotoNumber only returns null for a row with no parseable suffix at all
+            // (shouldn't happen for anything Upload() stored after its own validation), in which
+            // case the MediaUrl tiebreak below just keeps a stable, deterministic order.
+            .ThenBy(m => GetExtraPhotoNumber(m.MediaUrl) ?? int.MaxValue)
             .ThenBy(m => m.MediaUrl, StringComparer.OrdinalIgnoreCase)
             .ToList();
 

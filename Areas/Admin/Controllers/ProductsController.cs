@@ -207,6 +207,11 @@ public class ProductsController : AdminBaseController
             .Where(pc => pc.ProductId == id)
             .OrderBy(pc => pc.DisplayOrder)
             .ToListAsync();
+        // Already fetched (and just normalized) above — reused here so the "Color Photos"
+        // section of the view can show each color's extra (non-main) photos without a second
+        // query. Already reflects the normalization that just ran, since these are the same
+        // tracked entities.
+        ViewBag.ProductMedia = productMediaWithColor;
         return View(product);
     }
 

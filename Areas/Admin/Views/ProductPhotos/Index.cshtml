@@ -5,7 +5,7 @@
 }
 
 <h1>@Localizer["Product Photos"]</h1>
-<p class="text-muted">@Localizer["Bulk-upload vendor product photos. Files must be named with the vendor's own SKU-color code (e.g. Condor's \"101228-002.webp\") — each is matched to a Product by its Vendor SKU and a color by its Vendor Color Code, and the matching image is saved and linked automatically."]</p>
+<p class="text-muted">@Localizer["Bulk-upload vendor product photos. Files must be named with the vendor's own SKU-color code (e.g. Condor's \"101228-002.webp\") as the color's main photo, or the same name with \"-2\" through \"-20\" (e.g. \"101228-002-2.webp\") as extra gallery photos for that color — each is matched to a Product by its Vendor SKU and a color by its Vendor Color Code, and the matching image is saved and linked automatically."]</p>
 
 @if (Model.HasActivity)
 {
